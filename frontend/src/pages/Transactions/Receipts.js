@@ -163,7 +163,7 @@ const Receipts = () => {
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">Receipt Number:</Typography>
               <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                RCPT-{selectedInvoice?.id.hex[:6].toUpperCase()}
+                RCPT-{selectedInvoice?.id.substring(0, 6).toUpperCase()}
               </Typography>
             </Grid>
             <Grid item xs={6} sx={{ textAlign: 'right' }}>

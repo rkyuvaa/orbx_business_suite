@@ -218,7 +218,7 @@ const Sales = () => {
     {
       id: 'sales_order_id',
       label: 'SO Ref ID',
-      render: (row) => `SO-${row.sales_order_id.hex[:6].toUpperCase()}`
+      render: (row) => `SO-${row.sales_order_id.substring(0, 6).toUpperCase()}`
     },
     { id: 'qty_delivered', label: 'Shipped Qty' },
     { id: 'delivery_note', label: 'Logistics Notes' }
@@ -483,7 +483,7 @@ const Sales = () => {
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Typography variant="body1">
-            Order Ref: <strong>SO-{selectedSO?.id.hex[:6].toUpperCase()}</strong>
+            Order Ref: <strong>SO-{selectedSO?.id.substring(0, 6).toUpperCase()}</strong>
           </Typography>
           <TextField
             label="Logistics Note / Airway Bill"
@@ -505,7 +505,7 @@ const Sales = () => {
         title="Create Tax Invoice"
       >
         <Typography variant="body1" sx={{ mb: 3 }}>
-          Generating sequential tax invoice for order: <strong>SO-{selectedSO?.id.hex[:6].toUpperCase()}</strong>
+          Generating sequential tax invoice for order: <strong>SO-{selectedSO?.id.substring(0, 6).toUpperCase()}</strong>
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button onClick={() => setOpenInvoiceModal(false)} variant="outlined">Cancel</Button>

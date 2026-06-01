@@ -154,7 +154,7 @@ const Purchase = () => {
   // ==========================================
   const handleOpenBill = (grn) => {
     setSelectedGRN(grn);
-    setBillInvoiceNo(f"INV-{grn.id.hex[:6].toUpperCase()}");
+    setBillInvoiceNo(`INV-${grn.id.substring(0, 6).toUpperCase()}`);
     setBillDueDate(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
     setOpenBillModal(true);
   };
@@ -232,7 +232,7 @@ const Purchase = () => {
     {
       id: 'purchase_order_id',
       label: 'Linked PO Ref',
-      render: (row) => `PO-${row.purchase_order_id.hex[:6].toUpperCase()}`
+      render: (row) => `PO-${row.purchase_order_id.substring(0, 6).toUpperCase()}`
     },
     {
       id: 'branch_id',
@@ -498,7 +498,7 @@ const Purchase = () => {
         maxWidth="md"
       >
         <Typography variant="body1" sx={{ mb: 3 }}>
-          Order reference: <strong>PO-{selectedPO?.id.hex[:6].toUpperCase()}</strong>
+          Order reference: <strong>PO-{selectedPO?.id.substring(0, 6).toUpperCase()}</strong>
         </Typography>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>

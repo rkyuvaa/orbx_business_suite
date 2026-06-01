@@ -367,4 +367,3 @@ const Products = () => {
 };
 
 export default Products;
- Pals
