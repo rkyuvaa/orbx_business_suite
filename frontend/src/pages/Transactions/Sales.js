@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import {
   Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField,
-  Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider
+  Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer
 } from '@mui/material';
 import {
   Add as AddIcon, Delete as DeleteIcon, LocalShipping as ShipIcon,
