@@ -12,9 +12,9 @@ class Company(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     logo: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Store base64 or file path
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    gstin: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+    gstin: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     financial_year_start: Mapped[Optional[str]] = mapped_column(String(10), nullable=True) # e.g. "2026-04-01"
 
     # Relationships
@@ -48,8 +48,8 @@ class Customer(Base):
 
     name: Mapped[str] = mapped_column(String(100), index=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    gstin: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    gstin: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     billing_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     shipping_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -67,8 +67,8 @@ class Supplier(Base):
 
     name: Mapped[str] = mapped_column(String(100), index=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    gstin: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    gstin: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
