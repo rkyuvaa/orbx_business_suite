@@ -1,0 +1,178 @@
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from uuid import UUID
+from pydantic import BaseModel, EmailStr
+
+
+# Customer Schemas
+class CustomerCreate(BaseModel):
+    name: str
+    code: str
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    credit_limit: float = 0.0
+    payment_terms: Optional[str] = None
+    branch_id: Optional[UUID] = None
+
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    credit_limit: Optional[float] = None
+    payment_terms: Optional[str] = None
+    branch_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+
+
+class CustomerOut(BaseModel):
+    id: UUID
+    name: str
+    code: str
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    credit_limit: float
+    payment_terms: Optional[str] = None
+    branch_id: Optional[UUID] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Supplier Schemas
+class SupplierCreate(BaseModel):
+    name: str
+    code: str
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    address: Optional[str] = None
+    payment_terms: Optional[str] = None
+    bank_details: Optional[Dict[str, Any]] = None  # JSON format (bank_name, account_no, ifsc)
+    branch_id: Optional[UUID] = None
+
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    address: Optional[str] = None
+    payment_terms: Optional[str] = None
+    bank_details: Optional[Dict[str, Any]] = None
+    branch_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+
+
+class SupplierOut(BaseModel):
+    id: UUID
+    name: str
+    code: str
+    gstin: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    address: Optional[str] = None
+    payment_terms: Optional[str] = None
+    bank_details: Optional[Dict[str, Any]] = None
+    branch_id: Optional[UUID] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Category Schemas
+class ProductCategoryCreate(BaseModel):
+    name: str
+    parent_id: Optional[UUID] = None
+    description: Optional[str] = None
+
+
+class ProductCategoryOut(BaseModel):
+    id: UUID
+    name: str
+    parent_id: Optional[UUID] = None
+    description: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# Product Pricing Schemas
+class ProductPricingCreate(BaseModel):
+    branch_id: Optional[UUID] = None
+    customer_group: Optional[str] = None
+    price_override: float
+
+
+class ProductPricingOut(BaseModel):
+    id: UUID
+    product_id: UUID
+    branch_id: Optional[UUID] = None
+    customer_group: Optional[str] = None
+    price_override: float
+
+    class Config:
+        from_attributes = True
+
+
+# Product Schemas
+class ProductCreate(BaseModel):
+    name: str
+    sku: str
+    category_id: UUID
+    uom: str = "PCS"
+    hsn_code: Optional[str] = None
+    tax_rate: float = 18.0
+    purchase_price: float = 0.0
+    selling_price: float = 0.0
+    min_stock_level: float = 0.0
+    pricing_overrides: Optional[List[ProductPricingCreate]] = None
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    sku: Optional[str] = None
+    category_id: Optional[UUID] = None
+    uom: Optional[str] = None
+    hsn_code: Optional[str] = None
+    tax_rate: Optional[float] = None
+    purchase_price: Optional[float] = None
+    selling_price: Optional[float] = None
+    min_stock_level: Optional[float] = None
+    is_active: Optional[bool] = None
+    pricing_overrides: Optional[List[ProductPricingCreate]] = None
+
+
+class ProductOut(BaseModel):
+    id: UUID
+    name: str
+    sku: str
+    category_id: UUID
+    uom: str
+    hsn_code: Optional[str] = None
+    tax_rate: float
+    purchase_price: float
+    selling_price: float
+    min_stock_level: float
+    pricing_overrides: List[ProductPricingOut] = []
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

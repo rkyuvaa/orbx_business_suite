@@ -1,0 +1,83 @@
+from typing import List, Optional
+from uuid import UUID
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core import deps
+from app.schemas.transaction import (
+    PurchaseOrderOut, PurchaseOrderCreate,
+    GRNOut, GRNCreate,
+    PurchaseEntryOut, PurchaseEntryCreate
+)
+from app.services.tx_services import TxServices
+
+router = APIRouter()
+
+
+# ==========================================
+# PURCHASE ORDERS ENDPOINTS
+# ==========================================
+@router.get("/po", response_model=List[PurchaseOrderOut])
+async def list_purchase_orders(
+    branch_id: Optional[UUID] = Query(None, description="Filter POs by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """Retrieve lists of purchase orders."""
+    return await TxServices.list_purchase_orders(db, branch_id)
+
+
+@router.post("/po", response_model=PurchaseOrderOut, status_code=status.HTTP_201_CREATED)
+async def create_purchase_order(
+    po_data: PurchaseOrderCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Create a new Purchase Order."""
+    return await TxServices.create_purchase_order(db, po_data)
+
+
+# ==========================================
+# GOODS RECEIPT NOTES (GRN) ENDPOINTS
+# ==========================================
+@router.get("/grn", response_model=List[GRNOut])
+async def list_grns(
+    branch_id: Optional[UUID] = Query(None, description="Filter GRNs by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """List all Goods Receipt Notes."""
+    return await TxServices.list_grns(db, branch_id)
+
+
+@router.post("/grn", response_model=GRNOut, status_code=status.HTTP_201_CREATED)
+async def create_grn(
+    grn_data: GRNCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Record a Goods Receipt Note and increment active stock positions."""
+    return await TxServices.create_grn(db, grn_data, current_user.id)
+
+
+# ==========================================
+# PURCHASE ENTRIES (BILLS) ENDPOINTS
+# ==========================================
+@router.get("/bills", response_model=List[PurchaseEntryOut])
+async def list_bills(
+    branch_id: Optional[UUID] = Query(None, description="Filter bills by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """List all purchase entries/bills."""
+    return await TxServices.list_purchase_entries(db, branch_id)
+
+
+@router.post("/bills", response_model=PurchaseEntryOut, status_code=status.HTTP_201_CREATED)
+async def create_bill(
+    entry_data: PurchaseEntryCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Log a supplier invoice bill."""
+    return await TxServices.create_purchase_entry(db, entry_data)
