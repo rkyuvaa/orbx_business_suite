@@ -12,6 +12,6 @@ alembic upgrade head
 
 # 2. Run db seeder script
 echo "Seeding initial masters, roles, permissions, and admin user..."
-python app/db/init_db.py
+PYTHONPATH=. python app/db/init_db.py
 
 echo "Database setup successfully completed!"
