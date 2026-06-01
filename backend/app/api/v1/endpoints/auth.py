@@ -7,7 +7,6 @@ from jose import jwt, JWTError
 from app.core import deps
 from app.core.config import settings
 from app.core.security import ALGORITHM
-from app.db.session import get_db
 from app.models.auth import User, Role
 from app.schemas.auth import UserLogin, Token, UserOut, TokenPayload
 from app.services.auth_service import AuthService
