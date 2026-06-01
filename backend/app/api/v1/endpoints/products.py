@@ -77,4 +77,3 @@ async def update_product(
 ):
     """Update product SKU parameters or pricing overrides."""
     return await MasterServices.update_product(db, product_id, product_data)
- Pals
