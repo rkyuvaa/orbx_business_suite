@@ -648,7 +648,7 @@ const Sales = () => {
           sx={{
             width: '180mm',
             minHeight: '265mm',
-            p: 4,
+            p: '0mm',
             mx: 'auto',
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
@@ -669,40 +669,42 @@ const Sales = () => {
           }}
         >
           {/* Header */}
-          <Grid container justifyContent="space-between" sx={{ mb: 3 }}>
-            <Grid item>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
-                {company?.name || 'ORBX CORPORATION'}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+            <Box>
+              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
+                {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address}</Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin}</strong></Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Email: {company?.email} | Phone: {company?.phone}</Typography>
-            </Grid>
-            <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address ? company.address.trim() : ''}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin ? company.gstin.trim() : ''}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                Email: {company?.email ? company.email.trim() : ''} | Phone: {company?.phone ? company.phone.trim() : ''}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
                 TAX INVOICE
               </Typography>
               <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
               <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Billing Date: <strong>{selectedInvoice ? formatBillingDate(selectedInvoice.date) : ''}</strong></Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Divider sx={{ mb: 2 }} />
 
           {/* Addresses */}
-          <Grid container spacing={4} sx={{ mb: 3 }}>
-            <Grid item xs={6}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+            <Box sx={{ width: '48%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>BILL TO:</Typography>
               <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
               <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_billing_address}</Typography>
               <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
-            </Grid>
-            <Grid item xs={6}>
+            </Box>
+            <Box sx={{ width: '48%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>SHIP TO:</Typography>
               <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
               <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_shipping_address}</Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           {/* Items Grid */}
           {(() => {
@@ -744,49 +746,49 @@ const Sales = () => {
           })()}
 
           {/* Summary / Totals */}
-          <Grid container justifyContent="space-between" sx={{ mb: 3 }}>
-            <Grid item xs={6}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+            <Box sx={{ width: '50%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>Terms & Conditions:</Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
                 {printBranch?.invoice_terms}
               </Typography>
-            </Grid>
-            <Grid item xs={5} sx={{ textAlign: 'right' }}>
+            </Box>
+            <Box sx={{ width: '42%', textAlign: 'right' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
-                <Typography variant="body2">Subtotal:</Typography>
+                <Typography variant="body2" sx={{ textAlign: 'left' }}>Subtotal:</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
                 
                 {selectedInvoice?.discount_amount > 0 && (
                   <>
-                    <Typography variant="body2">Discount:</Typography>
+                    <Typography variant="body2" sx={{ textAlign: 'left' }}>Discount:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{selectedInvoice.discount_amount.toFixed(2)}</Typography>
                   </>
                 )}
 
                 {selectedInvoice?.gst_breakup?.cgst > 0 && (
                   <>
-                    <Typography variant="body2">CGST:</Typography>
+                    <Typography variant="body2" sx={{ textAlign: 'left' }}>CGST:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
                   </>
                 )}
 
                 {selectedInvoice?.gst_breakup?.sgst > 0 && (
                   <>
-                    <Typography variant="body2">SGST:</Typography>
+                    <Typography variant="body2" sx={{ textAlign: 'left' }}>SGST:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
                   </>
                 )}
 
                 {selectedInvoice?.gst_breakup?.igst > 0 && (
                   <>
-                    <Typography variant="body2">IGST:</Typography>
+                    <Typography variant="body2" sx={{ textAlign: 'left' }}>IGST:</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
                   </>
                 )}
               </Box>
               <Divider sx={{ my: 1 }} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.9rem' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'left' }}>Grand Total:</Typography>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
                   ₹{selectedInvoice?.total_amount?.toFixed(2)}
                 </Typography>
@@ -796,22 +798,22 @@ const Sales = () => {
                   Rupees: {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
                 </Typography>
               </Box>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Divider sx={{ mb: 3 }} />
 
           {/* Signatures & Footer */}
-          <Grid container justifyContent="space-between" sx={{ mt: 3 }}>
-            <Grid item>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 3 }}>
+            <Box>
               <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Customer Signature</Typography>
               <Box sx={{ height: 35, borderBottom: '1px solid #000000', width: 150 }} />
-            </Grid>
-            <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Authorized Signatory for {company?.name}</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Authorized Signatory for {company?.name ? company.name.trim() : ''}</Typography>
               <Box sx={{ height: 35, borderBottom: '1px solid #000000', width: 150, ml: 'auto' }} />
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
