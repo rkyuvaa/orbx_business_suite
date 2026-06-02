@@ -7,6 +7,9 @@ COPY package.json /app/package.json
 RUN npm install --silent
 
 COPY . /app
+# Optimize React build for low-resource environments (AWS EC2)
+ENV GENERATE_SOURCEMAP=false
+ENV DISABLE_ESLINT_PLUGIN=true
 RUN npm run build
 
 # Stage 2: Production Nginx Server
