@@ -1,27 +1,24 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import fs from 'fs';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Tell Babel/React plugin to compile JSX in normal .js files
+      include: /\.(js|jsx)$/,
+    }),
+  ],
   esbuild: {
+    // Tell esbuild to parse JSX in .js files
     loader: 'jsx',
     include: /src\/.*\.js$/,
     exclude: [],
   },
   optimizeDeps: {
     esbuildOptions: {
-      plugins: [
-        {
-          name: 'load-js-files-as-jsx',
-          setup(build) {
-            build.onLoad({ filter: /src\/.*\.js$/ }, async (args) => ({
-              loader: 'jsx',
-              contents: await fs.promises.readFile(args.path, 'utf8'),
-            }));
-          },
-        },
-      ],
+      loader: {
+        '.js': 'jsx',
+      },
     },
   },
   server: {
