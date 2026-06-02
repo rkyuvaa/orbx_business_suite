@@ -708,17 +708,17 @@ const Sales = () => {
             const hasDiscount = selectedInvoice?.items?.some(item => (item.discount_amount || 0) > 0) || false;
             return (
               <TableContainer sx={{ mb: 3 }}>
-                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1, fontSize: '0.85rem' } }}>
+                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, fontSize: '0.85rem' } }}>
                   <TableHead>
-                    <TableRow sx={{ borderTop: '2px solid #000000', borderBottom: '2px solid #000000' }}>
-                      <TableCell sx={{ fontWeight: 700, width: '6%' }}>S.No.</TableCell>
-                      <TableCell sx={{ fontWeight: 700, width: '44%' }}>Item Description</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: '12%' }}>HSN</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: '7%' }}>Qty</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: '11%' }}>Rate (₹)</TableCell>
-                      {hasDiscount && <TableCell align="center" sx={{ fontWeight: 700, width: '10%' }}>Disc (₹)</TableCell>}
-                      <TableCell align="center" sx={{ fontWeight: 700, width: '8%' }}>GST %</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, width: '12%' }}>Amount (₹)</TableCell>
+                    <TableRow sx={{ borderTop: '1.5px solid #000000', borderBottom: '1.5px solid #000000' }}>
+                      <TableCell sx={{ fontWeight: 700, width: '5%', whiteSpace: 'nowrap' }}>S.No.</TableCell>
+                      <TableCell sx={{ fontWeight: 700, width: '40%', whiteSpace: 'nowrap' }}>Item Description</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '12%', whiteSpace: 'nowrap' }}>HSN</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '8%', whiteSpace: 'nowrap' }}>Qty</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '12%', whiteSpace: 'nowrap' }}>Rate (₹)</TableCell>
+                      {hasDiscount && <TableCell align="center" sx={{ fontWeight: 700, width: '10%', whiteSpace: 'nowrap' }}>Disc (₹)</TableCell>}
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '10%', whiteSpace: 'nowrap' }}>GST %</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, width: '13%', whiteSpace: 'nowrap' }}>Amount (₹)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
