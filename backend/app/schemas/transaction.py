@@ -18,6 +18,8 @@ class PurchaseOrderItemOut(BaseModel):
     id: UUID
     purchase_order_id: UUID
     product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
     qty: float
     rate: float
     tax_rate: float
@@ -38,6 +40,7 @@ class PurchaseOrderCreate(BaseModel):
 class PurchaseOrderOut(BaseModel):
     id: UUID
     supplier_id: UUID
+    supplier_name: Optional[str] = None
     branch_id: UUID
     date: datetime
     expected_delivery: Optional[datetime] = None
@@ -107,6 +110,7 @@ class PurchaseEntryOut(BaseModel):
     id: UUID
     grn_id: Optional[UUID] = None
     supplier_id: UUID
+    supplier_name: Optional[str] = None
     branch_id: UUID
     invoice_number: str
     billing_date: datetime
@@ -172,6 +176,8 @@ class SalesOrderItemOut(BaseModel):
     id: UUID
     sales_order_id: UUID
     product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
     qty: float
     rate: float
     discount_amount: float
@@ -192,6 +198,7 @@ class SalesOrderCreate(BaseModel):
 class SalesOrderOut(BaseModel):
     id: UUID
     customer_id: UUID
+    customer_name: Optional[str] = None
     branch_id: UUID
     date: datetime
     status: str
@@ -209,6 +216,8 @@ class InvoiceItemOut(BaseModel):
     id: UUID
     invoice_id: UUID
     product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
     qty: float
     rate: float
     discount_amount: float
@@ -228,6 +237,11 @@ class InvoiceCreate(BaseModel):
 class InvoiceOut(BaseModel):
     id: UUID
     sales_order_id: Optional[UUID] = None
+    customer_name: Optional[str] = None
+    customer_id: Optional[UUID] = None
+    customer_gstin: Optional[str] = None
+    customer_billing_address: Optional[str] = None
+    customer_shipping_address: Optional[str] = None
     branch_id: UUID
     invoice_number: str
     date: datetime
@@ -343,3 +357,20 @@ class DashboardResponse(BaseModel):
     monthly_sales_trend: List[MonthlySalesTrendOut]
     top_products: List[TopProductSalesOut]
     recent_transactions: List[RecentTransactionOut]
+
+
+class PaymentReceiptListOut(BaseModel):
+    id: UUID
+    customer_id: UUID
+    customer_name: Optional[str] = None
+    invoice_id: Optional[UUID] = None
+    invoice_number: Optional[str] = None
+    receipt_number: Optional[str] = None
+    payment_date: datetime
+    payment_mode: str
+    reference_number: Optional[str] = None
+    amount_paid: float
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True

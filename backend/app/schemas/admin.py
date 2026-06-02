@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # Company Schemas
@@ -28,6 +28,20 @@ class CompanyUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     financial_year_start: Optional[str] = None
+
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def capitalize_gstin(cls, v):
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lowercase_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 
 # Branch Schemas

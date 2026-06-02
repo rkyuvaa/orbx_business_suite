@@ -6,14 +6,13 @@ import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
+import FormAutocomplete from '../../components/FormAutocomplete';
 
 const Purchase = () => {
   const [tabIndex, setTabIndex] = useState(0);
   const [pos, setPos] = useState([]);
   const [grns, setGrns] = useState([]);
   const [bills, setBills] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
   const [branches, setBranches] = useState([]);
   
   const [openPOModal, setOpenPOModal] = useState(false);
@@ -42,15 +41,11 @@ const Purchase = () => {
       const poRes = await apiClient.get('/purchase/po');
       const grnRes = await apiClient.get('/purchase/grn');
       const billRes = await apiClient.get('/purchase/bills');
-      const prodRes = await apiClient.get('/products/');
-      const supRes = await apiClient.get('/suppliers/');
       const brRes = await apiClient.get('/admin/branches');
 
       setPos(poRes.data);
       setGrns(grnRes.data);
       setBills(billRes.data);
-      setProducts(prodRes.data);
-      setSuppliers(supRes.data);
       setBranches(brRes.data);
     } catch (err) {
       setError('Failed to load transaction data records.');
@@ -117,6 +112,7 @@ const Purchase = () => {
     setSelectedPO(po);
     const items = po.items.map((item) => ({
       product_id: item.product_id,
+      product_name: item.product_name,
       po_item_id: item.id,
       qty_ordered: item.qty,
       qty_received: item.qty,
@@ -186,12 +182,9 @@ const Purchase = () => {
   const poColumns = [
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
-      id: 'supplier_id',
-      label: 'Supplier',
-      render: (row) => {
-        const s = suppliers.find((sup) => sup.id === row.supplier_id);
-        return s ? s.name : 'Unknown';
-      }
+      id: 'supplier_name',
+      label: 'Supplier Vendor',
+      render: (row) => row.supplier_name || 'Unknown'
     },
     {
       id: 'branch_id',
@@ -201,7 +194,7 @@ const Purchase = () => {
         return b ? b.branch_name : 'Global';
       }
     },
-    { id: 'grand_total', label: 'Total Value', render: (row) => `$${row.grand_total.toFixed(2)}` },
+    { id: 'grand_total', label: 'Total Value (₹)', render: (row) => `₹${row.grand_total.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -267,14 +260,11 @@ const Purchase = () => {
     { id: 'billing_date', label: 'Bill Date', render: (row) => new Date(row.billing_date).toLocaleDateString() },
     { id: 'invoice_number', label: 'Supplier Invoice #' },
     {
-      id: 'supplier_id',
+      id: 'supplier_name',
       label: 'Supplier Name',
-      render: (row) => {
-        const s = suppliers.find((sup) => sup.id === row.supplier_id);
-        return s ? s.name : 'Unknown';
-      }
+      render: (row) => row.supplier_name || 'Unknown'
     },
-    { id: 'total_amount', label: 'Bill Value', render: (row) => `$${row.total_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Bill Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
     {
       id: 'status',
       label: 'Payment Status',
@@ -367,17 +357,12 @@ const Purchase = () => {
       >
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Supplier Vendor"
-              fullWidth
+            <FormAutocomplete
+              label="Select Supplier"
+              endpoint="/suppliers/"
               value={poSupplierId}
-              onChange={(e) => setPoSupplierId(e.target.value)}
-            >
-              {suppliers.map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.name} ({s.code})</MenuItem>
-              ))}
-            </TextField>
+              onChange={(val) => setPoSupplierId(val)}
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -404,27 +389,37 @@ const Purchase = () => {
               <TableRow sx={{ backgroundColor: '#f8fafc' }}>
                 <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>Qty</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 140 }}>Rate ($)</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, width: 140 }}>Rate (₹)</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>GST %</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Total ($)</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>Total (₹)</TableCell>
                 <TableCell align="center" sx={{ width: 60 }}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {poItems.map((item, idx) => (
                 <TableRow key={idx}>
-                  <TableCell>
-                    <TextField
-                      select
-                      size="small"
-                      fullWidth
+                  <TableCell sx={{ minWidth: 240 }}>
+                    <FormAutocomplete
+                      label="Select Product"
+                      endpoint="/products/"
                       value={item.product_id}
-                      onChange={(e) => handleItemChange(idx, 'product_id', e.target.value)}
-                    >
-                      {products.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                      ))}
-                    </TextField>
+                      onChange={(val) => handleItemChange(idx, 'product_id', val)}
+                      onChangeOverride={(prodObj) => {
+                        if (prodObj) {
+                          setPoItems(prevItems => prevItems.map((it, i) => {
+                            if (i === idx) {
+                              return {
+                                ...it,
+                                product_id: prodObj.id,
+                                rate: prodObj.purchase_price,
+                                tax_rate: prodObj.tax_rate
+                              };
+                            }
+                            return it;
+                          }));
+                        }
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <TextField
@@ -469,9 +464,9 @@ const Purchase = () => {
         </Button>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2, mb: 4 }}>
-          <Typography variant="body1">Subtotal: <strong>${poTotalAmountSum.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Taxes (GST): <strong>${poTotalTaxSum.toFixed(2)}</strong></Typography>
-          <Typography variant="h6" color="primary.main">Grand Total: <strong>${(poTotalAmountSum + poTotalTaxSum).toFixed(2)}</strong></Typography>
+          <Typography variant="body1">Subtotal: <strong>₹{poTotalAmountSum.toFixed(2)}</strong></Typography>
+          <Typography variant="body1">Taxes (GST): <strong>₹{poTotalTaxSum.toFixed(2)}</strong></Typography>
+          <Typography variant="h6" color="primary.main">Grand Total: <strong>₹{(poTotalAmountSum + poTotalTaxSum).toFixed(2)}</strong></Typography>
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -503,10 +498,9 @@ const Purchase = () => {
             </TableHead>
             <TableBody>
               {grnItems.map((item, idx) => {
-                const prod = products.find((p) => p.id === item.product_id);
                 return (
                   <TableRow key={idx}>
-                    <TableCell sx={{ fontWeight: 600 }}>{prod ? prod.name : 'Unknown'}</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</TableCell>
                     <TableCell align="center">{item.qty_ordered}</TableCell>
                     <TableCell align="center">
                       <TextField

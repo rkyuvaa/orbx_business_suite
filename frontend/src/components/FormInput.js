@@ -31,7 +31,20 @@ const FormInput = ({
           rows={rows}
           select={type === 'select'}
           value={value}
-          onChange={onChange}
+          onChange={(e) => {
+            let val = e.target.value;
+            if (name.toLowerCase() === 'gstin') {
+              val = val.toUpperCase();
+            } else if (type === 'email' || name.toLowerCase() === 'email') {
+              val = val.toLowerCase();
+            }
+            onChange(val);
+          }}
+          inputProps={{
+            style: {
+              textTransform: name.toLowerCase() === 'gstin' ? 'uppercase' : 'none'
+            }
+          }}
           disabled={disabled}
           fullWidth={fullWidth}
           size={size}

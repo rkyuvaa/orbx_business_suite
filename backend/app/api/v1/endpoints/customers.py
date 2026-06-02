@@ -13,11 +13,12 @@ router = APIRouter()
 @router.get("/", response_model=List[CustomerOut])
 async def list_customers(
     branch_id: Optional[UUID] = Query(None, description="Filter customers by branch"),
+    search: Optional[str] = Query(None, description="Search term for name or code"),
     db: AsyncSession = Depends(deps.get_db),
     current_user = Depends(deps.PermissionChecker("masters", "view"))
 ):
     """Retrieve list of customers."""
-    return await MasterServices.list_customers(db, branch_id)
+    return await MasterServices.list_customers(db, branch_id, search)
 
 
 @router.post("/", response_model=CustomerOut, status_code=status.HTTP_201_CREATED)

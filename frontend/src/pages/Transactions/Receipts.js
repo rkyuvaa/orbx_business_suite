@@ -1,34 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import { Button, Box, Alert, Paper, Typography, Grid, Divider, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
+import { Button, Box, Alert, Paper, Typography, Grid, Divider } from '@mui/material';
 import { Print as PrintIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
-import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
 
 const Receipts = () => {
-  const [invoices, setInvoices] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [company, setCompany] = useState(null);
   
   const [openPrintModal, setOpenPrintModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
 
   const [error, setError] = useState(null);
   const printRef = useRef();
 
   const loadData = async () => {
     try {
-      // List invoices that have some payment history
-      const invRes = await apiClient.get('/sales/invoices');
-      const custRes = await apiClient.get('/customers/');
+      const payRes = await apiClient.get('/payments/');
       const compRes = await apiClient.get('/admin/company');
       
-      const paidInvoices = invRes.data.filter((i) => i.status === 'Paid' || i.status === 'PartiallyPaid');
-      setInvoices(paidInvoices);
-      setCustomers(custRes.data);
+      setPayments(payRes.data);
       setCompany(compRes.data);
     } catch (err) {
       setError('Failed to load payment receipt records.');
@@ -39,8 +33,8 @@ const Receipts = () => {
     loadData();
   }, []);
 
-  const handleOpenPrint = (inv) => {
-    setSelectedInvoice(inv);
+  const handleOpenPrint = (payment) => {
+    setSelectedPayment(payment);
     setOpenPrintModal(true);
   };
 
@@ -48,9 +42,9 @@ const Receipts = () => {
     content: () => printRef.current,
   });
 
-  // Simple number-to-words generator for Dollars
+  // Simple number-to-words generator for Rupees
   const numberToWords = (num) => {
-    if (num === 0) return 'Zero Dollars Only';
+    if (num === 0) return 'Zero Rupees Only';
     const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     
@@ -61,28 +55,43 @@ const Receipts = () => {
       return '';
     };
 
-    const dollars = Math.floor(num);
-    const cents = Math.round((num - dollars) * 100);
+    const rupees = Math.floor(num);
+    const paise = Math.round((num - rupees) * 100);
     
-    let word = convert(dollars) + ' Dollars';
-    if (cents > 0) {
-      word += ' and ' + convert(cents) + ' Cents';
+    let word = convert(rupees) + ' Rupees';
+    if (paise > 0) {
+      word += ' and ' + convert(paise) + ' Paise';
     }
     return word + ' Only';
   };
 
   const columns = [
-    { id: 'invoice_number', label: 'Linked Invoice #' },
+    { id: 'receipt_number', label: 'Receipt Number', render: (row) => row.receipt_number || 'N/A' },
     {
-      id: 'customer',
-      label: 'Customer Name',
-      render: (row) => {
-        // Find matching customer
-        return 'Corporate Client';
-      }
+      id: 'invoice_number',
+      label: 'Linked Invoice #',
+      render: (row) => row.invoice_number || (
+        <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic', fontWeight: 500 }}>
+          Advance Payment
+        </Typography>
+      )
     },
-    { id: 'date', label: 'Payment Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    { id: 'total_amount', label: 'Amount Cleared', render: (row) => `$${row.total_amount.toFixed(2)}` },
+    {
+      id: 'customer_name',
+      label: 'Customer Name',
+      render: (row) => row.customer_name || 'Unknown'
+    },
+    { 
+      id: 'payment_date', 
+      label: 'Payment Date', 
+      render: (row) => new Date(row.payment_date).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }) 
+    },
+    { id: 'amount_paid', label: 'Amount Paid (₹)', render: (row) => `₹${row.amount_paid.toFixed(2)}` },
+    { id: 'payment_mode', label: 'Payment Mode', render: (row) => row.payment_mode ? row.payment_mode.toUpperCase() : 'N/A' },
   ];
 
   return (
@@ -95,7 +104,7 @@ const Receipts = () => {
 
       <CommonTable
         columns={columns}
-        rows={invoices}
+        rows={payments}
         actions={[
           {
             icon: <PrintIcon />,
@@ -104,7 +113,8 @@ const Receipts = () => {
             color: 'primary'
           }
         ]}
-        searchKey="invoice_number"
+        searchKey="receipt_number"
+        searchPlaceholder="Search by receipt number..."
       />
 
       <CommonModal
@@ -155,13 +165,13 @@ const Receipts = () => {
             <Grid item xs={6}>
               <Typography variant="body2" color="text.secondary">Receipt Number:</Typography>
               <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                RCPT-{selectedInvoice?.id.substring(0, 6).toUpperCase()}
+                {selectedPayment?.receipt_number || 'N/A'}
               </Typography>
             </Grid>
             <Grid item xs={6} sx={{ textAlign: 'right' }}>
               <Typography variant="body2" color="text.secondary">Date Received:</Typography>
               <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                {selectedInvoice ? new Date(selectedInvoice.date).toLocaleDateString() : ''}
+                {selectedPayment ? new Date(selectedPayment.payment_date).toLocaleDateString('en-IN') : ''}
               </Typography>
             </Grid>
           </Grid>
@@ -169,23 +179,47 @@ const Receipts = () => {
           <Box sx={{ backgroundColor: '#f8fafc', p: 3, borderRadius: '8px', mb: 3 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 1.5 }}>
               <Typography variant="body2" color="text.secondary">Received From:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>Corporate Client</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {selectedPayment?.customer_name || 'Unknown'}
+              </Typography>
 
               <Typography variant="body2" color="text.secondary">Payment For:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>Invoice {selectedInvoice?.invoice_number}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {selectedPayment?.invoice_number ? `Invoice ${selectedPayment.invoice_number}` : 'Advance Payment (No Invoice)'}
+              </Typography>
 
               <Typography variant="body2" color="text.secondary">Amount Paid:</Typography>
               <Typography variant="body1" color="primary.main" sx={{ fontWeight: 700 }}>
-                ${selectedInvoice?.total_amount?.toFixed(2)}
+                ₹{selectedPayment?.amount_paid?.toFixed(2)}
               </Typography>
 
               <Typography variant="body2" color="text.secondary">Amount in Words:</Typography>
               <Typography variant="body2" sx={{ fontWeight: 600, fontStyle: 'italic' }}>
-                {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
+                {selectedPayment ? numberToWords(selectedPayment.amount_paid) : ''}
               </Typography>
 
               <Typography variant="body2" color="text.secondary">Payment Method:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>UPI / Digital Bank</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                {selectedPayment?.payment_mode || 'N/A'}
+              </Typography>
+
+              {selectedPayment?.reference_number && (
+                <>
+                  <Typography variant="body2" color="text.secondary">Reference #:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedPayment.reference_number}
+                  </Typography>
+                </>
+              )}
+
+              {selectedPayment?.notes && (
+                <>
+                  <Typography variant="body2" color="text.secondary">Notes:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                    {selectedPayment.notes}
+                  </Typography>
+                </>
+              )}
             </Box>
           </Box>
 
@@ -210,3 +244,4 @@ const Receipts = () => {
 };
 
 export default Receipts;
+

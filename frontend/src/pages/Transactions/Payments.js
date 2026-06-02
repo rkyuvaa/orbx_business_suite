@@ -10,10 +10,11 @@ import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
 import FormInput from '../../components/FormInput';
+import FormAutocomplete from '../../components/FormAutocomplete';
 
 const schema = yup.object().shape({
   customer_id: yup.string().required('Customer is required'),
-  invoice_id: yup.string().required('Invoice is required'),
+  invoice_id: yup.string().nullable().optional(),
   payment_mode: yup.string().required('Payment mode is required'),
   reference_number: yup.string().nullable(),
   amount_paid: yup.number().typeError('Must be a number').required('Amount is required'),
@@ -22,9 +23,6 @@ const schema = yup.object().shape({
 
 const Payments = () => {
   const [outstandings, setOutstandings] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [invoices, setInvoices] = useState([]);
   const [openModal, setOpenModal] = useState(false);
   const [error, setError] = useState(null);
 
@@ -38,11 +36,7 @@ const Payments = () => {
   const loadData = async () => {
     try {
       const oRes = await apiClient.get('/payments/outstanding');
-      const cRes = await apiClient.get('/customers/');
-      const iRes = await apiClient.get('/sales/invoices');
       setOutstandings(oRes.data);
-      setCustomers(cRes.data);
-      setInvoices(iRes.data);
     } catch (err) {
       setError('Failed to load outstanding invoice data.');
     }
@@ -64,19 +58,23 @@ const Payments = () => {
 
   const handleOpenAdd = () => {
     reset({
-      customer_id: customers.length > 0 ? customers[0].id : '',
-      invoice_id: '',
+      customer_id: '',
+      invoice_id: 'none',
       payment_mode: 'UPI',
       reference_number: '',
       amount_paid: 0,
-      notes: 'Cleared outstanding invoice amount.',
+      notes: 'Payment collection entry.',
     });
     setOpenModal(true);
   };
 
   const onSubmit = async (data) => {
     try {
-      await apiClient.post('/payments/', data);
+      const payload = { ...data };
+      if (!payload.invoice_id || payload.invoice_id === 'none') {
+        payload.invoice_id = null;
+      }
+      await apiClient.post('/payments/', payload);
       setOpenModal(false);
       loadData();
     } catch (err) {
@@ -87,22 +85,17 @@ const Payments = () => {
   // Filter invoices for selected customer
   const filteredInvoices = outstandings.filter((inv) => {
     if (!selectedCustomerId) return true;
-    // We can match branch/customer via linked SO
-    return true; // Simple allow list in mock/frontend context
+    return inv.customer_id === selectedCustomerId;
   });
 
   const columns = [
     { id: 'invoice_number', label: 'Invoice Reference' },
     {
-      id: 'customer',
+      id: 'customer_name',
       label: 'Customer Name',
-      render: (row) => {
-        // Fetch matching customer
-        const cust = customers.find((c) => c.branch_id === row.branch_id || c.name); // Simple match
-        return cust ? cust.name : 'Corporate Client';
-      },
+      render: (row) => row.customer_name || 'Corporate Client',
     },
-    { id: 'total_amount', label: 'Invoice Value', render: (row) => `$${row.total_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Invoice Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -153,12 +146,12 @@ const Payments = () => {
       <CommonModal open={openModal} onClose={() => setOpenModal(false)} title="Collect Customer Payment">
         <form onSubmit={handleSubmit(onSubmit)}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <FormInput
+            <FormAutocomplete
               name="customer_id"
               control={control}
               label="Select Customer"
-              type="select"
-              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              endpoint="/customers/"
+              onChangeOverride={() => setValue('invoice_id', 'none')}
             />
 
             <FormInput
@@ -166,7 +159,10 @@ const Payments = () => {
               control={control}
               label="Select Outstanding Invoice"
               type="select"
-              options={filteredInvoices.map((i) => ({ value: i.id, label: `${i.invoice_number} ($${i.total_amount.toFixed(2)})` }))}
+              options={[
+                { value: 'none', label: 'None (Advance Payment)' },
+                ...filteredInvoices.map((i) => ({ value: i.id, label: `${i.invoice_number} (₹${i.total_amount.toFixed(2)})` }))
+              ]}
             />
 
             <FormInput
@@ -178,7 +174,7 @@ const Payments = () => {
             />
 
             <FormInput name="reference_number" control={control} label="Transaction ID / Cheque Ref #" />
-            <FormInput name="amount_paid" control={control} label="Amount Collected ($)" type="number" />
+            <FormInput name="amount_paid" control={control} label="Amount Collected (₹)" type="number" />
             <FormInput name="notes" control={control} label="Reference Notes" type="textarea" rows={2} />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>

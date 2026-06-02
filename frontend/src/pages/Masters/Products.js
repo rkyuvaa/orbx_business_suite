@@ -167,13 +167,13 @@ const Products = () => {
     { id: 'uom', label: 'UOM' },
     {
       id: 'purchase_price',
-      label: 'Purchase Price',
-      render: (row) => `$${row.purchase_price.toFixed(2)}`,
+      label: 'Purchase Price (₹)',
+      render: (row) => `₹${row.purchase_price.toFixed(2)}`,
     },
     {
       id: 'selling_price',
-      label: 'Selling Price',
-      render: (row) => `$${row.selling_price.toFixed(2)}`,
+      label: 'Selling Price (₹)',
+      render: (row) => `₹${row.selling_price.toFixed(2)}`,
     },
     {
       id: 'is_active',
@@ -324,8 +324,8 @@ const Products = () => {
 
             <FormInput name="hsn_code" control={pControl} label="HSN Code" />
             <FormInput name="tax_rate" control={pControl} label="Tax Rate (%)" type="number" />
-            <FormInput name="purchase_price" control={pControl} label="Purchase Rate ($)" type="number" />
-            <FormInput name="selling_price" control={pControl} label="Selling Rate ($)" type="number" />
+            <FormInput name="purchase_price" control={pControl} label="Purchase Rate (₹)" type="number" />
+            <FormInput name="selling_price" control={pControl} label="Selling Rate (₹)" type="number" />
             
             <Box sx={{ gridColumn: 'span 2' }}>
               <FormInput name="min_stock_level" control={pControl} label="Minimum stock level alert threshold" type="number" />

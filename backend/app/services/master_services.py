@@ -18,24 +18,35 @@ class MasterServices:
     # CUSTOMER SERVICES
     # ==========================================
     @staticmethod
-    async def list_customers(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[Customer]:
-        """List all customer accounts, optionally filtering by active branch."""
+    async def list_customers(db: AsyncSession, branch_id: Optional[UUID] = None, search: Optional[str] = None) -> List[Customer]:
+        """List all customer accounts, optionally filtering by active branch and search query."""
         stmt = select(Customer)
         if branch_id:
             stmt = stmt.filter(Customer.branch_id == branch_id)
+        if search:
+            stmt = stmt.filter(Customer.name.ilike(f"%{search}%") | Customer.code.ilike(f"%{search}%"))
         query = await db.execute(stmt)
         return list(query.scalars().all())
 
     @staticmethod
     async def create_customer(db: AsyncSession, customer_data: CustomerCreate) -> Customer:
         """Create a customer master record."""
-        # Verify unique code
-        query_check = await db.execute(select(Customer).filter(Customer.code == customer_data.code))
-        if query_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Customer code '{customer_data.code}' already exists."
-            )
+        import random
+        if not customer_data.code:
+            while True:
+                candidate = f"CUST-{random.randint(100000, 999999)}"
+                query_check = await db.execute(select(Customer).filter(Customer.code == candidate))
+                if not query_check.scalar_one_or_none():
+                    customer_data.code = candidate
+                    break
+        else:
+            # Verify unique code
+            query_check = await db.execute(select(Customer).filter(Customer.code == customer_data.code))
+            if query_check.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Customer code '{customer_data.code}' already exists."
+                )
 
         customer = Customer(**customer_data.model_dump())
         db.add(customer)
@@ -63,23 +74,34 @@ class MasterServices:
     # SUPPLIER SERVICES
     # ==========================================
     @staticmethod
-    async def list_suppliers(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[Supplier]:
-        """List all suppliers, optionally filtering by branch."""
+    async def list_suppliers(db: AsyncSession, branch_id: Optional[UUID] = None, search: Optional[str] = None) -> List[Supplier]:
+        """List all suppliers, optionally filtering by branch and search query."""
         stmt = select(Supplier)
         if branch_id:
             stmt = stmt.filter(Supplier.branch_id == branch_id)
+        if search:
+            stmt = stmt.filter(Supplier.name.ilike(f"%{search}%") | Supplier.code.ilike(f"%{search}%"))
         query = await db.execute(stmt)
         return list(query.scalars().all())
 
     @staticmethod
     async def create_supplier(db: AsyncSession, supplier_data: SupplierCreate) -> Supplier:
         """Create a supplier record."""
-        query_check = await db.execute(select(Supplier).filter(Supplier.code == supplier_data.code))
-        if query_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Supplier code '{supplier_data.code}' already exists."
-            )
+        import random
+        if not supplier_data.code:
+            while True:
+                candidate = f"SUPP-{random.randint(100000, 999999)}"
+                query_check = await db.execute(select(Supplier).filter(Supplier.code == candidate))
+                if not query_check.scalar_one_or_none():
+                    supplier_data.code = candidate
+                    break
+        else:
+            query_check = await db.execute(select(Supplier).filter(Supplier.code == supplier_data.code))
+            if query_check.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Supplier code '{supplier_data.code}' already exists."
+                )
 
         supplier = Supplier(**supplier_data.model_dump())
         db.add(supplier)
@@ -141,12 +163,12 @@ class MasterServices:
     # PRODUCTS SERVICES
     # ==========================================
     @staticmethod
-    async def list_products(db: AsyncSession) -> List[Product]:
-        """List all product records including branch pricing overrides."""
-        query = await db.execute(
-            select(Product)
-            .options(selectinload(Product.pricing_overrides))
-        )
+    async def list_products(db: AsyncSession, search: Optional[str] = None) -> List[Product]:
+        """List all product records including branch pricing overrides and search filter."""
+        stmt = select(Product).options(selectinload(Product.pricing_overrides))
+        if search:
+            stmt = stmt.filter(Product.name.ilike(f"%{search}%") | Product.sku.ilike(f"%{search}%"))
+        query = await db.execute(stmt)
         return list(query.scalars().all())
 
     @staticmethod

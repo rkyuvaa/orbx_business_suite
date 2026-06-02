@@ -131,18 +131,38 @@ class TxServices:
         q_final = await db.execute(
             select(PurchaseOrder)
             .filter(PurchaseOrder.id == po.id)
-            .options(selectinload(PurchaseOrder.items))
+            .options(
+                selectinload(PurchaseOrder.supplier),
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
+            )
         )
-        return q_final.scalar_one()
+        o = q_final.scalar_one()
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        for item in o.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+        return o
 
     @staticmethod
     async def list_purchase_orders(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[PurchaseOrder]:
         """Fetch all purchase orders."""
-        stmt = select(PurchaseOrder).options(selectinload(PurchaseOrder.items))
+        stmt = (
+            select(PurchaseOrder)
+            .options(
+                selectinload(PurchaseOrder.supplier),
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
+            )
+        )
         if branch_id:
             stmt = stmt.filter(PurchaseOrder.branch_id == branch_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        orders = list(query.scalars().all())
+        for o in orders:
+            o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+            for item in o.items:
+                item.product_name = item.product.name if item.product else "Unknown"
+                item.sku = item.product.sku if item.product else ""
+        return orders
 
     @staticmethod
     async def create_grn(db: AsyncSession, grn_data: GRNCreate, received_by_id: UUID) -> GRN:
@@ -213,17 +233,28 @@ class TxServices:
         entry = PurchaseEntry(**entry_data.model_dump(), status="Unpaid")
         db.add(entry)
         await db.commit()
-        await db.refresh(entry)
-        return entry
+        
+        # Re-fetch with relationship
+        q = await db.execute(
+            select(PurchaseEntry)
+            .filter(PurchaseEntry.id == entry.id)
+            .options(selectinload(PurchaseEntry.supplier))
+        )
+        o = q.scalar_one()
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        return o
 
     @staticmethod
     async def list_purchase_entries(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[PurchaseEntry]:
         """List purchase entries."""
-        stmt = select(PurchaseEntry)
+        stmt = select(PurchaseEntry).options(selectinload(PurchaseEntry.supplier))
         if branch_id:
             stmt = stmt.filter(PurchaseEntry.branch_id == branch_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        entries = list(query.scalars().all())
+        for e in entries:
+            e.supplier_name = e.supplier.name if e.supplier else "Unknown"
+        return entries
 
     # ==========================================
     # INVENTORY SERVICES
@@ -355,18 +386,38 @@ class TxServices:
         q_final = await db.execute(
             select(SalesOrder)
             .filter(SalesOrder.id == so.id)
-            .options(selectinload(SalesOrder.items))
+            .options(
+                selectinload(SalesOrder.customer),
+                selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
+            )
         )
-        return q_final.scalar_one()
+        o = q_final.scalar_one()
+        o.customer_name = o.customer.name if o.customer else "Unknown"
+        for item in o.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+        return o
 
     @staticmethod
     async def list_sales_orders(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[SalesOrder]:
         """Fetch all sales orders."""
-        stmt = select(SalesOrder).options(selectinload(SalesOrder.items))
+        stmt = (
+            select(SalesOrder)
+            .options(
+                selectinload(SalesOrder.customer),
+                selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
+            )
+        )
         if branch_id:
             stmt = stmt.filter(SalesOrder.branch_id == branch_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        orders = list(query.scalars().all())
+        for o in orders:
+            o.customer_name = o.customer.name if o.customer else "Unknown"
+            for item in o.items:
+                item.product_name = item.product.name if item.product else "Unknown"
+                item.sku = item.product.sku if item.product else ""
+        return orders
 
     @staticmethod
     async def create_delivery(db: AsyncSession, delivery_data: DeliveryCreate) -> Delivery:
@@ -431,6 +482,33 @@ class TxServices:
         so = q_so.scalar_one_or_none()
         if not so:
             raise HTTPException(status_code=404, detail="Sales Order not found.")
+
+        # Auto-fulfill/deliver if not already delivered to maintain inventory integrity
+        if so.status != "Delivered":
+            # Create Delivery record to decrement stock
+            delivery = Delivery(
+                sales_order_id=so.id,
+                delivery_note="Auto-delivered on Invoice generation",
+                status="Delivered",
+                qty_delivered=sum(item.qty for item in so.items)
+            )
+            db.add(delivery)
+            await db.flush()
+
+            # Decrement stocks for each item in the Sales Order
+            for item in so.items:
+                await TxServices.update_stock(
+                    db=db,
+                    product_id=item.product_id,
+                    branch_id=so.branch_id,
+                    qty_change=-item.qty,  # Subtract
+                    tx_type="Out",
+                    ref_type="Sales Delivery",
+                    ref_id=delivery.id,
+                    reason=f"Auto-fulfillment on Invoice generation: {so.id}"
+                )
+            so.status = "Delivered"
+            db.add(so)
 
         # Fetch Branch to get Invoice Config and update sequences
         q_br = await db.execute(select(Branch).filter(Branch.id == so.branch_id))
@@ -512,18 +590,54 @@ class TxServices:
         q_final = await db.execute(
             select(Invoice)
             .filter(Invoice.id == invoice.id)
-            .options(selectinload(Invoice.items))
+            .options(
+                selectinload(Invoice.items).selectinload(InvoiceItem.product),
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+            )
         )
-        return q_final.scalar_one()
+        inv = q_final.scalar_one()
+        if inv.sales_order and inv.sales_order.customer:
+            inv.customer_name = inv.sales_order.customer.name
+            inv.customer_id = inv.sales_order.customer.id
+            inv.customer_gstin = inv.sales_order.customer.gstin
+            inv.customer_billing_address = inv.sales_order.customer.billing_address
+            inv.customer_shipping_address = inv.sales_order.customer.shipping_address
+        for item in inv.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+        return inv
 
     @staticmethod
     async def list_invoices(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[Invoice]:
         """Fetch all invoices."""
-        stmt = select(Invoice).options(selectinload(Invoice.items))
+        stmt = (
+            select(Invoice)
+            .options(
+                selectinload(Invoice.items).selectinload(InvoiceItem.product),
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+            )
+        )
         if branch_id:
             stmt = stmt.filter(Invoice.branch_id == branch_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        invoices = list(query.scalars().all())
+        for inv in invoices:
+            if inv.sales_order and inv.sales_order.customer:
+                inv.customer_name = inv.sales_order.customer.name
+                inv.customer_id = inv.sales_order.customer.id
+                inv.customer_gstin = inv.sales_order.customer.gstin
+                inv.customer_billing_address = inv.sales_order.customer.billing_address
+                inv.customer_shipping_address = inv.sales_order.customer.shipping_address
+            else:
+                inv.customer_name = "Unknown"
+                inv.customer_id = None
+                inv.customer_gstin = None
+                inv.customer_billing_address = None
+                inv.customer_shipping_address = None
+            for item in inv.items:
+                item.product_name = item.product.name if item.product else "Unknown"
+                item.sku = item.product.sku if item.product else ""
+        return invoices
 
     # ==========================================
     # PAYMENTS & RECEIPT SERVICES
@@ -531,12 +645,35 @@ class TxServices:
     @staticmethod
     async def list_outstanding_invoices(db: AsyncSession, customer_id: Optional[UUID] = None) -> List[Invoice]:
         """Fetch unpaid or partially paid invoices."""
-        stmt = select(Invoice).filter(Invoice.status.in_(["Unpaid", "PartiallyPaid"]))
+        stmt = (
+            select(Invoice)
+            .filter(Invoice.status.in_(["Unpaid", "PartiallyPaid"]))
+            .options(
+                selectinload(Invoice.items).selectinload(InvoiceItem.product),
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+            )
+        )
         if customer_id:
-            # We can select SalesOrder -> customer_id
             stmt = stmt.join(SalesOrder).filter(SalesOrder.customer_id == customer_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        invoices = list(query.scalars().all())
+        for inv in invoices:
+            if inv.sales_order and inv.sales_order.customer:
+                inv.customer_name = inv.sales_order.customer.name
+                inv.customer_id = inv.sales_order.customer.id
+                inv.customer_gstin = inv.sales_order.customer.gstin
+                inv.customer_billing_address = inv.sales_order.customer.billing_address
+                inv.customer_shipping_address = inv.sales_order.customer.shipping_address
+            else:
+                inv.customer_name = "Unknown"
+                inv.customer_id = None
+                inv.customer_gstin = None
+                inv.customer_billing_address = None
+                inv.customer_shipping_address = None
+            for item in inv.items:
+                item.product_name = item.product.name if item.product else "Unknown"
+                item.sku = item.product.sku if item.product else ""
+        return invoices
 
     @staticmethod
     async def create_payment(db: AsyncSession, pay_data: PaymentCreate) -> Payment:
@@ -598,3 +735,30 @@ class TxServices:
         if not receipt:
             raise HTTPException(status_code=404, detail="Receipt not found.")
         return receipt
+
+    @staticmethod
+    async def list_payments(db: AsyncSession, customer_id: Optional[UUID] = None) -> List[Payment]:
+        """List all customer payments with nested relationships resolved."""
+        query = (
+            select(Payment)
+            .options(
+                selectinload(Payment.customer),
+                selectinload(Payment.invoice),
+                selectinload(Payment.receipts)
+            )
+        )
+        if customer_id:
+            query = query.filter(Payment.customer_id == customer_id)
+        
+        query = query.order_by(Payment.payment_date.desc())
+        
+        result = await db.execute(query)
+        payments = list(result.scalars().all())
+        
+        for p in payments:
+            p.customer_name = p.customer.name if p.customer else "Unknown"
+            p.invoice_number = p.invoice.invoice_number if p.invoice else None
+            p.receipt_number = p.receipts[0].receipt_number if p.receipts else None
+            
+        return payments
+

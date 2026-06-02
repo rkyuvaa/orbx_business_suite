@@ -57,9 +57,9 @@ const ReportsDashboard = () => {
   }
 
   const kpiCards = [
-    { label: "Today's Sales", value: `$${data.kpis.today_sales.toFixed(2)}`, icon: <SalesIcon />, color: '#1b4332', bg: 'rgba(27, 67, 50, 0.05)' },
-    { label: "Monthly Sales", value: `$${data.kpis.monthly_sales.toFixed(2)}`, icon: <RevenueIcon />, color: '#40916c', bg: 'rgba(64, 145, 108, 0.05)' },
-    { label: "Outstanding Payments", value: `$${data.kpis.outstanding_payments.toFixed(2)}`, icon: <OutstandingIcon />, color: '#ff8f00', bg: 'rgba(255, 143, 0, 0.05)' },
+    { label: "Today's Sales", value: `₹${data.kpis.today_sales.toFixed(2)}`, icon: <SalesIcon />, color: '#1b4332', bg: 'rgba(27, 67, 50, 0.05)' },
+    { label: "Monthly Sales", value: `₹${data.kpis.monthly_sales.toFixed(2)}`, icon: <RevenueIcon />, color: '#40916c', bg: 'rgba(64, 145, 108, 0.05)' },
+    { label: "Outstanding Payments", value: `₹${data.kpis.outstanding_payments.toFixed(2)}`, icon: <OutstandingIcon />, color: '#ff8f00', bg: 'rgba(255, 143, 0, 0.05)' },
     { label: "Low Stock Items", value: data.kpis.low_stock_count, icon: <LowStockIcon />, color: '#d90429', bg: 'rgba(217, 4, 41, 0.05)' }
   ];
 
@@ -127,7 +127,7 @@ const ReportsDashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} />
                   <YAxis tickLine={false} />
-                  <Tooltip formatter={(value) => [`$${value.toFixed(2)}`, 'Sales']} />
+                  <Tooltip formatter={(value) => [`₹${value.toFixed(2)}`, 'Sales']} />
                   <Bar dataKey="sales" fill="#1b4332" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -158,7 +158,7 @@ const ReportsDashboard = () => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => [`$${value.toFixed(2)}`, 'Sales']} />
+                  <Tooltip formatter={(value) => [`₹${value.toFixed(2)}`, 'Sales']} />
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
@@ -192,7 +192,7 @@ const ReportsDashboard = () => {
                         <Typography variant="caption" color="text.secondary">{row.sku}</Typography>
                       </TableCell>
                       <TableCell align="center">{row.qty_sold}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>${row.total_revenue.toFixed(2)}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>₹{row.total_revenue.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                   {data.top_products.length === 0 && (
@@ -236,7 +236,7 @@ const ReportsDashboard = () => {
                         {new Date(row.date).toLocaleDateString()}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        ${row.amount.toFixed(2)}
+                        ₹{row.amount.toFixed(2)}
                       </TableCell>
                     </TableRow>
                   ))}

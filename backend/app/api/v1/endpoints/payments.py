@@ -4,10 +4,20 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import deps
-from app.schemas.transaction import InvoiceOut, PaymentOut, PaymentCreate, PaymentReceiptOut
+from app.schemas.transaction import InvoiceOut, PaymentOut, PaymentCreate, PaymentReceiptOut, PaymentReceiptListOut
 from app.services.tx_services import TxServices
 
 router = APIRouter()
+
+
+@router.get("/", response_model=List[PaymentReceiptListOut])
+async def list_payments_history(
+    customer_id: Optional[UUID] = Query(None, description="Filter payments by customer"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("payments", "view"))
+):
+    """List all recorded customer payments."""
+    return await TxServices.list_payments(db, customer_id)
 
 
 @router.get("/outstanding", response_model=List[InvoiceOut])

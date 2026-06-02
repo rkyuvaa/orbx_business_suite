@@ -13,9 +13,10 @@ import FormInput from '../../components/FormInput';
 
 const schema = yup.object().shape({
   name: yup.string().required('Name is required'),
-  code: yup.string().required('Customer code is required'),
+  code: yup.string().nullable(),
   gstin: yup.string().nullable().max(15, 'GSTIN cannot exceed 15 chars'),
   phone: yup.string().nullable(),
+  alternative_phone: yup.string().nullable(),
   email: yup.string().email('Please enter a valid email').nullable(),
   billing_address: yup.string().nullable(),
   shipping_address: yup.string().nullable(),
@@ -53,6 +54,7 @@ const Customers = () => {
       code: '',
       gstin: '',
       phone: '',
+      alternative_phone: '',
       email: '',
       billing_address: '',
       shipping_address: '',
@@ -175,9 +177,10 @@ const Customers = () => {
         <form onSubmit={handleSubmit(onSubmit)}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             <FormInput name="name" control={control} label="Customer Name" />
-            <FormInput name="code" control={control} label="Customer Code" disabled={!!selectedCustomer} />
+            <FormInput name="code" control={control} label="Customer Code (Auto-generated if blank)" disabled={!!selectedCustomer} />
             <FormInput name="gstin" control={control} label="GSTIN" />
             <FormInput name="phone" control={control} label="Phone Number" />
+            <FormInput name="alternative_phone" control={control} label="Alternative Phone" />
             <FormInput name="email" control={control} label="Email Address" type="email" />
             <FormInput name="payment_terms" control={control} label="Payment Terms" />
             <FormInput name="credit_limit" control={control} label="Credit Limit" type="number" />

@@ -1,15 +1,16 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # Customer Schemas
 class CustomerCreate(BaseModel):
     name: str
-    code: str
+    code: Optional[str] = None
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     billing_address: Optional[str] = None
     shipping_address: Optional[str] = None
@@ -17,12 +18,27 @@ class CustomerCreate(BaseModel):
     payment_terms: Optional[str] = None
     branch_id: Optional[UUID] = None
 
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def capitalize_gstin(cls, v):
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lowercase_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
 
 class CustomerUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     billing_address: Optional[str] = None
     shipping_address: Optional[str] = None
@@ -31,6 +47,20 @@ class CustomerUpdate(BaseModel):
     branch_id: Optional[UUID] = None
     is_active: Optional[bool] = None
 
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def capitalize_gstin(cls, v):
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lowercase_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
 
 class CustomerOut(BaseModel):
     id: UUID
@@ -38,6 +68,7 @@ class CustomerOut(BaseModel):
     code: str
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     billing_address: Optional[str] = None
     shipping_address: Optional[str] = None
@@ -54,14 +85,29 @@ class CustomerOut(BaseModel):
 # Supplier Schemas
 class SupplierCreate(BaseModel):
     name: str
-    code: str
+    code: Optional[str] = None
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     payment_terms: Optional[str] = None
     bank_details: Optional[Dict[str, Any]] = None  # JSON format (bank_name, account_no, ifsc)
     branch_id: Optional[UUID] = None
+
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def capitalize_gstin(cls, v):
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lowercase_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 
 class SupplierUpdate(BaseModel):
@@ -69,12 +115,27 @@ class SupplierUpdate(BaseModel):
     code: Optional[str] = None
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     payment_terms: Optional[str] = None
     bank_details: Optional[Dict[str, Any]] = None
     branch_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def capitalize_gstin(cls, v):
+        if isinstance(v, str):
+            return v.strip().upper()
+        return v
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lowercase_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 
 class SupplierOut(BaseModel):
@@ -83,6 +144,7 @@ class SupplierOut(BaseModel):
     code: str
     gstin: Optional[str] = None
     phone: Optional[str] = None
+    alternative_phone: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     payment_terms: Optional[str] = None

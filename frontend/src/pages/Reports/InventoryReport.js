@@ -107,21 +107,21 @@ const InventoryReport = () => {
     { id: 'qty', label: 'On Hand Qty' },
     {
       id: 'purchase_price',
-      label: 'Unit Purchase Rate',
+      label: 'Unit Purchase Rate (₹)',
       render: (row) => {
         const prod = products.find((p) => p.id === row.product_id);
-        return prod ? `$${prod.purchase_price.toFixed(2)}` : '$0.00';
+        return prod ? `₹${prod.purchase_price.toFixed(2)}` : '₹0.00';
       },
     },
     {
       id: 'total_valuation',
-      label: 'Total Asset Value',
+      label: 'Total Asset Value (₹)',
       render: (row) => {
         const prod = products.find((p) => p.id === row.product_id);
         const val = prod ? row.qty * prod.purchase_price : 0;
         return (
           <Typography sx={{ fontWeight: 600, color: 'primary.main' }}>
-            ${val.toFixed(2)}
+            ₹{val.toFixed(2)}
           </Typography>
         );
       },

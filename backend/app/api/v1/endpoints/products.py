@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import deps
@@ -51,11 +51,12 @@ async def update_category(
 # ==========================================
 @router.get("/", response_model=List[ProductOut])
 async def list_products(
+    search: Optional[str] = Query(None, description="Search term for product name or SKU"),
     db: AsyncSession = Depends(deps.get_db),
     current_user = Depends(deps.PermissionChecker("masters", "view"))
 ):
     """Retrieve lists of catalog products and price configs."""
-    return await MasterServices.list_products(db)
+    return await MasterServices.list_products(db, search)
 
 
 @router.post("/", response_model=ProductOut, status_code=status.HTTP_201_CREATED)

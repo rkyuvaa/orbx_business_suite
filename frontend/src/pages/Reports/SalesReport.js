@@ -55,9 +55,9 @@ const SalesReport = () => {
   const columns = [
     { id: 'invoice_number', label: 'Invoice No.' },
     { id: 'date', label: 'Billing Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    { id: 'subtotal', label: 'Subtotal ($)', render: (row) => `$${row.subtotal.toFixed(2)}` },
-    { id: 'tax_amount', label: 'Tax (GST) ($)', render: (row) => `$${row.tax_amount.toFixed(2)}` },
-    { id: 'total_amount', label: 'Grand Total ($)', render: (row) => `$${row.total_amount.toFixed(2)}` },
+    { id: 'subtotal', label: 'Subtotal (₹)', render: (row) => `₹${row.subtotal.toFixed(2)}` },
+    { id: 'tax_amount', label: 'Tax (GST) (₹)', render: (row) => `₹${row.tax_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Grand Total (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',

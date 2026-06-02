@@ -13,11 +13,12 @@ router = APIRouter()
 @router.get("/", response_model=List[SupplierOut])
 async def list_suppliers(
     branch_id: Optional[UUID] = Query(None, description="Filter suppliers by branch"),
+    search: Optional[str] = Query(None, description="Search query for supplier name or code"),
     db: AsyncSession = Depends(deps.get_db),
     current_user = Depends(deps.PermissionChecker("masters", "view"))
 ):
     """Retrieve list of operating suppliers."""
-    return await MasterServices.list_suppliers(db, branch_id)
+    return await MasterServices.list_suppliers(db, branch_id, search)
 
 
 @router.post("/", response_model=SupplierOut, status_code=status.HTTP_201_CREATED)

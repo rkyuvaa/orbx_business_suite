@@ -65,9 +65,9 @@ const PurchaseReport = () => {
         return s ? s.name : 'Unknown';
       },
     },
-    { id: 'total_amount', label: 'Subtotal ($)', render: (row) => `$${row.total_amount.toFixed(2)}` },
-    { id: 'tax_amount', label: 'Taxes (GST) ($)', render: (row) => `$${row.tax_amount.toFixed(2)}` },
-    { id: 'grand_total', label: 'Total Value ($)', render: (row) => `$${row.grand_total.toFixed(2)}` },
+    { id: 'total_amount', label: 'Subtotal (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
+    { id: 'tax_amount', label: 'Taxes (GST) (₹)', render: (row) => `₹${row.tax_amount.toFixed(2)}` },
+    { id: 'grand_total', label: 'Total Value (₹)', render: (row) => `₹${row.grand_total.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',

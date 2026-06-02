@@ -13,14 +13,13 @@ import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
+import FormAutocomplete from '../../components/FormAutocomplete';
 
 const Sales = () => {
   const [tabIndex, setTabIndex] = useState(0);
   const [sos, setSos] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [company, setCompany] = useState(null);
 
@@ -48,16 +47,12 @@ const Sales = () => {
       const soRes = await apiClient.get('/sales/so');
       const invRes = await apiClient.get('/sales/invoices');
       const delRes = await apiClient.get('/sales/deliveries');
-      const prodRes = await apiClient.get('/products/');
-      const custRes = await apiClient.get('/customers/');
       const brRes = await apiClient.get('/admin/branches');
       const compRes = await apiClient.get('/admin/company');
 
       setSos(soRes.data);
       setInvoices(invRes.data);
       setDeliveries(delRes.data);
-      setProducts(prodRes.data);
-      setCustomers(custRes.data);
       setBranches(brRes.data);
       setCompany(compRes.data);
     } catch (err) {
@@ -180,14 +175,11 @@ const Sales = () => {
   const soColumns = [
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
-      id: 'customer_id',
+      id: 'customer_name',
       label: 'Customer',
-      render: (row) => {
-        const c = customers.find((cust) => cust.id === row.customer_id);
-        return c ? c.name : 'Unknown';
-      }
+      render: (row) => row.customer_name || 'Unknown'
     },
-    { id: 'grand_total', label: 'Grand Total', render: (row) => `$${row.grand_total.toFixed(2)}` },
+    { id: 'grand_total', label: 'Grand Total (₹)', render: (row) => `₹${row.grand_total.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -228,16 +220,11 @@ const Sales = () => {
     { id: 'invoice_number', label: 'Invoice No.' },
     { id: 'date', label: 'Billing Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
-      id: 'customer_id',
+      id: 'customer_name',
       label: 'Customer Name',
-      render: (row) => {
-        // Fetch SO, then customer
-        const so = sos.find((s) => s.id === row.sales_order_id);
-        const c = so ? customers.find((cust) => cust.id === so.customer_id) : null;
-        return c ? c.name : 'Unknown';
-      }
+      render: (row) => row.customer_name || 'Unknown'
     },
-    { id: 'total_amount', label: 'Invoice Value', render: (row) => `$${row.total_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Invoice Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -299,7 +286,10 @@ const Sales = () => {
             {
               icon: <InvoiceIcon />,
               label: 'Generate Tax Invoice',
-              condition: (row) => row.status === 'Delivered',
+              condition: (row) => {
+                const hasInvoice = invoices.some((inv) => inv.sales_order_id === row.id);
+                return !hasInvoice && (row.status === 'Draft' || row.status === 'Delivered');
+              },
               onClick: handleOpenInvoice,
               color: 'primary'
             }
@@ -342,17 +332,12 @@ const Sales = () => {
       >
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={6}>
-            <TextField
-              select
+            <FormAutocomplete
               label="Select Customer"
-              fullWidth
+              endpoint="/customers/"
               value={soCustomerId}
-              onChange={(e) => setSoCustomerId(e.target.value)}
-            >
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.name} ({c.code})</MenuItem>
-              ))}
-            </TextField>
+              onChange={(val) => setSoCustomerId(val)}
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -379,28 +364,38 @@ const Sales = () => {
               <TableRow sx={{ backgroundColor: '#f8fafc' }}>
                 <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600, width: 80 }}>Qty</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 130 }}>Rate ($)</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>Disc ($)</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, width: 130 }}>Rate (₹)</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>Disc (₹)</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600, width: 90 }}>GST %</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Total ($)</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>Total (₹)</TableCell>
                 <TableCell align="center" sx={{ width: 50 }}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {soItems.map((item, idx) => (
                 <TableRow key={idx}>
-                  <TableCell>
-                    <TextField
-                      select
-                      size="small"
-                      fullWidth
+                  <TableCell sx={{ minWidth: 240 }}>
+                    <FormAutocomplete
+                      label="Select Product"
+                      endpoint="/products/"
                       value={item.product_id}
-                      onChange={(e) => handleItemChange(idx, 'product_id', e.target.value)}
-                    >
-                      {products.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                      ))}
-                    </TextField>
+                      onChange={(val) => handleItemChange(idx, 'product_id', val)}
+                      onChangeOverride={(prodObj) => {
+                        if (prodObj) {
+                          setSoItems(prevItems => prevItems.map((it, i) => {
+                            if (i === idx) {
+                              return {
+                                ...it,
+                                product_id: prodObj.id,
+                                rate: prodObj.selling_price,
+                                tax_rate: prodObj.tax_rate
+                              };
+                            }
+                            return it;
+                          }));
+                        }
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <TextField
@@ -453,10 +448,10 @@ const Sales = () => {
         </Button>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2, mb: 4 }}>
-          <Typography variant="body1">Subtotal: <strong>${soTotalSum.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Discount: <strong>-${soTotalDiscount.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Taxes (GST): <strong>${soTotalTax.toFixed(2)}</strong></Typography>
-          <Typography variant="h6" color="primary.main">Grand Total: <strong>${(soTotalSum - soTotalDiscount + soTotalTax).toFixed(2)}</strong></Typography>
+          <Typography variant="body1">Subtotal: <strong>₹{soTotalSum.toFixed(2)}</strong></Typography>
+          <Typography variant="body1">Discount: <strong>-₹{soTotalDiscount.toFixed(2)}</strong></Typography>
+          <Typography variant="body1">Taxes (GST): <strong>₹{soTotalTax.toFixed(2)}</strong></Typography>
+          <Typography variant="h6" color="primary.main">Grand Total: <strong>₹{(soTotalSum - soTotalDiscount + soTotalTax).toFixed(2)}</strong></Typography>
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -552,14 +547,14 @@ const Sales = () => {
           <Grid container spacing={4} sx={{ mb: 4 }}>
             <Grid item xs={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>BILL TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{printCustomer?.name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{printCustomer?.billing_address}</Typography>
-              <Typography variant="body2">GSTIN: <strong>{printCustomer?.gstin}</strong></Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{selectedInvoice?.customer_billing_address}</Typography>
+              <Typography variant="body2">GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
             </Grid>
             <Grid item xs={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>SHIP TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{printCustomer?.name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{printCustomer?.shipping_address}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{selectedInvoice?.customer_shipping_address}</Typography>
             </Grid>
           </Grid>
 
@@ -571,22 +566,21 @@ const Sales = () => {
                   <TableCell sx={{ fontWeight: 700 }}>Item Description</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700 }}>HSN</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700 }}>Qty</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Rate ($)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Disc ($)</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Rate (₹)</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Disc (₹)</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700 }}>GST %</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Amount ($)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Amount (₹)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {selectedInvoice?.items?.map((item, idx) => {
-                  const prod = products.find((p) => p.id === item.product_id);
                   return (
                     <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                       <TableCell sx={{ py: 1.5 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{prod ? prod.name : 'Unknown'}</Typography>
-                        <Typography variant="caption" color="text.secondary">SKU: {prod ? prod.sku : ''}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</Typography>
+                        <Typography variant="caption" color="text.secondary">SKU: {item.sku || ''}</Typography>
                       </TableCell>
-                      <TableCell align="center">{prod ? prod.hsn_code : ''}</TableCell>
+                      <TableCell align="center">{item.sku ? item.sku.substring(0, 6) : ''}</TableCell>
                       <TableCell align="center">{item.qty}</TableCell>
                       <TableCell align="center">{item.rate.toFixed(2)}</TableCell>
                       <TableCell align="center">{item.discount_amount.toFixed(2)}</TableCell>
@@ -610,25 +604,25 @@ const Sales = () => {
             <Grid item xs={5} sx={{ textAlign: 'right' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
                 <Typography variant="body2">Subtotal:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>${selectedInvoice?.subtotal?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
                 
                 <Typography variant="body2">Discount:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>-${selectedInvoice?.discount_amount?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{selectedInvoice?.discount_amount?.toFixed(2)}</Typography>
 
                 <Typography variant="body2">CGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>${selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
 
                 <Typography variant="body2">SGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>${selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
 
                 <Typography variant="body2">IGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>${selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
               </Box>
               <Divider sx={{ my: 1.5 }} />
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  ${selectedInvoice?.total_amount?.toFixed(2)}
+                  ₹{selectedInvoice?.total_amount?.toFixed(2)}
                 </Typography>
               </Box>
             </Grid>
