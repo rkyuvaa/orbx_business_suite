@@ -646,9 +646,10 @@ const Sales = () => {
         <Box
           ref={printRef}
           sx={{
-            width: '180mm',
+            width: '100%',
+            maxWidth: '180mm',
             minHeight: '265mm',
-            p: '0mm',
+            p: 4, // Screen preview padding so content doesn't hit modal edges
             mx: 'auto',
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
@@ -656,8 +657,9 @@ const Sales = () => {
             fontFamily: '"Outfit", sans-serif',
             boxShadow: 'none',
             '@media print': {
-              width: '180mm !important',
-              minHeight: '265mm !important',
+              width: '100% !important',
+              maxWidth: 'none !important',
+              minHeight: '100% !important',
               p: '0mm !important',
               margin: '0mm !important',
               boxShadow: 'none !important',
@@ -711,7 +713,11 @@ const Sales = () => {
             const hasDiscount = selectedInvoice?.items?.some(item => (item.discount_amount || 0) > 0) || false;
             return (
               <TableContainer sx={{ mb: 3 }}>
-                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, fontSize: '0.85rem' } }}>
+                <Table size="small" sx={{ 
+                  '& .MuiTableCell-root': { py: 0.25, px: 1, fontSize: '0.85rem' },
+                  '& .MuiTableCell-root:first-of-type': { pl: 0 },
+                  '& .MuiTableCell-root:last-of-type': { pr: 0 }
+                }}>
                   <TableHead>
                     <TableRow sx={{ borderTop: '1.5px solid #000000', borderBottom: '1.5px solid #000000' }}>
                       <TableCell sx={{ fontWeight: 700, width: '5%', whiteSpace: 'nowrap' }}>S.No.</TableCell>
