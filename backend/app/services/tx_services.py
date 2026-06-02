@@ -605,6 +605,7 @@ class TxServices:
         for item in inv.items:
             item.product_name = item.product.name if item.product else "Unknown"
             item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
         return inv
 
     @staticmethod
@@ -637,6 +638,7 @@ class TxServices:
             for item in inv.items:
                 item.product_name = item.product.name if item.product else "Unknown"
                 item.sku = item.product.sku if item.product else ""
+                item.hsn_code = item.product.hsn_code if item.product else ""
         return invoices
 
     # ==========================================

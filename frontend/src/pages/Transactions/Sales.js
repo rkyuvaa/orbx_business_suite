@@ -225,6 +225,38 @@ const Sales = () => {
     }
   };
 
+  const numberToWords = (num) => {
+    if (num === 0) return 'Zero Rupees Only';
+    const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    const convert = (n) => {
+      if (n < 20) return units[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + units[n % 10] : '');
+      if (n < 1000) return units[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convert(n % 100) : '');
+      return '';
+    };
+
+    const rupees = Math.floor(num);
+    const paise = Math.round((num - rupees) * 100);
+    
+    let word = convert(rupees) + ' Rupees';
+    if (paise > 0) {
+      word += ' and ' + convert(paise) + ' Paise';
+    }
+    return word + ' Only';
+  };
+
+  const formatBillingDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+
   const soColumns = [
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
@@ -312,6 +344,44 @@ const Sales = () => {
     shipping_address: selectedInvoice.customer_shipping_address
   } : null;
   const printBranch = selectedInvoice ? branches.find((b) => b.id === selectedInvoice.branch_id) : null;
+
+  const getHsnTaxSummary = () => {
+    if (!selectedInvoice || !selectedInvoice.items) return [];
+    const summary = {};
+    const isIntrastate = (selectedInvoice.gst_breakup?.cgst || 0) > 0 || (selectedInvoice.gst_breakup?.sgst || 0) > 0;
+
+    selectedInvoice.items.forEach(item => {
+      const hsn = item.hsn_code || 'N/A';
+      const taxableValue = (item.rate * item.qty) - (item.discount_amount || 0);
+      const gstRate = item.tax_rate || 18;
+      const taxAmt = item.tax_amount || 0;
+
+      if (!summary[hsn]) {
+        summary[hsn] = {
+          hsn,
+          taxableValue: 0,
+          cgstRate: isIntrastate ? (gstRate / 2) : 0,
+          cgstAmount: 0,
+          sgstRate: isIntrastate ? (gstRate / 2) : 0,
+          sgstAmount: 0,
+          igstRate: !isIntrastate ? gstRate : 0,
+          igstAmount: 0,
+          totalTax: 0
+        };
+      }
+      summary[hsn].taxableValue += taxableValue;
+      if (isIntrastate) {
+        summary[hsn].cgstAmount += (taxAmt / 2);
+        summary[hsn].sgstAmount += (taxAmt / 2);
+      } else {
+        summary[hsn].igstAmount += taxAmt;
+      }
+      summary[hsn].totalTax += taxAmt;
+    });
+
+    return Object.values(summary);
+  };
+
 
   return (
     <Box>
@@ -576,137 +646,203 @@ const Sales = () => {
         <Box
           ref={printRef}
           sx={{
-            p: 4,
+            p: 3,
             backgroundColor: '#ffffff',
             color: '#000000',
+            fontFamily: '"Outfit", sans-serif',
             '@media print': {
-              p: 0,
+              p: '0mm !important',
+              margin: '0mm !important',
+              boxShadow: 'none !important',
+              '@page': {
+                size: 'A4 portrait',
+                margin: '8mm 12mm 8mm 12mm !important'
+              }
             }
           }}
         >
           {/* Header */}
-          <Grid container justifyContent="space-between" sx={{ mb: 4 }}>
+          <Grid container justifyContent="space-between" sx={{ mb: 2 }}>
             <Grid item>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
                 {company?.name || 'ORBX CORPORATION'}
               </Typography>
-              <Typography variant="body2">{company?.address}</Typography>
-              <Typography variant="body2">GSTIN: <strong>{company?.gstin}</strong></Typography>
-              <Typography variant="body2">Email: {company?.email} | Phone: {company?.phone}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{company?.address}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>GSTIN: <strong>{company?.gstin}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Email: {company?.email} | Phone: {company?.phone}</Typography>
             </Grid>
             <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
                 TAX INVOICE
               </Typography>
-              <Typography variant="body2">Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
-              <Typography variant="body2">Billing Date: {selectedInvoice ? new Date(selectedInvoice.date).toLocaleDateString() : ''}</Typography>
-              <Typography variant="body2">Branch: {printBranch?.branch_name}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Billing Date: <strong>{selectedInvoice ? formatBillingDate(selectedInvoice.date) : ''}</strong></Typography>
             </Grid>
           </Grid>
 
-          <Divider sx={{ mb: 3 }} />
+          <Divider sx={{ mb: 2 }} />
 
           {/* Addresses */}
-          <Grid container spacing={4} sx={{ mb: 4 }}>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>BILL TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{selectedInvoice?.customer_billing_address}</Typography>
-              <Typography variant="body2">GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>BILL TO:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.8rem', color: 'text.secondary' }}>{selectedInvoice?.customer_billing_address}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem', mt: 0.5 }}>GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
             </Grid>
             <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>SHIP TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{selectedInvoice?.customer_shipping_address}</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>SHIP TO:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.8rem', color: 'text.secondary' }}>{selectedInvoice?.customer_shipping_address}</Typography>
             </Grid>
           </Grid>
 
           {/* Items Grid */}
-          <TableContainer sx={{ mb: 4 }}>
-            <Table size="small">
+          {(() => {
+            const hasDiscount = selectedInvoice?.items?.some(item => (item.discount_amount || 0) > 0) || false;
+            return (
+              <TableContainer sx={{ mb: 2 }}>
+                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.75, fontSize: '0.75rem' } }}>
+                  <TableHead>
+                    <TableRow sx={{ borderTop: '2px solid #000000', borderBottom: '2px solid #000000' }}>
+                      <TableCell sx={{ fontWeight: 700, width: 40 }}>S.No.</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Item Description</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: 80 }}>HSN</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: 50 }}>Qty</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Rate (₹)</TableCell>
+                      {hasDiscount && <TableCell align="center" sx={{ fontWeight: 700, width: 80 }}>Disc (₹)</TableCell>}
+                      <TableCell align="center" sx={{ fontWeight: 700, width: 60 }}>GST %</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, width: 100 }}>Amount (₹)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedInvoice?.items?.map((item, idx) => {
+                      return (
+                        <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <TableCell>{idx + 1}</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</TableCell>
+                          <TableCell align="center">{item.hsn_code || 'N/A'}</TableCell>
+                          <TableCell align="center">{item.qty}</TableCell>
+                          <TableCell align="center">{item.rate.toFixed(2)}</TableCell>
+                          {hasDiscount && <TableCell align="center">{item.discount_amount.toFixed(2)}</TableCell>}
+                          <TableCell align="center">{item.tax_rate}%</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{item.amount.toFixed(2)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            );
+          })()}
+
+          {/* HSN Wise Tax Summary */}
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5, fontSize: '0.8rem' }}>HSN-wise Tax Summary</Typography>
+          <TableContainer sx={{ mb: 2 }}>
+            <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, fontSize: '0.7rem' } }}>
               <TableHead>
-                <TableRow sx={{ borderTop: '2px solid #000000', borderBottom: '2px solid #000000' }}>
-                  <TableCell sx={{ fontWeight: 700 }}>Item Description</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>HSN</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Qty</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Rate (₹)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Disc (₹)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>GST %</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Amount (₹)</TableCell>
+                <TableRow sx={{ borderTop: '1px solid #000000', borderBottom: '1px solid #000000', backgroundColor: '#f8fafc' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>HSN Code</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Taxable Value (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>CGST Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>CGST Amt (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>SGST Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>SGST Amt (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>IGST Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>IGST Amt (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tax (₹)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {selectedInvoice?.items?.map((item, idx) => {
-                  return (
-                    <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <TableCell sx={{ py: 1.5 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</Typography>
-                        <Typography variant="caption" color="text.secondary">SKU: {item.sku || ''}</Typography>
-                      </TableCell>
-                      <TableCell align="center">{item.sku ? item.sku.substring(0, 6) : ''}</TableCell>
-                      <TableCell align="center">{item.qty}</TableCell>
-                      <TableCell align="center">{item.rate.toFixed(2)}</TableCell>
-                      <TableCell align="center">{item.discount_amount.toFixed(2)}</TableCell>
-                      <TableCell align="center">{item.tax_rate}%</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>{item.amount.toFixed(2)}</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {getHsnTaxSummary().map((row, idx) => (
+                  <TableRow key={idx} sx={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <TableCell>{row.hsn}</TableCell>
+                    <TableCell align="right">₹{row.taxableValue.toFixed(2)}</TableCell>
+                    <TableCell align="right">{row.cgstRate}%</TableCell>
+                    <TableCell align="right">₹{row.cgstAmount.toFixed(2)}</TableCell>
+                    <TableCell align="right">{row.sgstRate}%</TableCell>
+                    <TableCell align="right">₹{row.sgstAmount.toFixed(2)}</TableCell>
+                    <TableCell align="right">{row.igstRate}%</TableCell>
+                    <TableCell align="right">₹{row.igstAmount.toFixed(2)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>₹{row.totalTax.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </TableContainer>
 
           {/* Summary / Totals */}
-          <Grid container justifyContent="space-between" sx={{ mb: 4 }}>
+          <Grid container justifyContent="space-between" sx={{ mb: 2 }}>
             <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Terms & Conditions:</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.8rem' }}>Terms & Conditions:</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.7rem', display: 'block', lineHeight: 1.2 }}>
                 {printBranch?.invoice_terms}
               </Typography>
             </Grid>
             <Grid item xs={5} sx={{ textAlign: 'right' }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                <Typography variant="body2">Subtotal:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, fontSize: '0.8rem' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Subtotal:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
                 
-                <Typography variant="body2">Discount:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{selectedInvoice?.discount_amount?.toFixed(2)}</Typography>
+                {selectedInvoice?.discount_amount > 0 && (
+                  <>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Discount:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>-₹{selectedInvoice.discount_amount.toFixed(2)}</Typography>
+                  </>
+                )}
 
-                <Typography variant="body2">CGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                {selectedInvoice?.gst_breakup?.cgst > 0 && (
+                  <>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>CGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                  </>
+                )}
 
-                <Typography variant="body2">SGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                {selectedInvoice?.gst_breakup?.sgst > 0 && (
+                  <>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>SGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                  </>
+                )}
 
-                <Typography variant="body2">IGST:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                {selectedInvoice?.gst_breakup?.igst > 0 && (
+                  <>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>IGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                  </>
+                )}
               </Box>
-              <Divider sx={{ my: 1.5 }} />
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.85rem' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
                   ₹{selectedInvoice?.total_amount?.toFixed(2)}
+                </Typography>
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.75rem' }}>
+                  Words: {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
                 </Typography>
               </Box>
             </Grid>
           </Grid>
 
-          <Divider sx={{ mb: 4 }} />
+          <Divider sx={{ mb: 2 }} />
 
           {/* Signatures & Footer */}
-          <Grid container justifyContent="space-between" sx={{ mt: 5 }}>
+          <Grid container justifyContent="space-between" sx={{ mt: 3 }}>
             <Grid item>
-              <Typography variant="body2">Customer Signature</Typography>
-              <Box sx={{ height: 40, borderBottom: '1px solid #000000', width: 160 }} />
+              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Customer Signature</Typography>
+              <Box sx={{ height: 30, borderBottom: '1px solid #000000', width: 140 }} />
             </Grid>
             <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="body2">Authorized Signatory for {company?.name}</Typography>
-              <Box sx={{ height: 40, borderBottom: '1px solid #000000', width: 160, ml: 'auto' }} />
+              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Authorized Signatory for {company?.name}</Typography>
+              <Box sx={{ height: 30, borderBottom: '1px solid #000000', width: 140, ml: 'auto' }} />
             </Grid>
           </Grid>
 
-          <Box sx={{ textAlign: 'center', mt: 5 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
               {printBranch?.invoice_footer || 'Thank you for your business!'}
             </Typography>
           </Box>

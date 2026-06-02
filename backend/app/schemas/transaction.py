@@ -218,6 +218,7 @@ class InvoiceItemOut(BaseModel):
     product_id: UUID
     product_name: Optional[str] = None
     sku: Optional[str] = None
+    hsn_code: Optional[str] = None
     qty: float
     rate: float
     discount_amount: float
