@@ -302,21 +302,6 @@ const Purchase = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Purchase Module"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Purchase Module' },
-        ]}
-        actions={
-          tabIndex === 0 && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddPO}>
-              Create Purchase Order
-            </Button>
-          )
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -345,6 +330,11 @@ const Purchase = () => {
             }
           ]}
           searchKey="status"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddPO}>
+              Create Purchase Order
+            </Button>
+          }
         />
       )}
 

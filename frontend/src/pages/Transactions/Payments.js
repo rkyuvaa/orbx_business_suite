@@ -133,26 +133,22 @@ const Payments = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Payment Update"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Payment Update' },
-        ]}
-        actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
-            Collect Payment
-          </Button>
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <CommonTable columns={columns} rows={outstandings} searchKey="invoice_number" />
+      <CommonTable
+        columns={columns}
+        rows={outstandings}
+        searchKey="invoice_number"
+        tableActions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+            Collect Payment
+          </Button>
+        }
+      />
 
       <CommonModal open={openModal} onClose={() => setOpenModal(false)} title="Collect Customer Payment">
         <form onSubmit={handleSubmit(onSubmit)}>

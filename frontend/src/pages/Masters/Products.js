@@ -256,25 +256,6 @@ const Products = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Product Master"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Product Master' },
-        ]}
-        actions={
-          tabIndex === 0 ? (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddProduct}>
-              Add Product
-            </Button>
-          ) : (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddCategory}>
-              Add Category
-            </Button>
-          )
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -289,9 +270,29 @@ const Products = () => {
       </Paper>
 
       {tabIndex === 0 ? (
-        <CommonTable columns={productColumns} rows={products} actions={productActions} searchKey="name" />
+        <CommonTable
+          columns={productColumns}
+          rows={products}
+          actions={productActions}
+          searchKey="name"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddProduct}>
+              Add Product
+            </Button>
+          }
+        />
       ) : (
-        <CommonTable columns={categoryColumns} rows={categories} actions={categoryActions} searchKey="name" />
+        <CommonTable
+          columns={categoryColumns}
+          rows={categories}
+          actions={categoryActions}
+          searchKey="name"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddCategory}>
+              Add Category
+            </Button>
+          }
+        />
       )}
 
       {/* Product Modal */}

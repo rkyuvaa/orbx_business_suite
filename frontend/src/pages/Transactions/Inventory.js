@@ -170,19 +170,6 @@ const Inventory = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Inventory Module"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Inventory Module' },
-        ]}
-        actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdjustment}>
-            Manual Stock Adjustment
-          </Button>
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -197,7 +184,16 @@ const Inventory = () => {
       </Paper>
 
       {tabIndex === 0 ? (
-        <CommonTable columns={stockColumns} rows={stockPositions} searchKey="qty" />
+        <CommonTable
+          columns={stockColumns}
+          rows={stockPositions}
+          searchKey="qty"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdjustment}>
+              Manual Stock Adjustment
+            </Button>
+          }
+        />
       ) : (
         <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
       )}

@@ -120,6 +120,34 @@ const theme = createTheme({
         },
       },
     },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-input': {
+            color: '#000000',
+            fontWeight: 500,
+          },
+          '& input::placeholder': {
+            color: 'rgba(0, 0, 0, 0.50)',
+            opacity: 1,
+          },
+          '& textarea::placeholder': {
+            color: 'rgba(0, 0, 0, 0.50)',
+            opacity: 1,
+          },
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          color: 'rgba(0, 0, 0, 0.50)',
+          '&.Mui-focused': {
+            color: '#1b4332',
+          },
+        },
+      },
+    },
   },
 });
 

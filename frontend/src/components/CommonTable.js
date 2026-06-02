@@ -17,7 +17,8 @@ const CommonTable = ({
   rows = [],
   actions = [], // Array of { label, icon, onClick, color, condition }
   searchPlaceholder = "Search records...",
-  searchKey = "name"
+  searchKey = "name",
+  tableActions = null
 }) => {
   const [order, setOrder] = useState('asc');
   const [orderBy, setOrderBy] = useState('');
@@ -75,25 +76,34 @@ const CommonTable = ({
 
   return (
     <Paper sx={{ width: '100%', overflow: 'hidden', mb: 2 }}>
-      {searchKey && (
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <TextField
-            size="small"
-            placeholder={searchPlaceholder}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setPage(0);
-            }}
-            sx={{ width: 280 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
+      {(searchKey || tableActions) && (
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexGrow: 1 }}>
+            {searchKey && (
+              <TextField
+                size="small"
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(0);
+                }}
+                sx={{ width: 280 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          </Box>
+          {tableActions && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {tableActions}
+            </Box>
+          )}
         </Box>
       )}
       <TableContainer>

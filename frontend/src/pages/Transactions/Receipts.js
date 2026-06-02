@@ -87,14 +87,6 @@ const Receipts = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Payment Receipts"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Payment Receipts' },
-        ]}
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}

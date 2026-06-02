@@ -74,6 +74,56 @@ const AppLayout = () => {
   const path = location.pathname;
   const isDashboard = path === '/';
 
+  const getPageInfo = () => {
+    const p = path.toLowerCase();
+    if (p.startsWith('/masters/customers')) {
+      return { title: 'Customer Master', breadcrumbs: 'Dashboard > Customer Master' };
+    }
+    if (p.startsWith('/masters/suppliers')) {
+      return { title: 'Supplier Master', breadcrumbs: 'Dashboard > Supplier Master' };
+    }
+    if (p.startsWith('/masters/products')) {
+      return { title: 'Product Master', breadcrumbs: 'Dashboard > Product Master' };
+    }
+    if (p.startsWith('/transactions/purchase')) {
+      return { title: 'Purchase Module', breadcrumbs: 'Dashboard > Purchase Module' };
+    }
+    if (p.startsWith('/transactions/inventory')) {
+      return { title: 'Inventory Module', breadcrumbs: 'Dashboard > Inventory Module' };
+    }
+    if (p.startsWith('/transactions/sales')) {
+      return { title: 'Sales Module', breadcrumbs: 'Dashboard > Sales Module' };
+    }
+    if (p.startsWith('/transactions/receipts')) {
+      return { title: 'Payment Receipt', breadcrumbs: 'Dashboard > Payment Receipt' };
+    }
+    if (p.startsWith('/transactions/payments')) {
+      return { title: 'Payment Update', breadcrumbs: 'Dashboard > Payment Update' };
+    }
+    if (p.startsWith('/reports/dashboard')) {
+      return { title: 'Reports Dashboard', breadcrumbs: 'Dashboard > Reports Dashboard' };
+    }
+    if (p.startsWith('/reports/sales')) {
+      return { title: 'Sales Reports', breadcrumbs: 'Dashboard > Sales Reports' };
+    }
+    if (p.startsWith('/reports/inventory')) {
+      return { title: 'Inventory Reports', breadcrumbs: 'Dashboard > Inventory Reports' };
+    }
+    if (p.startsWith('/reports/purchase')) {
+      return { title: 'Purchase Reports', breadcrumbs: 'Dashboard > Purchase Reports' };
+    }
+    if (p.startsWith('/admin/company')) {
+      return { title: 'Company Config', breadcrumbs: 'Dashboard > Company Config' };
+    }
+    if (p.startsWith('/admin/branches')) {
+      return { title: 'Branches', breadcrumbs: 'Dashboard > Branches' };
+    }
+    if (p.startsWith('/admin/users')) {
+      return { title: 'Users & Roles', breadcrumbs: 'Dashboard > Users & Roles' };
+    }
+    return { title: 'App Dashboard', breadcrumbs: 'Dashboard' };
+  };
+
   // Sub-navigation menus based on active module prefix
   const getSidebarMenu = () => {
     if (path.startsWith('/masters')) {
@@ -213,6 +263,22 @@ const AppLayout = () => {
             <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 800, fontSize: isSmallMobile ? '0.95rem' : '1.1rem', letterSpacing: '-0.3px', color: '#1b4332' }}>
               ORBX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
             </Typography>
+
+            {!isDashboard && (
+              <Box sx={{ display: 'flex', alignItems: 'center', ml: isSmallMobile ? 1 : 2.5, gap: isSmallMobile ? 1 : 1.5 }}>
+                <Typography sx={{ color: '#cbd5e1', fontWeight: 300, fontSize: '1.2rem' }}>|</Typography>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: isSmallMobile ? '0.85rem' : '0.95rem', lineHeight: 1.2 }}>
+                    {getPageInfo().title}
+                  </Typography>
+                  {!isSmallMobile && (
+                    <Typography sx={{ color: '#64748b', fontSize: '0.725rem', display: 'block', lineHeight: 1 }}>
+                      {getPageInfo().breadcrumbs}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: isSmallMobile ? 1.5 : 3 }}>

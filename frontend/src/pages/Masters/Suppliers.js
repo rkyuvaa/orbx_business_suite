@@ -174,26 +174,23 @@ const Suppliers = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Supplier Master"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Supplier Master' },
-        ]}
-        actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
-            Add Supplier
-          </Button>
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <CommonTable columns={columns} rows={suppliers} actions={actions} searchKey="name" />
+      <CommonTable
+        columns={columns}
+        rows={suppliers}
+        actions={actions}
+        searchKey="name"
+        tableActions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+            Add Supplier
+          </Button>
+        }
+      />
 
       <CommonModal
         open={openModal}

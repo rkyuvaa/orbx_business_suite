@@ -270,21 +270,6 @@ const Sales = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Sales Module"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Sales Module' },
-        ]}
-        actions={
-          tabIndex === 0 && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddSO}>
-              Create Sales Order
-            </Button>
-          )
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -320,6 +305,11 @@ const Sales = () => {
             }
           ]}
           searchKey="status"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddSO}>
+              Create Sales Order
+            </Button>
+          }
         />
       )}
 

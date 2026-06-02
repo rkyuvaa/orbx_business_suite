@@ -149,26 +149,23 @@ const Customers = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Customer Master"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Customer Master' },
-        ]}
-        actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
-            Add Customer
-          </Button>
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <CommonTable columns={columns} rows={customers} actions={actions} searchKey="name" />
+      <CommonTable
+        columns={columns}
+        rows={customers}
+        actions={actions}
+        searchKey="name"
+        tableActions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+            Add Customer
+          </Button>
+        }
+      />
 
       <CommonModal
         open={openModal}

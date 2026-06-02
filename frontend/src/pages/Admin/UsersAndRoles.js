@@ -223,21 +223,6 @@ const UsersAndRoles = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Users & Roles"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Users & Roles' },
-        ]}
-        actions={
-          tabIndex === 0 && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddUser}>
-              Add User
-            </Button>
-          )
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -252,7 +237,17 @@ const UsersAndRoles = () => {
       </Paper>
 
       {tabIndex === 0 ? (
-        <CommonTable columns={userColumns} rows={users} actions={[{ type: 'edit', label: 'Edit User Profile', onClick: handleOpenEditUser }]} searchKey="full_name" />
+        <CommonTable
+          columns={userColumns}
+          rows={users}
+          actions={[{ type: 'edit', label: 'Edit User Profile', onClick: handleOpenEditUser }]}
+          searchKey="full_name"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAddUser}>
+              Add User
+            </Button>
+          }
+        />
       ) : (
         <CommonTable
           columns={roleColumns}

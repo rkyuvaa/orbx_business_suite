@@ -111,26 +111,23 @@ const Branches = () => {
 
   return (
     <Box>
-      <PageHeader
-        title="Branches"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Branches' },
-        ]}
-        actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
-            Add Branch
-          </Button>
-        }
-      />
-
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
         </Alert>
       )}
 
-      <CommonTable columns={columns} rows={branches} actions={actions} searchKey="branch_name" />
+      <CommonTable
+        columns={columns}
+        rows={branches}
+        actions={actions}
+        searchKey="branch_name"
+        tableActions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>
+            Add Branch
+          </Button>
+        }
+      />
 
       <CommonModal
         open={openModal}
