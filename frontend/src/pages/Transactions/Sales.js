@@ -162,6 +162,10 @@ const Sales = () => {
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
+    pageStyle: `
+      @page { size: A4 portrait; margin: 12mm 15mm !important; }
+      body { margin: 0 !important; padding: 0 !important; }
+    `
   });
 
   const handleDownloadPDF = async () => {
@@ -679,19 +683,14 @@ const Sales = () => {
               fontFamily: '"Outfit", sans-serif',
               boxShadow: 'none',
               '@media print': {
-                width: '100% !important',
+                width: 'auto !important',
                 maxWidth: 'none !important',
                 minHeight: '100% !important',
                 boxShadow: 'none !important',
               }
             }}
           >
-            <style type="text/css" media="print">
-              {`
-                @page { size: A4 portrait; margin: 12mm 15mm !important; }
-                body { margin: 0 !important; padding: 0 !important; }
-              `}
-            </style>
+          {/* Header */}
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
             <Box>
