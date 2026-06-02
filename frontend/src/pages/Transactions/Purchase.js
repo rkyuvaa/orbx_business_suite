@@ -57,14 +57,14 @@ const Purchase = () => {
   }, []);
 
   const handleOpenAddPO = () => {
-    setPoSupplierId(suppliers.length > 0 ? suppliers[0].id : '');
+    setPoSupplierId('');
     setPoBranchId(branches.length > 0 ? branches[0].id : '');
-    setPoItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, tax_rate: 18 }]);
+    setPoItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
     setOpenPOModal(true);
   };
 
   const handleAddItemRow = () => {
-    setPoItems([...poItems, { product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, tax_rate: 18 }]);
+    setPoItems([...poItems, { product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
   };
 
   const handleRemoveItemRow = (idx) => {
@@ -75,15 +75,7 @@ const Purchase = () => {
     setPoItems(
       poItems.map((item, i) => {
         if (i === idx) {
-          const updated = { ...item, [field]: value };
-          if (field === 'product_id') {
-            const p = products.find((prod) => prod.id === value);
-            if (p) {
-              updated.rate = p.purchase_price;
-              updated.tax_rate = p.tax_rate;
-            }
-          }
-          return updated;
+          return { ...item, [field]: value };
         }
         return item;
       })

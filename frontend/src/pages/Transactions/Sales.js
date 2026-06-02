@@ -65,14 +65,14 @@ const Sales = () => {
   }, []);
 
   const handleOpenAddSO = () => {
-    setSoCustomerId(customers.length > 0 ? customers[0].id : '');
+    setSoCustomerId('');
     setSoBranchId(branches.length > 0 ? branches[0].id : '');
-    setSoItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
+    setSoItems([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
     setOpenSOModal(true);
   };
 
   const handleAddItemRow = () => {
-    setSoItems([...soItems, { product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
+    setSoItems([...soItems, { product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
   };
 
   const handleRemoveItemRow = (idx) => {
@@ -83,15 +83,7 @@ const Sales = () => {
     setSoItems(
       soItems.map((item, i) => {
         if (i === idx) {
-          const updated = { ...item, [field]: value };
-          if (field === 'product_id') {
-            const p = products.find((prod) => prod.id === value);
-            if (p) {
-              updated.rate = p.selling_price;
-              updated.tax_rate = p.tax_rate;
-            }
-          }
-          return updated;
+          return { ...item, [field]: value };
         }
         return item;
       })
@@ -171,6 +163,67 @@ const Sales = () => {
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
   });
+
+  const handleDownloadPDF = async () => {
+    if (!window.html2canvas || !window.jspdf) {
+      const loadScript = (src) => {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      };
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      } catch (err) {
+        setError("Failed to load PDF generation libraries. Please try again.");
+        return;
+      }
+    }
+
+    try {
+      const element = printRef.current;
+      const { jsPDF } = window.jspdf;
+      
+      const originalStyle = element.style.cssText;
+      element.style.width = '800px';
+      
+      const canvas = await window.html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      element.style.cssText = originalStyle;
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Invoice_${selectedInvoice?.invoice_number || 'Tax_Invoice'}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to generate PDF file.");
+    }
+  };
 
   const soColumns = [
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
@@ -252,7 +305,12 @@ const Sales = () => {
 
   // Find linked customer and branch info for active print layout
   const printSO = selectedInvoice ? sos.find((s) => s.id === selectedInvoice.sales_order_id) : null;
-  const printCustomer = printSO ? customers.find((c) => c.id === printSO.customer_id) : null;
+  const printCustomer = selectedInvoice ? {
+    name: selectedInvoice.customer_name,
+    gstin: selectedInvoice.customer_gstin,
+    billing_address: selectedInvoice.customer_billing_address,
+    shipping_address: selectedInvoice.customer_shipping_address
+  } : null;
   const printBranch = selectedInvoice ? branches.find((b) => b.id === selectedInvoice.branch_id) : null;
 
   return (
@@ -505,9 +563,14 @@ const Sales = () => {
         title="Print Tax Invoice"
         maxWidth="md"
         actions={
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>
-            Trigger Print Dialog
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}>
+              Print Invoice
+            </Button>
+            <Button variant="contained" onClick={handleDownloadPDF}>
+              Download PDF
+            </Button>
+          </Box>
         }
       >
         <Box
