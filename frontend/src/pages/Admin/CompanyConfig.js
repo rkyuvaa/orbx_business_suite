@@ -12,6 +12,7 @@ import FormInput from '../../components/FormInput';
 const schema = yup.object().shape({
   name: yup.string().required('Company name is required'),
   gstin: yup.string().required('GSTIN is required').max(15, 'GSTIN cannot exceed 15 chars'),
+  state_code: yup.string().nullable().max(10, 'State code cannot exceed 10 chars'),
   email: yup.string().email('Please enter a valid email').required('Email is required'),
   phone: yup.string().required('Phone number is required'),
   address: yup.string().required('Company address is required'),
@@ -97,6 +98,7 @@ const CompanyConfig = () => {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>
             <FormInput name="name" control={control} label="Company Name" />
             <FormInput name="gstin" control={control} label="GSTIN Number (Tax Identifier)" />
+            <FormInput name="state_code" control={control} label="Default State Code (e.g. 33)" />
             <FormInput name="email" control={control} label="Official Corporate Email" type="email" />
             <FormInput name="phone" control={control} label="Corporate Phone Number" />
             <FormInput name="financial_year_start" control={control} label="Financial Year Start Date (YYYY-MM-DD)" />

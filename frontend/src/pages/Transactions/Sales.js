@@ -646,54 +646,60 @@ const Sales = () => {
         <Box
           ref={printRef}
           sx={{
-            p: 3,
+            width: '794px',
+            minHeight: '1050px',
+            p: 4,
+            mx: 'auto',
             backgroundColor: '#ffffff',
             color: '#000000',
             fontFamily: '"Outfit", sans-serif',
+            boxShadow: 'none',
             '@media print': {
+              width: '100% !important',
+              minHeight: 'unset !important',
               p: '0mm !important',
               margin: '0mm !important',
               boxShadow: 'none !important',
               '@page': {
                 size: 'A4 portrait',
-                margin: '8mm 12mm 8mm 12mm !important'
+                margin: '12mm 15mm 12mm 15mm !important'
               }
             }
           }}
         >
           {/* Header */}
-          <Grid container justifyContent="space-between" sx={{ mb: 2 }}>
+          <Grid container justifyContent="space-between" sx={{ mb: 3 }}>
             <Grid item>
               <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
                 {company?.name || 'ORBX CORPORATION'}
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{company?.address}</Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>GSTIN: <strong>{company?.gstin}</strong></Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Email: {company?.email} | Phone: {company?.phone}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Email: {company?.email} | Phone: {company?.phone}</Typography>
             </Grid>
             <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
                 TAX INVOICE
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Billing Date: <strong>{selectedInvoice ? formatBillingDate(selectedInvoice.date) : ''}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Billing Date: <strong>{selectedInvoice ? formatBillingDate(selectedInvoice.date) : ''}</strong></Typography>
             </Grid>
           </Grid>
 
           <Divider sx={{ mb: 2 }} />
 
           {/* Addresses */}
-          <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid container spacing={4} sx={{ mb: 3 }}>
             <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>BILL TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.8rem', color: 'text.secondary' }}>{selectedInvoice?.customer_billing_address}</Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.85rem', mt: 0.5 }}>GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>BILL TO:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_billing_address}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
             </Grid>
             <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>SHIP TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.8rem', color: 'text.secondary' }}>{selectedInvoice?.customer_shipping_address}</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>SHIP TO:</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_shipping_address}</Typography>
             </Grid>
           </Grid>
 
@@ -701,18 +707,18 @@ const Sales = () => {
           {(() => {
             const hasDiscount = selectedInvoice?.items?.some(item => (item.discount_amount || 0) > 0) || false;
             return (
-              <TableContainer sx={{ mb: 2 }}>
-                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.75, fontSize: '0.75rem' } }}>
+              <TableContainer sx={{ mb: 3 }}>
+                <Table size="small" sx={{ '& .MuiTableCell-root': { py: 1, fontSize: '0.85rem' } }}>
                   <TableHead>
                     <TableRow sx={{ borderTop: '2px solid #000000', borderBottom: '2px solid #000000' }}>
-                      <TableCell sx={{ fontWeight: 700, width: 40 }}>S.No.</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Item Description</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: 80 }}>HSN</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: 50 }}>Qty</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, width: 90 }}>Rate (₹)</TableCell>
-                      {hasDiscount && <TableCell align="center" sx={{ fontWeight: 700, width: 80 }}>Disc (₹)</TableCell>}
-                      <TableCell align="center" sx={{ fontWeight: 700, width: 60 }}>GST %</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, width: 100 }}>Amount (₹)</TableCell>
+                      <TableCell sx={{ fontWeight: 700, width: '6%' }}>S.No.</TableCell>
+                      <TableCell sx={{ fontWeight: 700, width: '44%' }}>Item Description</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '12%' }}>HSN</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '7%' }}>Qty</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '11%' }}>Rate (₹)</TableCell>
+                      {hasDiscount && <TableCell align="center" sx={{ fontWeight: 700, width: '10%' }}>Disc (₹)</TableCell>}
+                      <TableCell align="center" sx={{ fontWeight: 700, width: '8%' }}>GST %</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, width: '12%' }}>Amount (₹)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -736,10 +742,68 @@ const Sales = () => {
             );
           })()}
 
-          {/* HSN Wise Tax Summary */}
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5, fontSize: '0.8rem' }}>HSN-wise Tax Summary</Typography>
-          <TableContainer sx={{ mb: 2 }}>
-            <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.5, fontSize: '0.7rem' } }}>
+          {/* Summary / Totals */}
+          <Grid container justifyContent="space-between" sx={{ mb: 3 }}>
+            <Grid item xs={6}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>Terms & Conditions:</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
+                {printBranch?.invoice_terms}
+              </Typography>
+            </Grid>
+            <Grid item xs={5} sx={{ textAlign: 'right' }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
+                <Typography variant="body2">Subtotal:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
+                
+                {selectedInvoice?.discount_amount > 0 && (
+                  <>
+                    <Typography variant="body2">Discount:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{selectedInvoice.discount_amount.toFixed(2)}</Typography>
+                  </>
+                )}
+
+                {selectedInvoice?.gst_breakup?.cgst > 0 && (
+                  <>
+                    <Typography variant="body2">CGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                  </>
+                )}
+
+                {selectedInvoice?.gst_breakup?.sgst > 0 && (
+                  <>
+                    <Typography variant="body2">SGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                  </>
+                )}
+
+                {selectedInvoice?.gst_breakup?.igst > 0 && (
+                  <>
+                    <Typography variant="body2">IGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                  </>
+                )}
+              </Box>
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.9rem' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  ₹{selectedInvoice?.total_amount?.toFixed(2)}
+                </Typography>
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.8rem' }}>
+                  Rupees: {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* HSN Wise Tax Summary - Relocated to bottom */}
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, fontSize: '0.8rem' }}>HSN-wise Tax Summary</Typography>
+          <TableContainer sx={{ mb: 3 }}>
+            <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.75, fontSize: '0.75rem' } }}>
               <TableHead>
                 <TableRow sx={{ borderTop: '1px solid #000000', borderBottom: '1px solid #000000', backgroundColor: '#f8fafc' }}>
                   <TableCell sx={{ fontWeight: 700 }}>HSN Code</TableCell>
@@ -771,77 +835,21 @@ const Sales = () => {
             </Table>
           </TableContainer>
 
-          {/* Summary / Totals */}
-          <Grid container justifyContent="space-between" sx={{ mb: 2 }}>
-            <Grid item xs={6}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.8rem' }}>Terms & Conditions:</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.7rem', display: 'block', lineHeight: 1.2 }}>
-                {printBranch?.invoice_terms}
-              </Typography>
-            </Grid>
-            <Grid item xs={5} sx={{ textAlign: 'right' }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, fontSize: '0.8rem' }}>
-                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Subtotal:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
-                
-                {selectedInvoice?.discount_amount > 0 && (
-                  <>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Discount:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>-₹{selectedInvoice.discount_amount.toFixed(2)}</Typography>
-                  </>
-                )}
-
-                {selectedInvoice?.gst_breakup?.cgst > 0 && (
-                  <>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>CGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
-                  </>
-                )}
-
-                {selectedInvoice?.gst_breakup?.sgst > 0 && (
-                  <>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>SGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
-                  </>
-                )}
-
-                {selectedInvoice?.gst_breakup?.igst > 0 && (
-                  <>
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>IGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
-                  </>
-                )}
-              </Box>
-              <Divider sx={{ my: 1 }} />
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.85rem' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  ₹{selectedInvoice?.total_amount?.toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.75rem' }}>
-                  Words: {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 3 }} />
 
           {/* Signatures & Footer */}
           <Grid container justifyContent="space-between" sx={{ mt: 3 }}>
             <Grid item>
-              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Customer Signature</Typography>
-              <Box sx={{ height: 30, borderBottom: '1px solid #000000', width: 140 }} />
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Customer Signature</Typography>
+              <Box sx={{ height: 35, borderBottom: '1px solid #000000', width: 150 }} />
             </Grid>
             <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Authorized Signatory for {company?.name}</Typography>
-              <Box sx={{ height: 30, borderBottom: '1px solid #000000', width: 140, ml: 'auto' }} />
+              <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Authorized Signatory for {company?.name}</Typography>
+              <Box sx={{ height: 35, borderBottom: '1px solid #000000', width: 150, ml: 'auto' }} />
             </Grid>
           </Grid>
 
-          <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
               {printBranch?.invoice_footer || 'Thank you for your business!'}
             </Typography>

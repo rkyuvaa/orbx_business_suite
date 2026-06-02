@@ -16,6 +16,7 @@ class Company(Base):
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     financial_year_start: Mapped[Optional[str]] = mapped_column(String(10), nullable=True) # e.g. "2026-04-01"
+    state_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     # Relationships
     branches: Mapped[List["Branch"]] = relationship(back_populates="company", cascade="all, delete-orphan")

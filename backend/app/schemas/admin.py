@@ -14,6 +14,7 @@ class CompanyOut(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     financial_year_start: Optional[str] = None
+    state_code: Optional[str] = None
     is_active: bool
 
     class Config:
@@ -28,6 +29,7 @@ class CompanyUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     financial_year_start: Optional[str] = None
+    state_code: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod

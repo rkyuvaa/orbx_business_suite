@@ -540,7 +540,7 @@ class TxServices:
         sgst = 0.0
         igst = 0.0
 
-        company_state = company.gstin[:2] if company and company.gstin else "22"
+        company_state = company.state_code if (company and company.state_code) else (company.gstin[:2] if company and company.gstin else "22")
         customer_state = customer.gstin[:2] if customer and customer.gstin else "22"
 
         if company_state == customer_state:
