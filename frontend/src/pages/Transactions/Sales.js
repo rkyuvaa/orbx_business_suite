@@ -643,33 +643,33 @@ const Sales = () => {
           </Box>
         }
       >
-        <Box
-          ref={printRef}
-          sx={{
-            width: '100%',
-            maxWidth: '180mm',
-            minHeight: '265mm',
-            p: 4, // Screen preview padding so content doesn't hit modal edges
-            mx: 'auto',
-            boxSizing: 'border-box',
-            backgroundColor: '#ffffff',
-            color: '#000000',
-            fontFamily: '"Outfit", sans-serif',
-            boxShadow: 'none',
-            '@media print': {
-              width: '100% !important',
-              maxWidth: 'none !important',
-              minHeight: '100% !important',
-              p: '0mm !important',
-              margin: '0mm !important',
-              boxShadow: 'none !important',
-              '@page': {
-                size: 'A4 portrait',
-                margin: '12mm 15mm 12mm 15mm !important'
+        <Box sx={{ p: 4, '@media print': { p: 0 } }}>
+          <Box
+            ref={printRef}
+            sx={{
+              width: '100%',
+              maxWidth: '180mm',
+              minHeight: '265mm',
+              mx: 'auto',
+              boxSizing: 'border-box',
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              fontFamily: '"Outfit", sans-serif',
+              boxShadow: 'none',
+              '@media print': {
+                width: '100% !important',
+                maxWidth: 'none !important',
+                minHeight: '100% !important',
+                boxShadow: 'none !important',
               }
-            }
-          }}
-        >
+            }}
+          >
+            <style type="text/css" media="print">
+              {`
+                @page { size: A4 portrait; margin: 12mm 15mm !important; }
+                body { margin: 0 !important; padding: 0 !important; }
+              `}
+            </style>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
             <Box>
@@ -715,8 +715,8 @@ const Sales = () => {
               <TableContainer sx={{ mb: 3 }}>
                 <Table size="small" sx={{ 
                   '& .MuiTableCell-root': { py: 0.25, px: 1, fontSize: '0.85rem' },
-                  '& .MuiTableCell-root:first-of-type': { pl: 0 },
-                  '& .MuiTableCell-root:last-of-type': { pr: 0 }
+                  '& .MuiTableCell-root:first-of-type': { paddingLeft: '0 !important' },
+                  '& .MuiTableCell-root:last-of-type': { paddingRight: '0 !important' }
                 }}>
                   <TableHead>
                     <TableRow sx={{ borderTop: '1.5px solid #000000', borderBottom: '1.5px solid #000000' }}>
@@ -826,6 +826,7 @@ const Sales = () => {
               {printBranch?.invoice_footer || 'Thank you for your business!'}
             </Typography>
           </Box>
+        </Box>
         </Box>
       </CommonModal>
     </Box>
