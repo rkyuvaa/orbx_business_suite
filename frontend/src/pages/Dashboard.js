@@ -48,18 +48,20 @@ const Dashboard = () => {
         container 
         spacing={isMobile ? 3 : 5} 
         justifyContent="center" 
+        alignItems="center"
         sx={{ maxWidth: '1000px', margin: '0 auto' }}
       >
         {apps.map((app, idx) => (
           <Grid 
             item 
-            xs={4} 
-            sm={3} 
-            md={2} 
+            xs={6} 
+            sm={4} 
+            md={2.4} 
             key={idx}
             sx={{ 
               display: 'flex', 
-              justifyContent: 'center' 
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
           >
             <Box
