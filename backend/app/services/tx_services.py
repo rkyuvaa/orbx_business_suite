@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models.auth import User
-from app.models.business import Customer, Supplier, Branch
+from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product
 from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry
 from app.models.inventory import StockTransaction, CurrentStock
