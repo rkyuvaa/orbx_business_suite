@@ -7,7 +7,7 @@ export const store = configureStore({
     auth: authReducer,
     branch: branchReducer,
   },
-  devTools: process.env.NODE_ENV !== 'production',
+  devTools: import.meta.env.MODE !== 'production',
 });
 
 export default store;
