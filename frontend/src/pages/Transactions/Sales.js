@@ -190,32 +190,54 @@ const Sales = () => {
       const { jsPDF } = window.jspdf;
       
       const originalStyle = element.style.cssText;
-      element.style.width = '800px';
+      // Force a wide capture frame to prevent any text wrapping or cutoff due to screen constraints
+      element.style.cssText += '; width: 800px !important; max-width: none !important; padding: 0 !important; margin: 0 !important;';
       
       const canvas = await window.html2canvas(element, {
         scale: 2,
         useCORS: true,
-        logging: false
+        logging: false,
+        windowWidth: 800
       });
       
       element.style.cssText = originalStyle;
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 295;
+      
+      // A4 dimensions: 210 x 297 mm
+      const margin = 15;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      
+      const imgWidth = pageWidth - (margin * 2); // 180mm printable width
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
       let heightLeft = imgHeight;
-      let position = 0;
+      let position = margin;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Draw first page
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      
+      // Hide bottom bleed to create bottom margin
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F');
+      
+      const heightShown = pageHeight - (margin * 2);
+      heightLeft -= heightShown;
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+      // Handle multi-page overflow
+      while (heightLeft > 0) {
+        position -= heightShown;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        
+        // Hide top and bottom bleed to maintain margins
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pageWidth, margin, 'F'); // Top margin cover
+        pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F'); // Bottom margin cover
+        
+        heightLeft -= heightShown;
       }
 
       pdf.save(`Invoice_${selectedInvoice?.invoice_number || 'Tax_Invoice'}.pdf`);
