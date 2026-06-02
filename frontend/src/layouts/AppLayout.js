@@ -83,11 +83,29 @@ const AppLayout = () => {
         { label: 'Product Master', icon: <ProductIcon />, to: '/masters/products' },
       ];
     }
-    if (path.startsWith('/transactions')) {
+    if (path.startsWith('/transactions/purchase')) {
       return [
         { label: 'Purchase Module', icon: <SupplierIcon />, to: '/transactions/purchase' },
+        { label: 'Supplier Master', icon: <PeopleIcon />, to: '/masters/suppliers' },
+        { label: 'Purchase Reports', icon: <ReportIcon />, to: '/reports/purchase' },
+      ];
+    }
+    if (path.startsWith('/transactions/inventory')) {
+      return [
         { label: 'Inventory Module', icon: <ProductIcon />, to: '/transactions/inventory' },
+        { label: 'Product Master', icon: <ProductIcon />, to: '/masters/products' },
+        { label: 'Inventory Reports', icon: <ReportIcon />, to: '/reports/inventory' },
+      ];
+    }
+    if (path.startsWith('/transactions/sales')) {
+      return [
         { label: 'Sales Module', icon: <SalesIcon />, to: '/transactions/sales' },
+        { label: 'Customer Master', icon: <PeopleIcon />, to: '/masters/customers' },
+        { label: 'Sales Reports', icon: <ReportIcon />, to: '/reports/sales' },
+      ];
+    }
+    if (path.startsWith('/transactions/receipts') || path.startsWith('/transactions/payments')) {
+      return [
         { label: 'Payment Receipt', icon: <ReceiptIcon />, to: '/transactions/receipts' },
         { label: 'Payment Update', icon: <ReceiptIcon />, to: '/transactions/payments' },
       ];
