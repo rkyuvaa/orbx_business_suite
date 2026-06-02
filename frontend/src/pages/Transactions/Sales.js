@@ -646,17 +646,18 @@ const Sales = () => {
         <Box
           ref={printRef}
           sx={{
-            width: '794px',
-            minHeight: '1050px',
+            width: '180mm',
+            minHeight: '265mm',
             p: 4,
             mx: 'auto',
+            boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             color: '#000000',
             fontFamily: '"Outfit", sans-serif',
             boxShadow: 'none',
             '@media print': {
-              width: '100% !important',
-              minHeight: 'unset !important',
+              width: '180mm !important',
+              minHeight: '265mm !important',
               p: '0mm !important',
               margin: '0mm !important',
               boxShadow: 'none !important',
@@ -797,43 +798,6 @@ const Sales = () => {
               </Box>
             </Grid>
           </Grid>
-
-          <Divider sx={{ mb: 2 }} />
-
-          {/* HSN Wise Tax Summary - Relocated to bottom */}
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, fontSize: '0.8rem' }}>HSN-wise Tax Summary</Typography>
-          <TableContainer sx={{ mb: 3 }}>
-            <Table size="small" sx={{ '& .MuiTableCell-root': { py: 0.75, fontSize: '0.75rem' } }}>
-              <TableHead>
-                <TableRow sx={{ borderTop: '1px solid #000000', borderBottom: '1px solid #000000', backgroundColor: '#f8fafc' }}>
-                  <TableCell sx={{ fontWeight: 700 }}>HSN Code</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Taxable Value (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>CGST Rate</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>CGST Amt (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>SGST Rate</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>SGST Amt (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>IGST Rate</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>IGST Amt (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total Tax (₹)</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {getHsnTaxSummary().map((row, idx) => (
-                  <TableRow key={idx} sx={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <TableCell>{row.hsn}</TableCell>
-                    <TableCell align="right">₹{row.taxableValue.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.cgstRate}%</TableCell>
-                    <TableCell align="right">₹{row.cgstAmount.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.sgstRate}%</TableCell>
-                    <TableCell align="right">₹{row.sgstAmount.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.igstRate}%</TableCell>
-                    <TableCell align="right">₹{row.igstAmount.toFixed(2)}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>₹{row.totalTax.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
 
           <Divider sx={{ mb: 3 }} />
 
