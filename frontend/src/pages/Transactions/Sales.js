@@ -163,7 +163,7 @@ const Sales = () => {
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
     pageStyle: `
-      @page { size: A4 portrait; margin: 12mm 15mm !important; }
+      @page { size: A4 portrait; margin: 0 !important; }
       body { margin: 0 !important; padding: 0 !important; }
     `
   });
@@ -683,14 +683,16 @@ const Sales = () => {
               fontFamily: '"Outfit", sans-serif',
               boxShadow: 'none',
               '@media print': {
-                width: 'auto !important',
-                maxWidth: 'none !important',
-                minHeight: '100% !important',
+                width: '210mm !important',
+                maxWidth: '210mm !important',
+                minHeight: '297mm !important',
+                padding: '12mm 15mm !important',
+                margin: '0 !important',
                 boxShadow: 'none !important',
+                boxSizing: 'border-box !important',
               }
             }}
           >
-          {/* Header */}
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
             <Box>
