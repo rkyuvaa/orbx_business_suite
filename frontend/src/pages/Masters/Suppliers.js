@@ -103,18 +103,18 @@ const Suppliers = () => {
     try {
       // Repack bank details
       const payload = {
+        code: data.code || null,
         name: data.name,
-        code: data.code,
-        gstin: data.gstin,
-        phone: data.phone,
-        alternative_phone: data.alternative_phone,
-        email: data.email,
-        address: data.address,
-        payment_terms: data.payment_terms,
+        gstin: data.gstin || null,
+        phone: data.phone || null,
+        alternative_phone: data.alternative_phone || null,
+        email: data.email || null,
+        address: data.address || null,
+        payment_terms: data.payment_terms || null,
         bank_details: {
-          bank_name: data.bank_name,
-          bank_account_no: data.bank_account_no,
-          bank_ifsc: data.bank_ifsc,
+          bank_name: data.bank_name || null,
+          bank_account_no: data.bank_account_no || null,
+          bank_ifsc: data.bank_ifsc || null,
         },
       };
 
@@ -126,7 +126,14 @@ const Suppliers = () => {
       setOpenModal(false);
       loadSuppliers();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save supplier details.');
+      const detail = err.response?.data?.detail;
+      let errorMsg = 'Failed to save supplier details.';
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errorMsg = detail.map((d) => `${d.loc?.join('.') || 'Field'}: ${d.msg}`).join(', ');
+      }
+      setError(errorMsg);
     }
   };
 
