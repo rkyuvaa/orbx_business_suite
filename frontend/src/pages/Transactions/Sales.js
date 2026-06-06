@@ -863,7 +863,7 @@ const Sales = () => {
           {(() => {
             const hasDiscount = printData?.items?.some(item => (item.discount_amount || 0) > 0) || false;
             return (
-              <TableContainer sx={{ mb: 3 }}>
+              <TableContainer sx={{ mb: 6 }}>
                 <Table size="small" sx={{ 
                   '& .MuiTableCell-root': { py: 0.25, px: 1, fontSize: '0.85rem' },
                   '& .MuiTableCell-root:first-of-type': { paddingLeft: '0 !important' },
