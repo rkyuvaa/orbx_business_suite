@@ -685,10 +685,12 @@ class TxServices:
             .filter(Invoice.id == invoice.id)
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
-                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+                selectinload(Invoice.payments)
             )
         )
         inv = q_final.scalar_one()
+        inv.outstanding_amount = inv.total_amount
         if inv.sales_order and inv.sales_order.customer:
             inv.customer_name = inv.sales_order.customer.name
             inv.customer_id = inv.sales_order.customer.id
@@ -708,7 +710,8 @@ class TxServices:
             select(Invoice)
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
-                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+                selectinload(Invoice.payments)
             )
         )
         if branch_id:
@@ -716,6 +719,8 @@ class TxServices:
         query = await db.execute(stmt)
         invoices = list(query.scalars().all())
         for inv in invoices:
+            total_paid = sum([p.amount_paid for p in inv.payments])
+            inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
@@ -745,7 +750,8 @@ class TxServices:
             .filter(Invoice.status.in_(["Unpaid", "PartiallyPaid"]))
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
-                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer)
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+                selectinload(Invoice.payments)
             )
         )
         if customer_id:
@@ -753,6 +759,8 @@ class TxServices:
         query = await db.execute(stmt)
         invoices = list(query.scalars().all())
         for inv in invoices:
+            total_paid = sum([p.amount_paid for p in inv.payments])
+            inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
@@ -768,6 +776,7 @@ class TxServices:
             for item in inv.items:
                 item.product_name = item.product.name if item.product else "Unknown"
                 item.sku = item.product.sku if item.product else ""
+                item.hsn_code = item.product.hsn_code if item.product else ""
         return invoices
 
     @staticmethod

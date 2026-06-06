@@ -45,10 +45,12 @@ const Payments = () => {
       const customerInvoices = outstandings.filter(inv => inv.customer_id === selectedCustomer.id);
       const invoiceState = {};
       customerInvoices.forEach(inv => {
+        const outstanding = inv.outstanding_amount !== undefined && inv.outstanding_amount !== null ? inv.outstanding_amount : inv.total_amount;
         invoiceState[inv.id] = {
           checked: false,
-          amount: inv.total_amount,
-          maxAmount: inv.total_amount,
+          amount: outstanding,
+          maxAmount: outstanding,
+          totalAmount: inv.total_amount,
           invoiceNumber: inv.invoice_number
         };
       });
@@ -130,6 +132,11 @@ const Payments = () => {
       render: (row) => row.customer_name || 'Corporate Client',
     },
     { id: 'total_amount', label: 'Invoice Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
+    {
+      id: 'outstanding_amount',
+      label: 'Outstanding (₹)',
+      render: (row) => `₹${(row.outstanding_amount !== undefined && row.outstanding_amount !== null ? row.outstanding_amount : row.total_amount).toFixed(2)}`
+    },
     {
       id: 'status',
       label: 'Status',
@@ -234,7 +241,7 @@ const Payments = () => {
                               style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }}
                             />
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {inv.invoiceNumber} (₹{inv.maxAmount.toFixed(2)})
+                              {inv.invoiceNumber} (Outstanding: ₹{inv.maxAmount.toFixed(2)} / Total: ₹{inv.totalAmount.toFixed(2)})
                             </Typography>
                           </Box>
                           

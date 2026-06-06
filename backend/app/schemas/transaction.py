@@ -256,6 +256,7 @@ class InvoiceOut(BaseModel):
     tax_amount: float
     discount_amount: float
     total_amount: float
+    outstanding_amount: Optional[float] = None
     status: str
     print_ready_layout: Optional[str] = None
     items: List[InvoiceItemOut] = []
