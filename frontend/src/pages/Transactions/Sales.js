@@ -31,6 +31,7 @@ const Sales = () => {
 
   // Sales Order Form Local States
   const [soCustomerId, setSoCustomerId] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [soBranchId, setSoBranchId] = useState('');
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
@@ -59,6 +60,7 @@ const Sales = () => {
 
   const handleOpenAddSO = () => {
     setSoCustomerId('');
+    setSelectedCustomer(null);
     setSoBranchId(branches.length > 0 ? branches[0].id : '');
     setSoItems([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
     setOpenSOModal(true);
@@ -433,20 +435,30 @@ const Sales = () => {
         title="Create Sales Order"
         maxWidth="md"
       >
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap', mb: 3 }}>
+          <Box sx={{ flex: '1 1 250px' }}>
             <FormAutocomplete
               label="Select Customer"
               endpoint="/customers/"
               value={soCustomerId}
+              size="small"
               onChange={(val) => setSoCustomerId(val)}
+              onChangeOverride={(custObj) => setSelectedCustomer(custObj)}
             />
-          </Grid>
-          <Grid item xs={12} sm={6}>
+            {selectedCustomer && (
+              <Box sx={{ mt: 0.5, px: 0.5, fontSize: '0.75rem', color: 'text.secondary', lineHeight: 1.3 }}>
+                GSTIN: <strong>{selectedCustomer.gstin || 'N/A'}</strong> | Phone: <strong>{selectedCustomer.phone || 'N/A'}</strong>
+                <br />
+                Address: <strong>{selectedCustomer.billing_address || 'N/A'}</strong>
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ flex: '1 1 200px' }}>
             <TextField
               select
               label="Ordering Branch"
               fullWidth
+              size="small"
               value={soBranchId}
               onChange={(e) => setSoBranchId(e.target.value)}
             >
@@ -454,34 +466,39 @@ const Sales = () => {
                 <MenuItem key={b.id} value={b.id}>{b.branch_name} ({b.code})</MenuItem>
               ))}
             </TextField>
-          </Grid>
-        </Grid>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+            <Button onClick={() => setOpenSOModal(false)} variant="outlined" size="small">Cancel</Button>
+            <Button onClick={submitSO} variant="contained" size="small">Submit SO</Button>
+          </Box>
+        </Box>
 
-        <Typography variant="subtitle1" color="primary.main" sx={{ fontWeight: 600, mb: 2 }}>
+        <Typography variant="subtitle1" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
           Sales Order Items sub-grid
         </Typography>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 80 }}>Qty</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 130 }}>Rate (₹)</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>Disc (₹)</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 90 }}>GST %</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Total (₹)</TableCell>
-                <TableCell align="center" sx={{ width: 50 }}></TableCell>
+                <TableCell sx={{ py: 1, px: 1, fontWeight: 600 }}>Product</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 80 }}>Qty</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 130 }}>Rate (₹)</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 100 }}>Disc (₹)</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 90 }}>GST %</TableCell>
+                <TableCell align="right" sx={{ py: 1, px: 1, fontWeight: 600 }}>Total (₹)</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, width: 50 }}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {soItems.map((item, idx) => (
                 <TableRow key={idx}>
-                  <TableCell sx={{ minWidth: 240 }}>
+                  <TableCell sx={{ py: 0.75, px: 1, minWidth: 240 }}>
                     <FormAutocomplete
                       label="Select Product"
                       endpoint="/products/"
                       value={item.product_id}
+                      size="small"
                       onChange={(val) => handleItemChange(idx, 'product_id', val)}
                       onChangeOverride={(prodObj) => {
                         if (prodObj) {
@@ -500,42 +517,46 @@ const Sales = () => {
                       }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.75, px: 1 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.qty}
                       onChange={(e) => handleItemChange(idx, 'qty', parseInt(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '6px 8px' } }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.75, px: 1 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.rate}
                       onChange={(e) => handleItemChange(idx, 'rate', parseFloat(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '6px 8px' } }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.75, px: 1 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.discount_amount}
                       onChange={(e) => handleItemChange(idx, 'discount_amount', parseFloat(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '6px 8px' } }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.75, px: 1 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.tax_rate}
                       onChange={(e) => handleItemChange(idx, 'tax_rate', parseFloat(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '6px 8px' } }}
                     />
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <TableCell align="right" sx={{ py: 0.75, px: 1, fontWeight: 600 }}>
                     {(((item.qty * item.rate) - item.discount_amount) * (1 + item.tax_rate / 100)).toFixed(2)}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ py: 0.75, px: 1 }}>
                     <IconButton color="error" size="small" onClick={() => handleRemoveItemRow(idx)} disabled={soItems.length === 1}>
                       <DeleteIcon />
                     </IconButton>
@@ -550,16 +571,11 @@ const Sales = () => {
           Add Item Row
         </Button>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2, mb: 4 }}>
-          <Typography variant="body1">Subtotal: <strong>₹{soTotalSum.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Discount: <strong>-₹{soTotalDiscount.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Taxes (GST): <strong>₹{soTotalTax.toFixed(2)}</strong></Typography>
-          <Typography variant="h6" color="primary.main">Grand Total: <strong>₹{(soTotalSum - soTotalDiscount + soTotalTax).toFixed(2)}</strong></Typography>
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button onClick={() => setOpenSOModal(false)} variant="outlined">Cancel</Button>
-          <Button onClick={submitSO} variant="contained">Submit SO</Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2 }}>
+          <Typography variant="body2">Subtotal: <strong>₹{soTotalSum.toFixed(2)}</strong></Typography>
+          <Typography variant="body2">Discount: <strong>-₹{soTotalDiscount.toFixed(2)}</strong></Typography>
+          <Typography variant="body2">Taxes (GST): <strong>₹{soTotalTax.toFixed(2)}</strong></Typography>
+          <Typography variant="subtitle1" color="primary.main">Grand Total: <strong>₹{(soTotalSum - soTotalDiscount + soTotalTax).toFixed(2)}</strong></Typography>
         </Box>
       </CommonModal>
 

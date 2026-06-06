@@ -12,6 +12,7 @@ const FormAutocomplete = ({
   disabled = false,
   required = false,
   defaultValue = '',
+  size = 'medium',
   // Standalone mode:
   value,
   onChange,
@@ -105,10 +106,11 @@ const FormAutocomplete = ({
           <TextField
             {...params}
             label={label}
+            size={size}
             error={!!fieldError}
             helperText={fieldError ? fieldError.message : null}
             required={required}
-            sx={{ mb: 2 }}
+            sx={{ mb: size === 'small' ? 0 : 2 }}
             InputProps={{
               ...params.InputProps,
               endAdornment: (
