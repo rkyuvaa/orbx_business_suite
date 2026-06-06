@@ -59,14 +59,23 @@ const BackupRestore = () => {
     }
   };
 
-  const handleDownload = (filename) => {
-    const url = `${apiClient.defaults.baseURL}/admin/backups/${filename}/download`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (filename) => {
+    try {
+      setError(null);
+      const res = await apiClient.get(`/admin/backups/${filename}/download`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to download the backup file.');
+    }
   };
 
   const handleFileChange = (e) => {
