@@ -136,21 +136,14 @@ const AppLayout = () => {
 
   // Sub-navigation menus based on active module prefix
   const getSidebarMenu = () => {
-    if (path.startsWith('/masters')) {
-      return [
-        { label: 'Customer Master', icon: <PeopleIcon />, to: '/masters/customers' },
-        { label: 'Supplier Master', icon: <SupplierIcon />, to: '/masters/suppliers' },
-        { label: 'Product Master', icon: <ProductIcon />, to: '/masters/products' },
-      ];
-    }
-    if (path.startsWith('/transactions/purchase')) {
+    if (path.startsWith('/transactions/purchase') || path.startsWith('/masters/suppliers')) {
       return [
         { label: 'Purchase Module', icon: <SupplierIcon />, to: '/transactions/purchase' },
         { label: 'Supplier Master', icon: <PeopleIcon />, to: '/masters/suppliers' },
         { label: 'Purchase Reports', icon: <ReportIcon />, to: '/reports/purchase' },
       ];
     }
-    if (path.startsWith('/transactions/inventory') || path.startsWith('/transactions/transfers')) {
+    if (path.startsWith('/transactions/inventory') || path.startsWith('/transactions/transfers') || path.startsWith('/masters/products')) {
       return [
         { label: 'Inventory Module', icon: <ProductIcon />, to: '/transactions/inventory' },
         { label: 'Stock Transfers / DC', icon: <DispatchIcon />, to: '/transactions/transfers' },
@@ -158,7 +151,7 @@ const AppLayout = () => {
         { label: 'Inventory Reports', icon: <ReportIcon />, to: '/reports/inventory' },
       ];
     }
-    if (path.startsWith('/transactions/sales')) {
+    if (path.startsWith('/transactions/sales') || path.startsWith('/masters/customers')) {
       return [
         { label: 'Sales Module', icon: <SalesIcon />, to: '/transactions/sales' },
         { label: 'Customer Master', icon: <PeopleIcon />, to: '/masters/customers' },

@@ -25,7 +25,6 @@ const Dashboard = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const apps = [
-    { label: 'Masters', icon: <PeopleIcon />, color: '#00B4D8', to: '/masters/customers' },
     { label: 'Purchase', icon: <PurchaseIcon />, color: '#E76F51', to: '/transactions/purchase' },
     { label: 'Inventory', icon: <InventoryIcon />, color: '#9B5DE5', to: '/transactions/inventory' },
     { label: 'Sales', icon: <SalesIcon />, color: '#F15BB5', to: '/transactions/sales' },
