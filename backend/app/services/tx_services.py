@@ -165,6 +165,72 @@ class TxServices:
         return orders
 
     @staticmethod
+    async def update_purchase_order(db: AsyncSession, po_id: UUID, po_data: PurchaseOrderCreate) -> PurchaseOrder:
+        """Update a Purchase Order, clear old items, and recalculate totals."""
+        q_po = await db.execute(select(PurchaseOrder).filter(PurchaseOrder.id == po_id))
+        po = q_po.scalar_one_or_none()
+        if not po:
+            raise HTTPException(status_code=404, detail="Purchase Order not found.")
+        
+        if po.status != "Draft":
+            raise HTTPException(status_code=400, detail="Only Draft Purchase Orders can be edited.")
+        
+        po.supplier_id = po_data.supplier_id
+        po.branch_id = po_data.branch_id
+        po.expected_delivery = po_data.expected_delivery
+
+        from sqlalchemy import delete
+        await db.execute(delete(PurchaseOrderItem).filter(PurchaseOrderItem.purchase_order_id == po_id))
+        
+        total_amount = 0.0
+        tax_amount = 0.0
+
+        for item in po_data.items:
+            q_p = await db.execute(select(Product).filter(Product.id == item.product_id))
+            product = q_p.scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=400, detail="Invalid product ID.")
+
+            item_amount = item.qty * item.rate
+            item_tax = item_amount * (item.tax_rate / 100)
+            
+            total_amount += item_amount
+            tax_amount += item_tax
+
+            po_item = PurchaseOrderItem(
+                purchase_order_id=po.id,
+                product_id=item.product_id,
+                qty=item.qty,
+                rate=item.rate,
+                tax_rate=item.tax_rate,
+                tax_amount=item_tax,
+                amount=item_amount
+            )
+            db.add(po_item)
+
+        po.total_amount = total_amount
+        po.tax_amount = tax_amount
+        po.grand_total = total_amount + tax_amount
+        
+        db.add(po)
+        await db.commit()
+
+        q_final = await db.execute(
+            select(PurchaseOrder)
+            .filter(PurchaseOrder.id == po.id)
+            .options(
+                selectinload(PurchaseOrder.supplier),
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
+            )
+        )
+        o = q_final.scalar_one()
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        for item in o.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+        return o
+
+    @staticmethod
     async def create_grn(db: AsyncSession, grn_data: GRNCreate, received_by_id: UUID) -> GRN:
         """Create a GRN, verify linked PO, increment live inventory, and write transaction logs."""
         # Verify PO exists
@@ -393,9 +459,13 @@ class TxServices:
         )
         o = q_final.scalar_one()
         o.customer_name = o.customer.name if o.customer else "Unknown"
+        o.customer_gstin = o.customer.gstin if o.customer else None
+        o.customer_billing_address = o.customer.billing_address if o.customer else None
+        o.customer_shipping_address = o.customer.shipping_address if o.customer else None
         for item in o.items:
             item.product_name = item.product.name if item.product else "Unknown"
             item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
         return o
 
     @staticmethod
@@ -414,10 +484,87 @@ class TxServices:
         orders = list(query.scalars().all())
         for o in orders:
             o.customer_name = o.customer.name if o.customer else "Unknown"
+            o.customer_gstin = o.customer.gstin if o.customer else None
+            o.customer_billing_address = o.customer.billing_address if o.customer else None
+            o.customer_shipping_address = o.customer.shipping_address if o.customer else None
             for item in o.items:
                 item.product_name = item.product.name if item.product else "Unknown"
                 item.sku = item.product.sku if item.product else ""
+                item.hsn_code = item.product.hsn_code if item.product else ""
         return orders
+
+    @staticmethod
+    async def update_sales_order(db: AsyncSession, so_id: UUID, so_data: SalesOrderCreate) -> SalesOrder:
+        """Update a Sales Order, clear old items, and recalculate totals."""
+        q_so = await db.execute(select(SalesOrder).filter(SalesOrder.id == so_id))
+        so = q_so.scalar_one_or_none()
+        if not so:
+            raise HTTPException(status_code=404, detail="Sales Order not found.")
+        
+        if so.status != "Draft":
+            raise HTTPException(status_code=400, detail="Only Draft Sales Orders can be edited.")
+        
+        so.customer_id = so_data.customer_id
+        so.branch_id = so_data.branch_id
+
+        from sqlalchemy import delete
+        await db.execute(delete(SalesOrderItem).filter(SalesOrderItem.sales_order_id == so_id))
+        
+        total_amount = 0.0
+        tax_amount = 0.0
+        discount_amount = 0.0
+
+        for item in so_data.items:
+            q_p = await db.execute(select(Product).filter(Product.id == item.product_id))
+            product = q_p.scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=400, detail="Invalid product ID.")
+
+            item_amount = item.qty * item.rate
+            item_tax = (item_amount - item.discount_amount) * (item.tax_rate / 100)
+            
+            total_amount += item_amount
+            tax_amount += item_tax
+            discount_amount += item.discount_amount
+
+            so_item = SalesOrderItem(
+                sales_order_id=so.id,
+                product_id=item.product_id,
+                qty=item.qty,
+                rate=item.rate,
+                discount_amount=item.discount_amount,
+                tax_rate=item.tax_rate,
+                tax_amount=item_tax,
+                amount=item_amount - item.discount_amount
+            )
+            db.add(so_item)
+
+        so.total_amount = total_amount
+        so.tax_amount = tax_amount
+        so.discount_amount = discount_amount
+        so.grand_total = total_amount - discount_amount + tax_amount
+        
+        db.add(so)
+        await db.commit()
+
+        q_final = await db.execute(
+            select(SalesOrder)
+            .filter(SalesOrder.id == so.id)
+            .options(
+                selectinload(SalesOrder.customer),
+                selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
+            )
+        )
+        o = q_final.scalar_one()
+        o.customer_name = o.customer.name if o.customer else "Unknown"
+        o.customer_gstin = o.customer.gstin if o.customer else None
+        o.customer_billing_address = o.customer.billing_address if o.customer else None
+        o.customer_shipping_address = o.customer.shipping_address if o.customer else None
+        for item in o.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
+        return o
 
     @staticmethod
     async def create_invoice(db: AsyncSession, inv_data: InvoiceCreate) -> Invoice:

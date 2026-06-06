@@ -178,6 +178,7 @@ class SalesOrderItemOut(BaseModel):
     product_id: UUID
     product_name: Optional[str] = None
     sku: Optional[str] = None
+    hsn_code: Optional[str] = None
     qty: float
     rate: float
     discount_amount: float
@@ -199,6 +200,9 @@ class SalesOrderOut(BaseModel):
     id: UUID
     customer_id: UUID
     customer_name: Optional[str] = None
+    customer_gstin: Optional[str] = None
+    customer_billing_address: Optional[str] = None
+    customer_shipping_address: Optional[str] = None
     branch_id: UUID
     date: datetime
     status: str

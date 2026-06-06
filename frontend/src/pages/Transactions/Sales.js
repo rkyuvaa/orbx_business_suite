@@ -6,7 +6,8 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon, Delete as DeleteIcon,
-  Receipt as InvoiceIcon, Print as PrintIcon
+  Receipt as InvoiceIcon, Print as PrintIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -28,6 +29,7 @@ const Sales = () => {
 
   const [selectedSO, setSelectedSO] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [printDocType, setPrintDocType] = useState('Invoice');
 
   // Sales Order Form Local States
   const [soCustomerId, setSoCustomerId] = useState('');
@@ -59,10 +61,36 @@ const Sales = () => {
   }, []);
 
   const handleOpenAddSO = () => {
+    setSelectedSO(null);
     setSoCustomerId('');
     setSelectedCustomer(null);
     setSoBranchId(branches.length > 0 ? branches[0].id : '');
     setSoItems([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
+    setOpenSOModal(true);
+  };
+
+  const handleOpenEditSO = (so) => {
+    setSelectedSO(so);
+    setSoCustomerId(so.customer_id);
+    setSelectedCustomer({
+      id: so.customer_id,
+      name: so.customer_name,
+      gstin: so.customer_gstin,
+      billing_address: so.customer_billing_address,
+      shipping_address: so.customer_shipping_address
+    });
+    setSoBranchId(so.branch_id);
+    setSoItems(
+      so.items.map((item) => ({
+        product_id: item.product_id,
+        qty: item.qty,
+        rate: item.rate,
+        discount_amount: item.discount_amount,
+        tax_rate: item.tax_rate,
+        product_name: item.product_name,
+        sku: item.sku
+      }))
+    );
     setOpenSOModal(true);
   };
 
@@ -90,9 +118,19 @@ const Sales = () => {
       const payload = {
         customer_id: soCustomerId,
         branch_id: soBranchId,
-        items: soItems
+        items: soItems.map(item => ({
+          product_id: item.product_id,
+          qty: item.qty,
+          rate: item.rate,
+          discount_amount: item.discount_amount,
+          tax_rate: item.tax_rate
+        }))
       };
-      await apiClient.post('/sales/so', payload);
+      if (selectedSO && selectedSO.status === 'Draft') {
+        await apiClient.put(`/sales/so/${selectedSO.id}`, payload);
+      } else {
+        await apiClient.post('/sales/so', payload);
+      }
       setOpenSOModal(false);
       loadData();
     } catch (err) {
@@ -129,6 +167,13 @@ const Sales = () => {
   // ==========================================
   const handleOpenPrint = (invoice) => {
     setSelectedInvoice(invoice);
+    setPrintDocType('Invoice');
+    setOpenPrintModal(true);
+  };
+
+  const handleOpenPrintSO = (so) => {
+    setSelectedSO(so);
+    setPrintDocType('SalesOrder');
     setOpenPrintModal(true);
   };
 
@@ -216,7 +261,7 @@ const Sales = () => {
         heightLeft -= heightShown;
       }
 
-      pdf.save(`Invoice_${selectedInvoice?.invoice_number || 'Tax_Invoice'}.pdf`);
+      pdf.save(`${printDocType}_${printData?.invoice_number || 'Document'}.pdf`);
     } catch (err) {
       console.error(err);
       setError("Failed to generate PDF file.");
@@ -324,22 +369,45 @@ const Sales = () => {
   const soTotalDiscount = soItems.reduce((acc, item) => acc + (parseFloat(item.discount_amount) || 0), 0);
   const soTotalTax = soItems.reduce((acc, item) => acc + (((parseInt(item.qty) || 0) * (parseFloat(item.rate) || 0) - (parseFloat(item.discount_amount) || 0)) * (parseFloat(item.tax_rate) || 18) / 100), 0);
 
-  // Find linked customer and branch info for active print layout
-  const printSO = selectedInvoice ? sos.find((s) => s.id === selectedInvoice.sales_order_id) : null;
-  const printCustomer = selectedInvoice ? {
-    name: selectedInvoice.customer_name,
-    gstin: selectedInvoice.customer_gstin,
-    billing_address: selectedInvoice.customer_billing_address,
-    shipping_address: selectedInvoice.customer_shipping_address
-  } : null;
-  const printBranch = selectedInvoice ? branches.find((b) => b.id === selectedInvoice.branch_id) : null;
+  // Unified print data mapper
+  const printData = (() => {
+    if (printDocType === 'Invoice') {
+      return selectedInvoice;
+    } else if (printDocType === 'SalesOrder') {
+      if (!selectedSO) return null;
+      const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '22');
+      const customerState = selectedSO.customer_gstin ? selectedSO.customer_gstin.substring(0, 2) : '22';
+      const isIntrastate = companyState === customerState;
+      const cgst = isIntrastate ? selectedSO.tax_amount / 2 : 0;
+      const sgst = isIntrastate ? selectedSO.tax_amount / 2 : 0;
+      const igst = !isIntrastate ? selectedSO.tax_amount : 0;
+      return {
+        invoice_number: `SO-${selectedSO.id.substring(0, 6).toUpperCase()}`,
+        date: selectedSO.date,
+        customer_name: selectedSO.customer_name,
+        customer_gstin: selectedSO.customer_gstin,
+        customer_billing_address: selectedSO.customer_billing_address,
+        customer_shipping_address: selectedSO.customer_shipping_address,
+        subtotal: selectedSO.total_amount,
+        discount_amount: selectedSO.discount_amount,
+        tax_amount: selectedSO.tax_amount,
+        total_amount: selectedSO.grand_total,
+        items: selectedSO.items,
+        gst_breakup: { cgst, sgst, igst },
+        branch_id: selectedSO.branch_id
+      };
+    }
+    return null;
+  })();
+
+  const printBranch = printData ? branches.find((b) => b.id === printData.branch_id) : null;
 
   const getHsnTaxSummary = () => {
-    if (!selectedInvoice || !selectedInvoice.items) return [];
+    if (!printData || !printData.items) return [];
     const summary = {};
-    const isIntrastate = (selectedInvoice.gst_breakup?.cgst || 0) > 0 || (selectedInvoice.gst_breakup?.sgst || 0) > 0;
+    const isIntrastate = (printData.gst_breakup?.cgst || 0) > 0 || (printData.gst_breakup?.sgst || 0) > 0;
 
-    selectedInvoice.items.forEach(item => {
+    printData.items.forEach(item => {
       const hsn = item.hsn_code || 'N/A';
       const taxableValue = (item.rate * item.qty) - (item.discount_amount || 0);
       const gstRate = item.tax_rate || 18;
@@ -393,6 +461,19 @@ const Sales = () => {
           rows={sos}
           actions={[
             {
+              icon: <PrintIcon />,
+              label: 'Print Sales Order',
+              onClick: handleOpenPrintSO,
+              color: 'primary'
+            },
+            {
+              icon: <EditIcon />,
+              label: 'Edit Sales Order',
+              condition: (row) => row.status === 'Draft',
+              onClick: handleOpenEditSO,
+              color: 'secondary'
+            },
+            {
               icon: <InvoiceIcon />,
               label: 'Generate Tax Invoice',
               condition: (row) => {
@@ -432,7 +513,7 @@ const Sales = () => {
       <CommonModal
         open={openSOModal}
         onClose={() => setOpenSOModal(false)}
-        title="Create Sales Order"
+        title={selectedSO ? "Edit Sales Order" : "Create Sales Order"}
         maxWidth="md"
       >
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap', mb: 3 }}>
@@ -444,6 +525,7 @@ const Sales = () => {
               size="small"
               onChange={(val) => setSoCustomerId(val)}
               onChangeOverride={(custObj) => setSelectedCustomer(custObj)}
+              initialOption={selectedCustomer}
             />
             {selectedCustomer && (
               <Box sx={{ mt: 0.5, px: 0.5, fontSize: '0.75rem', color: 'text.secondary', lineHeight: 1.3 }}>
@@ -493,7 +575,7 @@ const Sales = () => {
             <TableBody>
               {soItems.map((item, idx) => (
                 <TableRow key={idx}>
-                  <TableCell sx={{ py: 0.75, px: 1, minWidth: 240 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5, minWidth: 240 }}>
                     <FormAutocomplete
                       label="Select Product"
                       endpoint="/products/"
@@ -508,55 +590,62 @@ const Sales = () => {
                                 ...it,
                                 product_id: prodObj.id,
                                 rate: prodObj.selling_price,
-                                tax_rate: prodObj.tax_rate
+                                tax_rate: prodObj.tax_rate,
+                                product_name: prodObj.name,
+                                sku: prodObj.sku
                               };
                             }
                             return it;
                           }));
                         }
                       }}
+                      initialOption={item.product_id ? { id: item.product_id, name: item.product_name || 'Unknown', sku: item.sku || '' } : null}
                     />
                   </TableCell>
-                  <TableCell sx={{ py: 0.75, px: 1 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.qty}
                       onChange={(e) => handleItemChange(idx, 'qty', parseInt(e.target.value) || 0)}
-                      inputProps={{ style: { padding: '6px 8px' } }}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell sx={{ py: 0.75, px: 1 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.rate}
                       onChange={(e) => handleItemChange(idx, 'rate', parseFloat(e.target.value) || 0)}
-                      inputProps={{ style: { padding: '6px 8px' } }}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell sx={{ py: 0.75, px: 1 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.discount_amount}
                       onChange={(e) => handleItemChange(idx, 'discount_amount', parseFloat(e.target.value) || 0)}
-                      inputProps={{ style: { padding: '6px 8px' } }}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell sx={{ py: 0.75, px: 1 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.tax_rate}
                       onChange={(e) => handleItemChange(idx, 'tax_rate', parseFloat(e.target.value) || 0)}
-                      inputProps={{ style: { padding: '6px 8px' } }}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell align="right" sx={{ py: 0.75, px: 1, fontWeight: 600 }}>
+                  <TableCell align="right" sx={{ py: 0.5, px: 0.5, fontWeight: 600 }}>
                     {(((item.qty * item.rate) - item.discount_amount) * (1 + item.tax_rate / 100)).toFixed(2)}
                   </TableCell>
-                  <TableCell align="center" sx={{ py: 0.75, px: 1 }}>
+                  <TableCell align="center" sx={{ py: 0.5, px: 0.5 }}>
                     <IconButton color="error" size="small" onClick={() => handleRemoveItemRow(idx)} disabled={soItems.length === 1}>
                       <DeleteIcon />
                     </IconButton>
@@ -595,16 +684,16 @@ const Sales = () => {
         </Box>
       </CommonModal>
 
-      {/* PRINT-READY TAX INVOICE PRINT MODAL */}
+      {/* PRINT-READY INVOICE / SALES ORDER PRINT MODAL */}
       <CommonModal
         open={openPrintModal}
         onClose={() => setOpenPrintModal(false)}
-        title="Print Tax Invoice"
+        title={printDocType === 'Invoice' ? "Print Tax Invoice" : "Print Sales Order"}
         maxWidth="md"
         actions={
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}>
-              Print Invoice
+              {printDocType === 'Invoice' ? 'Print Invoice' : 'Print Sales Order'}
             </Button>
             <Button variant="contained" onClick={handleDownloadPDF}>
               Download PDF
@@ -650,10 +739,16 @@ const Sales = () => {
             </Box>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
-                TAX INVOICE
+                {printDocType === 'Invoice' ? 'TAX INVOICE' : 'SALES ORDER'}
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Invoice No: <strong>{selectedInvoice?.invoice_number}</strong></Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>Billing Date: <strong>{selectedInvoice ? formatBillingDate(selectedInvoice.date) : ''}</strong></Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                {printDocType === 'Invoice' ? 'Invoice No: ' : 'Order No: '}
+                <strong>{printData?.invoice_number}</strong>
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                {printDocType === 'Invoice' ? 'Billing Date: ' : 'Order Date: '}
+                <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
+              </Typography>
             </Box>
           </Box>
 
@@ -663,20 +758,20 @@ const Sales = () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
             <Box sx={{ width: '48%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>BILL TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_billing_address}</Typography>
-              <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{selectedInvoice?.customer_gstin}</strong></Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{printData?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{printData?.customer_billing_address}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{printData?.customer_gstin}</strong></Typography>
             </Box>
             <Box sx={{ width: '48%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>SHIP TO:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedInvoice?.customer_name}</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedInvoice?.customer_shipping_address}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{printData?.customer_name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{printData?.customer_shipping_address}</Typography>
             </Box>
           </Box>
 
           {/* Items Grid */}
           {(() => {
-            const hasDiscount = selectedInvoice?.items?.some(item => (item.discount_amount || 0) > 0) || false;
+            const hasDiscount = printData?.items?.some(item => (item.discount_amount || 0) > 0) || false;
             return (
               <TableContainer sx={{ mb: 3 }}>
                 <Table size="small" sx={{ 
@@ -697,7 +792,7 @@ const Sales = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {selectedInvoice?.items?.map((item, idx) => {
+                    {printData?.items?.map((item, idx) => {
                       return (
                         <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                           <TableCell>{idx + 1}</TableCell>
@@ -728,33 +823,33 @@ const Sales = () => {
             <Box sx={{ width: '42%', textAlign: 'right' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
                 <Typography variant="body2" sx={{ textAlign: 'left' }}>Subtotal:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.subtotal?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.subtotal?.toFixed(2)}</Typography>
                 
-                {selectedInvoice?.discount_amount > 0 && (
+                {printData?.discount_amount > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>Discount:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{selectedInvoice.discount_amount.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{printData.discount_amount.toFixed(2)}</Typography>
                   </>
                 )}
 
-                {selectedInvoice?.gst_breakup?.cgst > 0 && (
+                {printData?.gst_breakup?.cgst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>CGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.cgst?.toFixed(2)}</Typography>
                   </>
                 )}
 
-                {selectedInvoice?.gst_breakup?.sgst > 0 && (
+                {printData?.gst_breakup?.sgst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>SGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.sgst?.toFixed(2)}</Typography>
                   </>
                 )}
 
-                {selectedInvoice?.gst_breakup?.igst > 0 && (
+                {printData?.gst_breakup?.igst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>IGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedInvoice?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.igst?.toFixed(2)}</Typography>
                   </>
                 )}
               </Box>
@@ -762,12 +857,12 @@ const Sales = () => {
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.9rem' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'left' }}>Grand Total:</Typography>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  ₹{selectedInvoice?.total_amount?.toFixed(2)}
+                  ₹{printData?.total_amount?.toFixed(2)}
                 </Typography>
               </Box>
               <Box sx={{ mt: 1 }}>
                 <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.8rem' }}>
-                  Rupees: {selectedInvoice ? numberToWords(selectedInvoice.total_amount) : ''}
+                  Rupees: {printData ? numberToWords(printData.total_amount) : ''}
                 </Typography>
               </Box>
             </Box>

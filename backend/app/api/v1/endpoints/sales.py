@@ -60,3 +60,14 @@ async def generate_invoice(
 ):
     """Generate a sequential Tax Invoice with automatic CGST+SGST/IGST breakdown."""
     return await TxServices.create_invoice(db, inv_data)
+
+
+@router.put("/so/{so_id}", response_model=SalesOrderOut)
+async def update_sales_order(
+    so_id: UUID,
+    so_data: SalesOrderCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "create"))
+):
+    """Update an existing Sales Order."""
+    return await TxServices.update_sales_order(db, so_id, so_data)

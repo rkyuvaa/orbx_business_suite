@@ -16,6 +16,7 @@ const FormAutocomplete = ({
   // Standalone mode:
   value,
   onChange,
+  initialOption,
 }) => {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState([]);
@@ -66,7 +67,11 @@ const FormAutocomplete = ({
   }, [open]);
 
   const renderAutocomplete = (fieldVal, fieldOnChange, fieldError) => {
-    const selectedOption = options.find((opt) => opt.id === fieldVal) || null;
+    const autocompleteOptions = [...options];
+    if (fieldVal && initialOption && !options.some((opt) => opt.id === fieldVal)) {
+      autocompleteOptions.unshift(initialOption);
+    }
+    const selectedOption = autocompleteOptions.find((opt) => opt.id === fieldVal) || null;
 
     return (
       <Autocomplete
@@ -87,7 +92,7 @@ const FormAutocomplete = ({
           const valId = typeof val === 'object' && val !== null ? val.id : val;
           return option.id === valId;
         }}
-        options={options}
+        options={autocompleteOptions}
         loading={loading}
         value={selectedOption}
         onInputChange={(event, newInputValue, reason) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -24,6 +24,7 @@ const Purchase = () => {
   
   // Purchase Order form local states
   const [poSupplierId, setPoSupplierId] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [poBranchId, setPoBranchId] = useState('');
   const [poItems, setPoItems] = useState([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
   
@@ -57,9 +58,32 @@ const Purchase = () => {
   }, []);
 
   const handleOpenAddPO = () => {
+    setSelectedPO(null);
     setPoSupplierId('');
+    setSelectedSupplier(null);
     setPoBranchId(branches.length > 0 ? branches[0].id : '');
     setPoItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
+    setOpenPOModal(true);
+  };
+
+  const handleOpenEditPO = (po) => {
+    setSelectedPO(po);
+    setPoSupplierId(po.supplier_id);
+    setSelectedSupplier({
+      id: po.supplier_id,
+      name: po.supplier_name
+    });
+    setPoBranchId(po.branch_id);
+    setPoItems(
+      po.items.map((item) => ({
+        product_id: item.product_id,
+        qty: item.qty,
+        rate: item.rate,
+        tax_rate: item.tax_rate,
+        product_name: item.product_name,
+        sku: item.sku
+      }))
+    );
     setOpenPOModal(true);
   };
 
@@ -87,9 +111,18 @@ const Purchase = () => {
       const payload = {
         supplier_id: poSupplierId,
         branch_id: poBranchId,
-        items: poItems
+        items: poItems.map(item => ({
+          product_id: item.product_id,
+          qty: item.qty,
+          rate: item.rate,
+          tax_rate: item.tax_rate
+        }))
       };
-      await apiClient.post('/purchase/po', payload);
+      if (selectedPO && selectedPO.status === 'Draft') {
+        await apiClient.put(`/purchase/po/${selectedPO.id}`, payload);
+      } else {
+        await apiClient.post('/purchase/po', payload);
+      }
       setOpenPOModal(false);
       loadData();
     } catch (err) {
@@ -304,6 +337,13 @@ const Purchase = () => {
           rows={pos}
           actions={[
             {
+              icon: <EditIcon />,
+              label: 'Edit Purchase Order',
+              condition: (row) => row.status === 'Draft',
+              onClick: handleOpenEditPO,
+              color: 'secondary'
+            },
+            {
               icon: <ReceiveIcon />,
               label: 'Goods Receipt Note (GRN)',
               condition: (row) => row.status === 'Draft',
@@ -344,23 +384,26 @@ const Purchase = () => {
       <CommonModal
         open={openPOModal}
         onClose={() => setOpenPOModal(false)}
-        title="Create Purchase Order"
+        title={selectedPO ? "Edit Purchase Order" : "Create Purchase Order"}
         maxWidth="md"
       >
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap', mb: 3 }}>
+          <Box sx={{ flex: '1 1 250px' }}>
             <FormAutocomplete
               label="Select Supplier"
               endpoint="/suppliers/"
               value={poSupplierId}
+              size="small"
               onChange={(val) => setPoSupplierId(val)}
+              initialOption={selectedSupplier}
             />
-          </Grid>
-          <Grid item xs={12} sm={6}>
+          </Box>
+          <Box sx={{ flex: '1 1 200px' }}>
             <TextField
               select
               label="Ordering Branch"
               fullWidth
+              size="small"
               value={poBranchId}
               onChange={(e) => setPoBranchId(e.target.value)}
             >
@@ -368,33 +411,38 @@ const Purchase = () => {
                 <MenuItem key={b.id} value={b.id}>{b.branch_name} ({b.code})</MenuItem>
               ))}
             </TextField>
-          </Grid>
-        </Grid>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+            <Button onClick={() => setOpenPOModal(false)} variant="outlined" size="small">Cancel</Button>
+            <Button onClick={submitPO} variant="contained" size="small">Submit PO</Button>
+          </Box>
+        </Box>
 
-        <Typography variant="subtitle1" color="primary.main" sx={{ fontWeight: 600, mb: 2 }}>
+        <Typography variant="subtitle1" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
           Purchase Order Line Items
         </Typography>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>Qty</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 140 }}>Rate (₹)</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, width: 100 }}>GST %</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Total (₹)</TableCell>
-                <TableCell align="center" sx={{ width: 60 }}></TableCell>
+                <TableCell sx={{ py: 1, px: 1, fontWeight: 600 }}>Product</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 80 }}>Qty</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 130 }}>Rate (₹)</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, fontWeight: 600, width: 90 }}>GST %</TableCell>
+                <TableCell align="right" sx={{ py: 1, px: 1, fontWeight: 600 }}>Total (₹)</TableCell>
+                <TableCell align="center" sx={{ py: 1, px: 1, width: 50 }}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {poItems.map((item, idx) => (
                 <TableRow key={idx}>
-                  <TableCell sx={{ minWidth: 240 }}>
+                  <TableCell sx={{ py: 0.5, px: 0.5, minWidth: 240 }}>
                     <FormAutocomplete
                       label="Select Product"
                       endpoint="/products/"
                       value={item.product_id}
+                      size="small"
                       onChange={(val) => handleItemChange(idx, 'product_id', val)}
                       onChangeOverride={(prodObj) => {
                         if (prodObj) {
@@ -404,43 +452,52 @@ const Purchase = () => {
                                 ...it,
                                 product_id: prodObj.id,
                                 rate: prodObj.purchase_price,
-                                tax_rate: prodObj.tax_rate
+                                tax_rate: prodObj.tax_rate,
+                                product_name: prodObj.name,
+                                sku: prodObj.sku
                               };
                             }
                             return it;
                           }));
                         }
                       }}
+                      initialOption={item.product_id ? { id: item.product_id, name: item.product_name || 'Unknown', sku: item.sku || '' } : null}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.qty}
                       onChange={(e) => handleItemChange(idx, 'qty', parseInt(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.rate}
                       onChange={(e) => handleItemChange(idx, 'rate', parseFloat(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 0.5, px: 0.5 }}>
                     <TextField
                       type="number"
                       size="small"
                       value={item.tax_rate}
                       onChange={(e) => handleItemChange(idx, 'tax_rate', parseFloat(e.target.value) || 0)}
+                      inputProps={{ style: { padding: '4px 6px', textAlign: 'center' } }}
+                      sx={{ '& .MuiInputBase-root': { height: 32 } }}
                     />
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <TableCell align="right" sx={{ py: 0.5, px: 0.5, fontWeight: 600 }}>
                     {((item.qty * item.rate) * (1 + item.tax_rate / 100)).toFixed(2)}
                   </TableCell>
-                  <TableCell align="center">
+                  <TableCell align="center" sx={{ py: 0.5, px: 0.5 }}>
                     <IconButton color="error" size="small" onClick={() => handleRemoveItemRow(idx)} disabled={poItems.length === 1}>
                       <DeleteIcon />
                     </IconButton>
@@ -455,15 +512,10 @@ const Purchase = () => {
           Add Item Row
         </Button>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2, mb: 4 }}>
-          <Typography variant="body1">Subtotal: <strong>₹{poTotalAmountSum.toFixed(2)}</strong></Typography>
-          <Typography variant="body1">Taxes (GST): <strong>₹{poTotalTaxSum.toFixed(2)}</strong></Typography>
-          <Typography variant="h6" color="primary.main">Grand Total: <strong>₹{(poTotalAmountSum + poTotalTaxSum).toFixed(2)}</strong></Typography>
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button onClick={() => setOpenPOModal(false)} variant="outlined">Cancel</Button>
-          <Button onClick={submitPO} variant="contained">Submit PO</Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2 }}>
+          <Typography variant="body2">Subtotal: <strong>₹{poTotalAmountSum.toFixed(2)}</strong></Typography>
+          <Typography variant="body2">Taxes (GST): <strong>₹{poTotalTaxSum.toFixed(2)}</strong></Typography>
+          <Typography variant="subtitle1" color="primary.main">Grand Total: <strong>₹{(poTotalAmountSum + poTotalTaxSum).toFixed(2)}</strong></Typography>
         </Box>
       </CommonModal>
 

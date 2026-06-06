@@ -81,3 +81,14 @@ async def create_bill(
 ):
     """Log a supplier invoice bill."""
     return await TxServices.create_purchase_entry(db, entry_data)
+
+
+@router.put("/po/{po_id}", response_model=PurchaseOrderOut)
+async def update_purchase_order(
+    po_id: UUID,
+    po_data: PurchaseOrderCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Update an existing Purchase Order."""
+    return await TxServices.update_purchase_order(db, po_id, po_data)
