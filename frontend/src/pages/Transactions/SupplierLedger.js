@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import {
   Box, Button, Card, CardContent, Grid, Typography, Alert,
-  Divider, TextField, Autocomplete, Paper
+  Divider, TextField, Autocomplete, Paper, Table, TableHead,
+  TableRow, TableCell, TableBody, TableContainer
 } from '@mui/material';
 import {
   Print as PrintIcon,
