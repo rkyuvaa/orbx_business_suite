@@ -1,6 +1,6 @@
-"""add_vendor_payments_audit_fields
+"""vendor_pay_audit
 
-Revision ID: 0008_add_vendor_payments_audit_fields
+Revision ID: 0008_vendor_pay_audit
 Revises: 0007_add_vendor_payments
 Create Date: 2026-06-06 19:40:00.000000
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0008_add_vendor_payments_audit_fields'
+revision: str = '0008_vendor_pay_audit'
 down_revision: Union[str, None] = '0007_add_vendor_payments'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
