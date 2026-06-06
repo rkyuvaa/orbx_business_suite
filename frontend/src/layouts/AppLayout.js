@@ -140,7 +140,6 @@ const AppLayout = () => {
       return [
         { label: 'Purchase Module', icon: <SupplierIcon />, to: '/transactions/purchase' },
         { label: 'Supplier Master', icon: <PeopleIcon />, to: '/masters/suppliers' },
-        { label: 'Purchase Reports', icon: <ReportIcon />, to: '/reports/purchase' },
       ];
     }
     if (path.startsWith('/transactions/inventory') || path.startsWith('/transactions/transfers') || path.startsWith('/masters/products')) {
@@ -148,14 +147,12 @@ const AppLayout = () => {
         { label: 'Inventory Module', icon: <ProductIcon />, to: '/transactions/inventory' },
         { label: 'Stock Transfers / DC', icon: <DispatchIcon />, to: '/transactions/transfers' },
         { label: 'Product Master', icon: <ProductIcon />, to: '/masters/products' },
-        { label: 'Inventory Reports', icon: <ReportIcon />, to: '/reports/inventory' },
       ];
     }
     if (path.startsWith('/transactions/sales') || path.startsWith('/masters/customers')) {
       return [
         { label: 'Sales Module', icon: <SalesIcon />, to: '/transactions/sales' },
         { label: 'Customer Master', icon: <PeopleIcon />, to: '/masters/customers' },
-        { label: 'Sales Reports', icon: <ReportIcon />, to: '/reports/sales' },
       ];
     }
     if (path.startsWith('/transactions/receipts') ||
