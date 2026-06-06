@@ -23,6 +23,7 @@ import Payments from '../pages/Transactions/Payments';
 import Receipts from '../pages/Transactions/Receipts';
 import CustomerLedger from '../pages/Transactions/CustomerLedger';
 import SupplierLedger from '../pages/Transactions/SupplierLedger';
+import VendorPayments from '../pages/Transactions/VendorPayments';
 
 // Reports Module Pages
 import ReportsDashboard from '../pages/Reports/ReportsDashboard';
@@ -73,6 +74,7 @@ const AppRoutes = () => {
           <Route path="receipts" element={<Receipts />} />
           <Route path="customer-ledger" element={<CustomerLedger />} />
           <Route path="supplier-ledger" element={<SupplierLedger />} />
+          <Route path="vendor-payments" element={<VendorPayments />} />
           <Route path="*" element={<Navigate to="purchase" replace />} />
         </Route>
 

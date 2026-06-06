@@ -8,4 +8,4 @@ from app.models.product import ProductCategory, Product, ProductPricing  # noqa
 from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry  # noqa
 from app.models.inventory import StockTransaction, CurrentStock, StockTransfer, StockTransferItem  # noqa
 from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem  # noqa
-from app.models.finance import Payment, PaymentReceipt  # noqa
+from app.models.finance import Payment, PaymentReceipt, VendorPayment  # noqa

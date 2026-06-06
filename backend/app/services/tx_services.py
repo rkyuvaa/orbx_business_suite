@@ -12,11 +12,11 @@ from app.models.product import Product
 from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry
 from app.models.inventory import StockTransaction, CurrentStock, StockTransfer, StockTransferItem
 from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem
-from app.models.finance import Payment, PaymentReceipt
+from app.models.finance import Payment, PaymentReceipt, VendorPayment
 from app.schemas.transaction import (
     PurchaseOrderCreate, GRNCreate, PurchaseEntryCreate,
     StockTransactionCreate, SalesOrderCreate, InvoiceCreate,
-    PaymentCreate, StockTransferCreate
+    PaymentCreate, StockTransferCreate, VendorPaymentCreate
 )
 
 
@@ -340,21 +340,24 @@ class TxServices:
         q = await db.execute(
             select(PurchaseEntry)
             .filter(PurchaseEntry.id == entry.id)
-            .options(selectinload(PurchaseEntry.supplier))
+            .options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments))
         )
         o = q.scalar_one()
+        o.outstanding_amount = o.total_amount
         o.supplier_name = o.supplier.name if o.supplier else "Unknown"
         return o
 
     @staticmethod
     async def list_purchase_entries(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[PurchaseEntry]:
         """List purchase entries."""
-        stmt = select(PurchaseEntry).options(selectinload(PurchaseEntry.supplier))
+        stmt = select(PurchaseEntry).options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments))
         if branch_id:
             stmt = stmt.filter(PurchaseEntry.branch_id == branch_id)
         query = await db.execute(stmt)
         entries = list(query.scalars().all())
         for e in entries:
+            total_paid = sum([p.amount_paid for p in e.payments])
+            e.outstanding_amount = max(0.0, e.total_amount - total_paid)
             e.supplier_name = e.supplier.name if e.supplier else "Unknown"
         return entries
 
@@ -1155,6 +1158,120 @@ class TxServices:
                 invoice.status = "Unpaid"
             db.add(invoice)
             
+        await db.commit()
+
+    @staticmethod
+    async def list_outstanding_purchase_entries(db: AsyncSession) -> List[PurchaseEntry]:
+        """Fetch all purchase entries/bills with outstanding balances (Unpaid/PartiallyPaid)."""
+        stmt = (
+            select(PurchaseEntry)
+            .filter(PurchaseEntry.status.in_(["Unpaid", "PartiallyPaid"]))
+            .options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments))
+        )
+        query = await db.execute(stmt)
+        entries = list(query.scalars().all())
+        for pe in entries:
+            total_paid = sum([p.amount_paid for p in pe.payments])
+            pe.outstanding_amount = max(0.0, pe.total_amount - total_paid)
+            pe.supplier_name = pe.supplier.name if pe.supplier else "Unknown"
+        return entries
+
+    @staticmethod
+    async def record_vendor_payment(db: AsyncSession, payment_data: VendorPaymentCreate) -> VendorPayment:
+        """Record a payment to a supplier and update the corresponding purchase entry/bill status."""
+        bill = None
+        if payment_data.purchase_entry_id:
+            q_bill = await db.execute(
+                select(PurchaseEntry)
+                .filter(PurchaseEntry.id == payment_data.purchase_entry_id)
+                .options(selectinload(PurchaseEntry.payments))
+            )
+            bill = q_bill.scalar_one_or_none()
+            if not bill:
+                raise HTTPException(status_code=404, detail="Purchase Entry bill not found.")
+
+        # Create payment record
+        payment = VendorPayment(
+            id=uuid4(),
+            supplier_id=payment_data.supplier_id,
+            purchase_entry_id=payment_data.purchase_entry_id,
+            payment_mode=payment_data.payment_mode,
+            reference_number=payment_data.reference_number,
+            amount_paid=payment_data.amount_paid,
+            notes=payment_data.notes
+        )
+        db.add(payment)
+        await db.flush()
+
+        if bill:
+            # Re-fetch payments to recalculate status
+            q_rem = await db.execute(select(VendorPayment).filter(VendorPayment.purchase_entry_id == bill.id))
+            remaining = q_rem.scalars().all()
+            total_paid = sum([p.amount_paid for p in remaining])
+
+            if total_paid >= bill.total_amount:
+                bill.status = "Paid"
+            elif total_paid > 0:
+                bill.status = "PartiallyPaid"
+            else:
+                bill.status = "Unpaid"
+            db.add(bill)
+
+        await db.commit()
+
+        # Re-fetch with relationships for serialization
+        q_final = await db.execute(
+            select(VendorPayment)
+            .filter(VendorPayment.id == payment.id)
+            .options(selectinload(VendorPayment.supplier), selectinload(VendorPayment.purchase_entry))
+        )
+        o = q_final.scalar_one()
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        o.purchase_entry_number = o.purchase_entry.invoice_number if o.purchase_entry else None
+        return o
+
+    @staticmethod
+    async def list_vendor_payments(db: AsyncSession, supplier_id: Optional[UUID] = None) -> List[VendorPayment]:
+        """List recorded vendor payments."""
+        stmt = select(VendorPayment).options(selectinload(VendorPayment.supplier), selectinload(VendorPayment.purchase_entry))
+        if supplier_id:
+            stmt = stmt.filter(VendorPayment.supplier_id == supplier_id)
+        query = await db.execute(stmt)
+        payments = list(query.scalars().all())
+        for p in payments:
+            p.supplier_name = p.supplier.name if p.supplier else "Unknown"
+            p.purchase_entry_number = p.purchase_entry.invoice_number if p.purchase_entry else None
+        return payments
+
+    @staticmethod
+    async def cancel_vendor_payment(db: AsyncSession, payment_id: UUID) -> None:
+        """Cancel a recorded vendor payment and restore purchase entry bill status."""
+        q_pay = await db.execute(
+            select(VendorPayment)
+            .filter(VendorPayment.id == payment_id)
+            .options(selectinload(VendorPayment.purchase_entry))
+        )
+        payment = q_pay.scalar_one_or_none()
+        if not payment:
+            raise HTTPException(status_code=404, detail="Vendor payment record not found.")
+
+        bill = payment.purchase_entry
+        await db.delete(payment)
+        await db.flush()
+
+        if bill:
+            q_rem = await db.execute(select(VendorPayment).filter(VendorPayment.purchase_entry_id == bill.id))
+            remaining = q_rem.scalars().all()
+            total_paid = sum([p.amount_paid for p in remaining])
+
+            if total_paid >= bill.total_amount:
+                bill.status = "Paid"
+            elif total_paid > 0:
+                bill.status = "PartiallyPaid"
+            else:
+                bill.status = "Unpaid"
+            db.add(bill)
+
         await db.commit()
 
     # ==========================================

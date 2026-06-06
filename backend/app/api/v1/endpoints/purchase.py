@@ -7,7 +7,8 @@ from app.core import deps
 from app.schemas.transaction import (
     PurchaseOrderOut, PurchaseOrderCreate,
     GRNOut, GRNCreate,
-    PurchaseEntryOut, PurchaseEntryCreate
+    PurchaseEntryOut, PurchaseEntryCreate,
+    VendorPaymentCreate, VendorPaymentOut
 )
 from app.services.tx_services import TxServices
 
@@ -122,3 +123,46 @@ async def cancel_purchase_entry(
 ):
     """Mark a Purchase Entry Bill as Cancelled."""
     return await TxServices.cancel_purchase_entry(db, bill_id)
+
+
+# ==========================================
+# VENDOR PAYMENTS (OUTWARD) ENDPOINTS
+# ==========================================
+@router.get("/payments/outstanding", response_model=List[PurchaseEntryOut])
+async def list_outstanding_bills(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """List supplier purchase bills with outstanding balances."""
+    return await TxServices.list_outstanding_purchase_entries(db)
+
+
+@router.get("/payments", response_model=List[VendorPaymentOut])
+async def list_vendor_payments(
+    supplier_id: Optional[UUID] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """List recorded vendor payments."""
+    return await TxServices.list_vendor_payments(db, supplier_id)
+
+
+@router.post("/payments", response_model=VendorPaymentOut, status_code=status.HTTP_201_CREATED)
+async def record_vendor_payment(
+    payment_data: VendorPaymentCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Record a payment to a vendor."""
+    return await TxServices.record_vendor_payment(db, payment_data)
+
+
+@router.post("/payments/{payment_id}/cancel")
+async def cancel_vendor_payment(
+    payment_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "edit"))
+):
+    """Cancel a vendor payment collection."""
+    await TxServices.cancel_vendor_payment(db, payment_id)
+    return {"detail": "Vendor payment cancelled successfully."}

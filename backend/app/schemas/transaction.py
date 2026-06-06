@@ -121,6 +121,7 @@ class PurchaseEntryOut(BaseModel):
     subtotal: float
     tax_amount: float
     total_amount: float
+    outstanding_amount: Optional[float] = None
     status: str
 
     class Config:
@@ -304,6 +305,31 @@ class PaymentReceiptOut(BaseModel):
     receipt_number: str
     printed_at: datetime
     printed_by_id: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
+
+
+class VendorPaymentCreate(BaseModel):
+    supplier_id: UUID
+    purchase_entry_id: Optional[UUID] = None
+    payment_mode: str
+    reference_number: Optional[str] = None
+    amount_paid: float
+    notes: Optional[str] = None
+
+
+class VendorPaymentOut(BaseModel):
+    id: UUID
+    supplier_id: UUID
+    supplier_name: Optional[str] = None
+    purchase_entry_id: Optional[UUID] = None
+    purchase_entry_number: Optional[str] = None
+    payment_date: datetime
+    payment_mode: str
+    reference_number: Optional[str] = None
+    amount_paid: float
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True

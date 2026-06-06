@@ -101,3 +101,4 @@ class PurchaseEntry(Base):
     grn: Mapped[Optional["GRN"]] = relationship(back_populates="purchase_entries")
     supplier: Mapped["Supplier"] = relationship()
     branch: Mapped["Branch"] = relationship()
+    payments: Mapped[List["VendorPayment"]] = relationship(back_populates="purchase_entry", cascade="all, delete-orphan")

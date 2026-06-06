@@ -111,6 +111,9 @@ const AppLayout = () => {
     if (p.startsWith('/transactions/payments')) {
       return { title: 'Payment Update', breadcrumbs: 'Dashboard > Payment Update' };
     }
+    if (p.startsWith('/transactions/vendor-payments')) {
+      return { title: 'Vendor Payments', breadcrumbs: 'Dashboard > Vendor Payments' };
+    }
     if (p.startsWith('/transactions/customer-ledger')) {
       return { title: 'Customer Ledger Report', breadcrumbs: 'Dashboard > Customer Ledger' };
     }
@@ -170,11 +173,13 @@ const AppLayout = () => {
     }
     if (path.startsWith('/transactions/receipts') ||
         path.startsWith('/transactions/payments') ||
+        path.startsWith('/transactions/vendor-payments') ||
         path.startsWith('/transactions/customer-ledger') ||
         path.startsWith('/transactions/supplier-ledger')) {
       return [
         { label: 'Payment Receipt', icon: <ReceiptIcon />, to: '/transactions/receipts' },
         { label: 'Payment Update', icon: <ReceiptIcon />, to: '/transactions/payments' },
+        { label: 'Vendor Payments', icon: <ReceiptIcon />, to: '/transactions/vendor-payments' },
         { label: 'Customer Ledger', icon: <PeopleIcon />, to: '/transactions/customer-ledger' },
         { label: 'Supplier Ledger', icon: <SupplierIcon />, to: '/transactions/supplier-ledger' },
       ];

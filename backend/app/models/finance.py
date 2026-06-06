@@ -35,3 +35,19 @@ class PaymentReceipt(Base):
     # Relationships
     payment: Mapped["Payment"] = relationship(back_populates="receipts")
     printed_by: Mapped[Optional["User"]] = relationship()
+
+
+class VendorPayment(Base):
+    __tablename__ = "vendor_payments"
+
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
+    purchase_entry_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("purchase_entries.id", ondelete="SET NULL"), nullable=True, index=True)
+    payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    payment_mode: Mapped[str] = mapped_column(String(30)) # cash, cheque, UPI, bank
+    reference_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    amount_paid: Mapped[float] = mapped_column(Float)
+    notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Relationships
+    supplier: Mapped["Supplier"] = relationship()
+    purchase_entry: Mapped[Optional["PurchaseEntry"]] = relationship(back_populates="payments")
