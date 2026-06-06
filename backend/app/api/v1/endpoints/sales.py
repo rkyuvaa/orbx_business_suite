@@ -71,3 +71,23 @@ async def update_sales_order(
 ):
     """Update an existing Sales Order."""
     return await TxServices.update_sales_order(db, so_id, so_data)
+
+
+@router.post("/so/{so_id}/cancel", response_model=SalesOrderOut)
+async def cancel_sales_order(
+    so_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "edit"))
+):
+    """Mark a Sales Order as Cancelled."""
+    return await TxServices.cancel_sales_order(db, so_id)
+
+
+@router.post("/invoices/{invoice_id}/cancel", response_model=InvoiceOut)
+async def cancel_invoice(
+    invoice_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "edit"))
+):
+    """Mark a Tax Invoice as Cancelled and reverse stock updates."""
+    return await TxServices.cancel_invoice(db, invoice_id)

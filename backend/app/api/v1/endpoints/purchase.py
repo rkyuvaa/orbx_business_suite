@@ -92,3 +92,33 @@ async def update_purchase_order(
 ):
     """Update an existing Purchase Order."""
     return await TxServices.update_purchase_order(db, po_id, po_data)
+
+
+@router.post("/po/{po_id}/cancel", response_model=PurchaseOrderOut)
+async def cancel_purchase_order(
+    po_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "edit"))
+):
+    """Mark a Purchase Order as Cancelled."""
+    return await TxServices.cancel_purchase_order(db, po_id)
+
+
+@router.post("/grn/{grn_id}/cancel", response_model=GRNOut)
+async def cancel_grn(
+    grn_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "edit"))
+):
+    """Mark a GRN as Cancelled and reverse stock changes."""
+    return await TxServices.cancel_grn(db, grn_id)
+
+
+@router.post("/bills/{bill_id}/cancel", response_model=PurchaseEntryOut)
+async def cancel_purchase_entry(
+    bill_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "edit"))
+):
+    """Mark a Purchase Entry Bill as Cancelled."""
+    return await TxServices.cancel_purchase_entry(db, bill_id)

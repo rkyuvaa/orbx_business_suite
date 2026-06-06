@@ -100,6 +100,12 @@ const AppLayout = () => {
     if (p.startsWith('/transactions/payments')) {
       return { title: 'Payment Update', breadcrumbs: 'Dashboard > Payment Update' };
     }
+    if (p.startsWith('/transactions/customer-ledger')) {
+      return { title: 'Customer Ledger Report', breadcrumbs: 'Dashboard > Customer Ledger' };
+    }
+    if (p.startsWith('/transactions/supplier-ledger')) {
+      return { title: 'Supplier Ledger Report', breadcrumbs: 'Dashboard > Supplier Ledger' };
+    }
     if (p.startsWith('/reports/dashboard')) {
       return { title: 'Reports Dashboard', breadcrumbs: 'Dashboard > Reports Dashboard' };
     }
@@ -154,10 +160,15 @@ const AppLayout = () => {
         { label: 'Sales Reports', icon: <ReportIcon />, to: '/reports/sales' },
       ];
     }
-    if (path.startsWith('/transactions/receipts') || path.startsWith('/transactions/payments')) {
+    if (path.startsWith('/transactions/receipts') ||
+        path.startsWith('/transactions/payments') ||
+        path.startsWith('/transactions/customer-ledger') ||
+        path.startsWith('/transactions/supplier-ledger')) {
       return [
         { label: 'Payment Receipt', icon: <ReceiptIcon />, to: '/transactions/receipts' },
         { label: 'Payment Update', icon: <ReceiptIcon />, to: '/transactions/payments' },
+        { label: 'Customer Ledger', icon: <PeopleIcon />, to: '/transactions/customer-ledger' },
+        { label: 'Supplier Ledger', icon: <SupplierIcon />, to: '/transactions/supplier-ledger' },
       ];
     }
     if (path.startsWith('/reports')) {
@@ -189,7 +200,7 @@ const AppLayout = () => {
         {sidebarItems.map((item, index) => {
           const isActive = path === item.to || path.startsWith(item.to);
           return (
-            <ListItem key={index} disablePadding sx={{ mb: 0.5 }}>
+            <ListItem key={index} disablePadding sx={{ mb: 1.2 }}>
               <ListItemButton
                 component={RouterLink}
                 to={item.to}

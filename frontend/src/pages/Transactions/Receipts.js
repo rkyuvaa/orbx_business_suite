@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Button, Box, Alert, Paper, Typography, Grid, Divider } from '@mui/material';
-import { Print as PrintIcon } from '@mui/icons-material';
+import { Print as PrintIcon, Block as CancelIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import CommonTable from '../../components/CommonTable';
@@ -32,6 +32,17 @@ const Receipts = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleCancelPayment = async (payment) => {
+    if (window.confirm(`Are you sure you want to cancel and reverse Payment Receipt ${payment.receipt_number || 'N/A'} for ₹${payment.amount_paid.toFixed(2)}?`)) {
+      try {
+        await apiClient.post(`/payments/${payment.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Payment Receipt.');
+      }
+    }
+  };
 
   const handleOpenPrint = (payment) => {
     setSelectedPayment(payment);
@@ -111,6 +122,12 @@ const Receipts = () => {
             label: 'Print Payment Receipt',
             onClick: handleOpenPrint,
             color: 'primary'
+          },
+          {
+            icon: <CancelIcon />,
+            label: 'Cancel Payment Receipt',
+            onClick: handleCancelPayment,
+            color: 'error'
           }
         ]}
         searchKey="receipt_number"

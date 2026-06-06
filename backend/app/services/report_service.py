@@ -8,13 +8,14 @@ from sqlalchemy import func, and_
 
 from app.models.business import Customer, Supplier, Branch
 from app.models.product import Product, ProductCategory
-from app.models.purchase import PurchaseOrder
+from app.models.purchase import PurchaseOrder, PurchaseEntry
 from app.models.inventory import CurrentStock, StockTransaction
 from app.models.sales import SalesOrder, Invoice, InvoiceItem
 from app.models.finance import Payment
 from app.schemas.transaction import (
     DashboardResponse, KPICardsOut, SalesByCategoryOut,
-    MonthlySalesTrendOut, TopProductSalesOut, RecentTransactionOut
+    MonthlySalesTrendOut, TopProductSalesOut, RecentTransactionOut,
+    LedgerEntry, CustomerLedgerResponse, SupplierLedgerResponse
 )
 
 
@@ -171,4 +172,189 @@ class ReportService:
             monthly_sales_trend=monthly_sales_trend,
             top_products=top_products,
             recent_transactions=recent_transactions
+        )
+
+    @staticmethod
+    async def get_customer_ledger(
+        db: AsyncSession,
+        customer_id: UUID,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> CustomerLedgerResponse:
+        # 1. Parse start and end datetimes
+        start_dt = None
+        end_dt = None
+        if start_date:
+            try:
+                if len(start_date) == 7:
+                    start_dt = datetime.strptime(start_date, "%Y-%m")
+                else:
+                    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            except Exception:
+                pass
+        if end_date:
+            try:
+                if len(end_date) == 7:
+                    year, month = map(int, end_date.split("-"))
+                    if month == 12:
+                        end_dt = datetime(year + 1, 1, 1) - timedelta(seconds=1)
+                    else:
+                        end_dt = datetime(year, month + 1, 1) - timedelta(seconds=1)
+                else:
+                    end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+            except Exception:
+                pass
+
+        # 2. Fetch Invoices
+        stmt_inv = select(Invoice).filter(Invoice.customer_id == customer_id, Invoice.status != "Cancelled")
+        if start_dt:
+            stmt_inv = stmt_inv.filter(Invoice.date >= start_dt)
+        if end_dt:
+            stmt_inv = stmt_inv.filter(Invoice.date <= end_dt)
+        q_inv = await db.execute(stmt_inv.order_by(Invoice.date.asc()))
+        invoices = q_inv.scalars().all()
+
+        # 3. Fetch Payments
+        stmt_pay = select(Payment).filter(Payment.customer_id == customer_id)
+        if start_dt:
+            stmt_pay = stmt_pay.filter(Payment.payment_date >= start_dt)
+        if end_dt:
+            stmt_pay = stmt_pay.filter(Payment.payment_date <= end_dt)
+        q_pay = await db.execute(stmt_pay.order_by(Payment.payment_date.asc()))
+        payments = q_pay.scalars().all()
+
+        # 4. Merge entries chronologically
+        entries = []
+        for inv in invoices:
+            entries.append({
+                "date": inv.date,
+                "tx_type": "Invoice",
+                "reference_no": inv.invoice_number,
+                "debit": inv.total_amount,
+                "credit": 0.0
+            })
+        for pay in payments:
+            entries.append({
+                "date": pay.payment_date,
+                "tx_type": "Payment",
+                "reference_no": pay.reference_number or "N/A",
+                "debit": 0.0,
+                "credit": pay.amount_paid
+            })
+
+        # Sort entries by date
+        entries.sort(key=lambda x: x["date"])
+
+        # Calculate running balance and totals
+        total_billed = 0.0
+        total_paid = 0.0
+        running_balance = 0.0
+        ledger_entries = []
+
+        for e in entries:
+            debit = e["debit"]
+            credit = e["credit"]
+            total_billed += debit
+            total_paid += credit
+            running_balance += (debit - credit)
+            ledger_entries.append(
+                LedgerEntry(
+                    date=e["date"],
+                    tx_type=e["tx_type"],
+                    reference_no=e["reference_no"],
+                    debit=debit,
+                    credit=credit,
+                    running_balance=running_balance
+                )
+            )
+
+        return CustomerLedgerResponse(
+            total_billed=total_billed,
+            total_paid=total_paid,
+            balance=running_balance,
+            transactions=ledger_entries
+        )
+
+    @staticmethod
+    async def get_supplier_ledger(
+        db: AsyncSession,
+        supplier_id: UUID,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> SupplierLedgerResponse:
+        # 1. Parse start and end datetimes
+        start_dt = None
+        end_dt = None
+        if start_date:
+            try:
+                if len(start_date) == 7:
+                    start_dt = datetime.strptime(start_date, "%Y-%m")
+                else:
+                    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            except Exception:
+                pass
+        if end_date:
+            try:
+                if len(end_date) == 7:
+                    year, month = map(int, end_date.split("-"))
+                    if month == 12:
+                        end_dt = datetime(year + 1, 1, 1) - timedelta(seconds=1)
+                    else:
+                        end_dt = datetime(year, month + 1, 1) - timedelta(seconds=1)
+                else:
+                    end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+            except Exception:
+                pass
+
+        # 2. Fetch Bills (PurchaseEntry)
+        stmt_bills = select(PurchaseEntry).filter(PurchaseEntry.supplier_id == supplier_id, PurchaseEntry.status != "Cancelled")
+        if start_dt:
+            stmt_bills = stmt_bills.filter(PurchaseEntry.billing_date >= start_dt)
+        if end_dt:
+            stmt_bills = stmt_bills.filter(PurchaseEntry.billing_date <= end_dt)
+        q_bills = await db.execute(stmt_bills.order_by(PurchaseEntry.billing_date.asc()))
+        bills = q_bills.scalars().all()
+
+        # 3. Construct ledger entries
+        entries = []
+        for bill in bills:
+            paid_amt = bill.total_amount if bill.status == "Paid" else 0.0
+            entries.append({
+                "date": bill.billing_date,
+                "tx_type": "Purchase Bill",
+                "reference_no": bill.invoice_number,
+                "debit": bill.total_amount,
+                "credit": paid_amt
+            })
+
+        # Sort entries by date
+        entries.sort(key=lambda x: x["date"])
+
+        total_purchased = 0.0
+        total_paid = 0.0
+        running_balance = 0.0
+        ledger_entries = []
+
+        for e in entries:
+            debit = e["debit"]
+            credit = e["credit"]
+            total_purchased += debit
+            total_paid += credit
+            running_balance += (debit - credit)
+            ledger_entries.append(
+                LedgerEntry(
+                    date=e["date"],
+                    tx_type=e["tx_type"],
+                    reference_no=e["reference_no"],
+                    debit=debit,
+                    credit=credit,
+                    running_balance=running_balance
+                )
+            )
+
+        return SupplierLedgerResponse(
+            total_purchased=total_purchased,
+            total_paid=total_paid,
+            balance=running_balance,
+            transactions=ledger_entries
         )

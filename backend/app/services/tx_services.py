@@ -857,3 +857,215 @@ class TxServices:
             
         return payments
 
+    @staticmethod
+    async def cancel_sales_order(db: AsyncSession, so_id: UUID) -> SalesOrder:
+        """Cancel a Sales Order if it has no active Tax Invoices."""
+        q_so = await db.execute(
+            select(SalesOrder)
+            .filter(SalesOrder.id == so_id)
+            .options(selectinload(SalesOrder.invoices))
+        )
+        so = q_so.scalar_one_or_none()
+        if not so:
+            raise HTTPException(status_code=404, detail="Sales Order not found.")
+        
+        # Check if invoices exist (excluding Cancelled ones)
+        active_invoices = [inv for inv in so.invoices if inv.status != "Cancelled"]
+        if active_invoices:
+            raise HTTPException(status_code=400, detail="Cannot cancel Sales Order that has active Tax Invoices. Cancel the Invoices first.")
+            
+        so.status = "Cancelled"
+        db.add(so)
+        await db.commit()
+        await db.refresh(so)
+        return so
+
+    @staticmethod
+    async def cancel_invoice(db: AsyncSession, invoice_id: UUID) -> Invoice:
+        """Cancel a Tax Invoice, restore linked Sales Order to Draft, and reverse stock changes."""
+        q_inv = await db.execute(
+            select(Invoice)
+            .filter(Invoice.id == invoice_id)
+            .options(selectinload(Invoice.payments))
+        )
+        inv = q_inv.scalar_one_or_none()
+        if not inv:
+            raise HTTPException(status_code=404, detail="Invoice not found.")
+            
+        if inv.payments:
+            raise HTTPException(status_code=400, detail="Cannot cancel Invoice with recorded payments. Cancel/delete the payments first.")
+            
+        inv.status = "Cancelled"
+        db.add(inv)
+        
+        # Reset linked sales order status to Draft so it can be re-invoiced
+        if inv.sales_order_id:
+            q_so = await db.execute(select(SalesOrder).filter(SalesOrder.id == inv.sales_order_id))
+            so = q_so.scalar_one_or_none()
+            if so:
+                so.status = "Draft"
+                db.add(so)
+                
+        # Reverse stock changes
+        q_stock = await db.execute(
+            select(StockTransaction).filter(
+                StockTransaction.reference_type == "Invoice",
+                StockTransaction.reference_id == invoice_id
+            )
+        )
+        stock_txs = q_stock.scalars().all()
+        for st in stock_txs:
+            rev_tx = StockTransaction(
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty=-st.qty,
+                transaction_type="Adjustment",
+                reference_type="InvoiceCancel",
+                reference_id=invoice_id,
+                reason=f"Stock reversal for Cancelled Invoice {inv.invoice_number}"
+            )
+            db.add(rev_tx)
+            await TxServices.update_stock(
+                db=db,
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty_change=-st.qty,
+                tx_type="Adjustment",
+                ref_type="InvoiceCancel",
+                ref_id=invoice_id,
+                reason=f"Stock reversal for Cancelled Invoice {inv.invoice_number}"
+            )
+            
+        await db.commit()
+        await db.refresh(inv)
+        return inv
+
+    @staticmethod
+    async def cancel_purchase_order(db: AsyncSession, po_id: UUID) -> PurchaseOrder:
+        """Cancel a Purchase Order if it has no active GRNs."""
+        q_po = await db.execute(
+            select(PurchaseOrder)
+            .filter(PurchaseOrder.id == po_id)
+            .options(selectinload(PurchaseOrder.grns))
+        )
+        po = q_po.scalar_one_or_none()
+        if not po:
+            raise HTTPException(status_code=404, detail="Purchase Order not found.")
+            
+        active_grns = [g for g in po.grns if g.status != "Cancelled"]
+        if active_grns:
+            raise HTTPException(status_code=400, detail="Cannot cancel Purchase Order with linked active GRNs. Cancel the GRNs first.")
+            
+        po.status = "Cancelled"
+        db.add(po)
+        await db.commit()
+        await db.refresh(po)
+        return po
+
+    @staticmethod
+    async def cancel_grn(db: AsyncSession, grn_id: UUID) -> GRN:
+        """Cancel a GRN, restore linked Purchase Order to Draft, and reverse stock changes."""
+        q_grn = await db.execute(
+            select(GRN)
+            .filter(GRN.id == grn_id)
+            .options(selectinload(GRN.purchase_entries))
+        )
+        grn = q_grn.scalar_one_or_none()
+        if not grn:
+            raise HTTPException(status_code=404, detail="GRN not found.")
+            
+        active_entries = [pe for pe in grn.purchase_entries if pe.status != "Cancelled"]
+        if active_entries:
+            raise HTTPException(status_code=400, detail="Cannot cancel GRN with linked active purchase bills. Cancel the bills first.")
+            
+        grn.status = "Cancelled"
+        db.add(grn)
+        
+        # Reset linked PO status back to Draft
+        if grn.purchase_order_id:
+            q_po = await db.execute(select(PurchaseOrder).filter(PurchaseOrder.id == grn.purchase_order_id))
+            po = q_po.scalar_one_or_none()
+            if po:
+                po.status = "Draft"
+                db.add(po)
+                
+        # Reverse stock changes
+        q_stock = await db.execute(
+            select(StockTransaction).filter(
+                StockTransaction.reference_type == "GRN",
+                StockTransaction.reference_id == grn_id
+            )
+        )
+        stock_txs = q_stock.scalars().all()
+        for st in stock_txs:
+            rev_tx = StockTransaction(
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty=-st.qty,
+                transaction_type="Adjustment",
+                reference_type="GRNCancel",
+                reference_id=grn_id,
+                reason=f"Stock reversal for Cancelled GRN"
+            )
+            db.add(rev_tx)
+            await TxServices.update_stock(
+                db=db,
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty_change=-st.qty,
+                tx_type="Adjustment",
+                ref_type="GRNCancel",
+                ref_id=grn_id,
+                reason=f"Stock reversal for Cancelled GRN"
+            )
+            
+        await db.commit()
+        await db.refresh(grn)
+        return grn
+
+    @staticmethod
+    async def cancel_purchase_entry(db: AsyncSession, bill_id: UUID) -> PurchaseEntry:
+        """Cancel a Supplier Purchase Bill."""
+        q_bill = await db.execute(select(PurchaseEntry).filter(PurchaseEntry.id == bill_id))
+        bill = q_bill.scalar_one_or_none()
+        if not bill:
+            raise HTTPException(status_code=404, detail="Purchase Entry bill not found.")
+            
+        bill.status = "Cancelled"
+        db.add(bill)
+        await db.commit()
+        await db.refresh(bill)
+        return bill
+
+    @staticmethod
+    async def cancel_payment(db: AsyncSession, payment_id: UUID) -> None:
+        """Cancel a Customer Payment collection and restore invoice status back to Unpaid/Partially Paid."""
+        q_pay = await db.execute(
+            select(Payment)
+            .filter(Payment.id == payment_id)
+            .options(selectinload(Payment.invoice))
+        )
+        payment = q_pay.scalar_one_or_none()
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment collection record not found.")
+            
+        invoice = payment.invoice
+        await db.delete(payment)
+        await db.flush()
+        
+        if invoice:
+            # Recalculate remaining payments
+            q_rem = await db.execute(select(Payment).filter(Payment.invoice_id == invoice.id))
+            remaining = q_rem.scalars().all()
+            total_paid = sum([p.amount_paid for p in remaining])
+            
+            if total_paid >= invoice.total_amount:
+                invoice.status = "Paid"
+            elif total_paid > 0:
+                invoice.status = "PartiallyPaid"
+            else:
+                invoice.status = "Unpaid"
+            db.add(invoice)
+            
+        await db.commit()
+

@@ -48,3 +48,14 @@ async def fetch_receipt_print(
 ):
     """Fetch printable transaction payment receipts."""
     return await TxServices.get_receipt(db, payment_id)
+
+
+@router.post("/{payment_id}/cancel")
+async def cancel_payment(
+    payment_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("payments", "create"))
+):
+    """Cancel and reverse a Customer Payment collection."""
+    await TxServices.cancel_payment(db, payment_id)
+    return {"status": "success", "message": "Payment cancelled successfully"}

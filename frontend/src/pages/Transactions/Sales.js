@@ -7,7 +7,7 @@ import {
 import {
   Add as AddIcon, Delete as DeleteIcon,
   Receipt as InvoiceIcon, Print as PrintIcon,
-  Edit as EditIcon
+  Edit as EditIcon, Block as CancelIcon
 } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -59,6 +59,28 @@ const Sales = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleCancelSO = async (so) => {
+    if (window.confirm(`Are you sure you want to cancel Sales Order SO-${so.id.substring(0, 6).toUpperCase()}?`)) {
+      try {
+        await apiClient.post(`/sales/so/${so.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Sales Order.');
+      }
+    }
+  };
+
+  const handleCancelInvoice = async (inv) => {
+    if (window.confirm(`Are you sure you want to cancel Tax Invoice ${inv.invoice_number}?`)) {
+      try {
+        await apiClient.post(`/sales/invoices/${inv.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Tax Invoice.');
+      }
+    }
+  };
 
   const handleOpenAddSO = () => {
     setSelectedSO(null);
@@ -482,6 +504,13 @@ const Sales = () => {
               },
               onClick: handleOpenInvoice,
               color: 'primary'
+            },
+            {
+              icon: <CancelIcon />,
+              label: 'Cancel Sales Order',
+              condition: (row) => row.status !== 'Cancelled',
+              onClick: handleCancelSO,
+              color: 'error'
             }
           ]}
           searchKey="status"
@@ -503,6 +532,13 @@ const Sales = () => {
               label: 'Print Tax Invoice',
               onClick: handleOpenPrint,
               color: 'primary'
+            },
+            {
+              icon: <CancelIcon />,
+              label: 'Cancel Tax Invoice',
+              condition: (row) => row.status !== 'Cancelled',
+              onClick: handleCancelInvoice,
+              color: 'error'
             }
           ]}
           searchKey="invoice_number"

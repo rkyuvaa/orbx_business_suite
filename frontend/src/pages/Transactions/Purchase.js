@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -56,6 +56,39 @@ const Purchase = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleCancelPO = async (po) => {
+    if (window.confirm(`Are you sure you want to cancel Purchase Order PO-${po.id.substring(0, 6).toUpperCase()}?`)) {
+      try {
+        await apiClient.post(`/purchase/po/${po.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Purchase Order.');
+      }
+    }
+  };
+
+  const handleCancelGRN = async (grn) => {
+    if (window.confirm(`Are you sure you want to cancel GRN GRN-${grn.id.substring(0, 6).toUpperCase()}?`)) {
+      try {
+        await apiClient.post(`/purchase/grn/${grn.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Goods Receipt Note.');
+      }
+    }
+  };
+
+  const handleCancelBill = async (bill) => {
+    if (window.confirm(`Are you sure you want to cancel Purchase Bill ${bill.invoice_number}?`)) {
+      try {
+        await apiClient.post(`/purchase/bills/${bill.id}/cancel`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to cancel Purchase Entry Bill.');
+      }
+    }
+  };
 
   const handleOpenAddPO = () => {
     setSelectedPO(null);
@@ -271,8 +304,8 @@ const Purchase = () => {
             py: 0.5,
             borderRadius: '4px',
             fontWeight: 600,
-            backgroundColor: 'rgba(45, 106, 79, 0.1)',
-            color: '#2d6a4f',
+            backgroundColor: row.status === 'Cancelled' ? 'rgba(100, 116, 139, 0.1)' : 'rgba(45, 106, 79, 0.1)',
+            color: row.status === 'Cancelled' ? '#64748b' : '#2d6a4f',
           }}
         >
           {row.status}
@@ -301,8 +334,8 @@ const Purchase = () => {
             py: 0.5,
             borderRadius: '4px',
             fontWeight: 600,
-            backgroundColor: row.status === 'Paid' ? 'rgba(45, 106, 79, 0.1)' : 'rgba(217, 4, 41, 0.1)',
-            color: row.status === 'Paid' ? '#2d6a4f' : '#d90429',
+            backgroundColor: row.status === 'Paid' ? 'rgba(45, 106, 79, 0.1)' : row.status === 'Cancelled' ? 'rgba(100, 116, 139, 0.1)' : 'rgba(217, 4, 41, 0.1)',
+            color: row.status === 'Paid' ? '#2d6a4f' : row.status === 'Cancelled' ? '#64748b' : '#d90429',
           }}
         >
           {row.status}
@@ -349,6 +382,13 @@ const Purchase = () => {
               condition: (row) => row.status === 'Draft',
               onClick: handleOpenReceive,
               color: 'success'
+            },
+            {
+              icon: <CancelIcon />,
+              label: 'Cancel Purchase Order',
+              condition: (row) => row.status !== 'Cancelled',
+              onClick: handleCancelPO,
+              color: 'error'
             }
           ]}
           searchKey="status"
@@ -368,8 +408,16 @@ const Purchase = () => {
             {
               icon: <BillIcon />,
               label: 'Purchase Entry Bill',
+              condition: (row) => row.status !== 'Cancelled',
               onClick: handleOpenBill,
               color: 'primary'
+            },
+            {
+              icon: <CancelIcon />,
+              label: 'Cancel GRN',
+              condition: (row) => row.status !== 'Cancelled',
+              onClick: handleCancelGRN,
+              color: 'error'
             }
           ]}
           searchKey="status"
@@ -377,7 +425,20 @@ const Purchase = () => {
       )}
 
       {tabIndex === 2 && (
-        <CommonTable columns={billColumns} rows={bills} searchKey="invoice_number" />
+        <CommonTable
+          columns={billColumns}
+          rows={bills}
+          actions={[
+            {
+              icon: <CancelIcon />,
+              label: 'Cancel Purchase Bill',
+              condition: (row) => row.status !== 'Cancelled',
+              onClick: handleCancelBill,
+              color: 'error'
+            }
+          ]}
+          searchKey="invoice_number"
+        />
       )}
 
       {/* PO CREATE MODAL */}

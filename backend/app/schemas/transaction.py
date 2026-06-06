@@ -362,3 +362,26 @@ class PaymentReceiptListOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LedgerEntry(BaseModel):
+    date: datetime
+    tx_type: str
+    reference_no: str
+    debit: float
+    credit: float
+    running_balance: float
+
+
+class CustomerLedgerResponse(BaseModel):
+    total_billed: float
+    total_paid: float
+    balance: float
+    transactions: List[LedgerEntry]
+
+
+class SupplierLedgerResponse(BaseModel):
+    total_purchased: float
+    total_paid: float
+    balance: float
+    transactions: List[LedgerEntry]
