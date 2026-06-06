@@ -148,14 +148,25 @@ const Receipts = () => {
         <Box
           ref={printRef}
           sx={{
-            p: 4,
+            width: '100%',
+            maxWidth: '180mm',
+            minHeight: '265mm',
+            mx: 'auto',
+            boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             color: '#000000',
+            fontFamily: '"Outfit", sans-serif',
+            boxShadow: 'none',
             border: '1px dashed #cbd5e1',
-            borderRadius: '8px',
             '@media print': {
-              p: 0,
-              border: 'none'
+              width: '210mm !important',
+              maxWidth: '210mm !important',
+              minHeight: '297mm !important',
+              padding: '12mm 15mm !important',
+              margin: '0 !important',
+              boxShadow: 'none !important',
+              boxSizing: 'border-box !important',
+              border: 'none !important',
             }
           }}
         >
