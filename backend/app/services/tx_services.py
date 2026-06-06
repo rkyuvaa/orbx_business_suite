@@ -296,6 +296,18 @@ class TxServices:
     @staticmethod
     async def create_purchase_entry(db: AsyncSession, entry_data: PurchaseEntryCreate) -> PurchaseEntry:
         """Create a supplier invoice record."""
+        # Check if a purchase bill already exists for this GRN
+        if entry_data.grn_id:
+            q_existing = await db.execute(
+                select(PurchaseEntry).filter(
+                    PurchaseEntry.grn_id == entry_data.grn_id,
+                    PurchaseEntry.status != "Cancelled"
+                )
+            )
+            existing = q_existing.scalars().first()
+            if existing:
+                raise HTTPException(status_code=400, detail="A purchase bill already exists for this GRN.")
+
         entry = PurchaseEntry(**entry_data.model_dump(), status="Unpaid")
         db.add(entry)
         await db.commit()

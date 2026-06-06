@@ -408,7 +408,7 @@ const Purchase = () => {
             {
               icon: <BillIcon />,
               label: 'Purchase Entry Bill',
-              condition: (row) => row.status !== 'Cancelled',
+              condition: (row) => row.status !== 'Cancelled' && !bills.some(b => b.grn_id === row.id && b.status !== 'Cancelled'),
               onClick: handleOpenBill,
               color: 'primary'
             },
