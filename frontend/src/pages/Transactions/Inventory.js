@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useReactToPrint } from 'react-to-print';
+import { useLocation } from 'react-router-dom';
 import {
   Button, Box, Alert, Typography, Tabs, Tab, Paper, Chip, MenuItem, TextField,
   Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer, Grid
@@ -41,7 +42,28 @@ const loadScript = (src) => {
   });
 };
 
+const numberToWords = (num) => {
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  if ((num = num.toString()).length > 9) return 'overflow';
+  let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return ''; 
+  let str = '';
+  str += n[1] != 0 ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+  str += n[2] != 0 ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+  str += n[3] != 0 ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+  str += n[4] != 0 ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+  str += n[5] != 0 ? (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) + 'Rupees ' : '';
+  
+  if (str === '') {
+    str = 'Zero Rupees ';
+  }
+  return str + 'Only';
+};
+
 const Inventory = () => {
+  const location = useLocation();
   const [tabIndex, setTabIndex] = useState(0);
   const [stockPositions, setStockPositions] = useState([]);
   const [ledger, setLedger] = useState([]);
@@ -62,7 +84,7 @@ const Inventory = () => {
   const [transferDestBranch, setTransferDestBranch] = useState('');
   const [transferCustomerId, setTransferCustomerId] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
-  const [transferItems, setTransferItems] = useState([{ product_id: '', qty: 1 }]);
+  const [transferItems, setTransferItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
   // Selected Transfer for printing
   const [selectedTransfer, setSelectedTransfer] = useState(null);
@@ -100,6 +122,15 @@ const Inventory = () => {
     loadData();
   }, []);
 
+  // Sync tab index with location path
+  useEffect(() => {
+    if (location.pathname === '/transactions/transfers') {
+      setTabIndex(2);
+    } else if (location.pathname === '/transactions/inventory') {
+      setTabIndex(0);
+    }
+  }, [location.pathname]);
+
   const handleOpenAdjustment = () => {
     reset({
       product_id: products.length > 0 ? products[0].id : '',
@@ -130,12 +161,12 @@ const Inventory = () => {
     setTransferDestBranch(branches.length > 1 ? branches[1].id : '');
     setTransferCustomerId('');
     setTransferNotes('');
-    setTransferItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1 }]);
+    setTransferItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
     setOpenTransferModal(true);
   };
 
   const handleAddTransferItemRow = () => {
-    setTransferItems([...transferItems, { product_id: products.length > 0 ? products[0].id : '', qty: 1 }]);
+    setTransferItems([...transferItems, { product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
   };
 
   const handleRemoveTransferItemRow = (index) => {
@@ -147,6 +178,14 @@ const Inventory = () => {
   const handleTransferItemChange = (index, field, value) => {
     const updated = [...transferItems];
     updated[index][field] = value;
+    
+    // Auto populate rate from product pricing if product selection changed
+    if (field === 'product_id' && value) {
+      const prod = products.find(p => p.id === value);
+      if (prod && prod.pricings && prod.pricings.length > 0) {
+        updated[index]['rate'] = prod.pricings[0].selling_price || 0;
+      }
+    }
     setTransferItems(updated);
   };
 
@@ -161,7 +200,13 @@ const Inventory = () => {
         destination_branch_id: transferType === 'branch' ? transferDestBranch : null,
         customer_id: transferType === 'customer' ? transferCustomerId : null,
         notes: transferNotes,
-        items: transferItems.map(i => ({ product_id: i.product_id, qty: parseFloat(i.qty) }))
+        items: transferItems.map(i => ({
+          product_id: i.product_id,
+          qty: parseFloat(i.qty),
+          rate: parseFloat(i.rate) || 0,
+          discount_amount: parseFloat(i.discount_amount) || 0,
+          tax_rate: parseFloat(i.tax_rate) || 18
+        }))
       };
       await apiClient.post('/inventory/transfers', payload);
       setOpenTransferModal(false);
@@ -378,6 +423,7 @@ const Inventory = () => {
         </Box>
       )
     },
+    { id: 'grand_total', label: 'Value (₹)', render: (row) => `₹${(row.grand_total || 0).toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -431,9 +477,20 @@ const Inventory = () => {
   const printSourceBranch = selectedTransfer ? branches.find(b => b.id === selectedTransfer.source_branch_id) : null;
   const printDestBranch = selectedTransfer ? branches.find(b => b.id === selectedTransfer.destination_branch_id) : null;
 
+  // Calculators for Draft creation
+  const transferSubtotal = transferItems.reduce((acc, item) => acc + (parseInt(item.qty) || 0) * (parseFloat(item.rate) || 0), 0);
+  const transferDiscount = transferItems.reduce((acc, item) => acc + (parseFloat(item.discount_amount) || 0), 0);
+  const transferTax = transferItems.reduce((acc, item) => {
+    const amt = (parseInt(item.qty) || 0) * (parseFloat(item.rate) || 0);
+    const disc = parseFloat(item.discount_amount) || 0;
+    const rate = parseFloat(item.tax_rate) || 18;
+    return acc + ((amt - disc) * rate / 100);
+  }, 0);
+  const transferGrandTotal = transferSubtotal - transferDiscount + transferTax;
+
   return (
     <Box>
-      <PageHeader title="Inventory Warehouse Management" subtitle="Manage stock balances, view logs, and issue stock delivery challans." />
+      <PageHeader title={tabIndex === 2 ? "Stock Transfers / Delivery Challan" : "Inventory Warehouse Management"} subtitle="Manage stock balances, view logs, and issue stock delivery challans." />
 
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
@@ -614,47 +671,92 @@ const Inventory = () => {
               <TableHead sx={{ backgroundColor: 'action.hover' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Product Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }} width="150px">Quantity</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }} width="80px">Action</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="100px">Qty</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="110px">Rate (₹)</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="100px">Discount</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="110px">GST %</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} align="right" width="110px">Total</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="60px"></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {transferItems.map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <TextField
-                        select
-                        fullWidth
-                        size="small"
-                        value={row.product_id}
-                        onChange={(e) => handleTransferItemChange(index, 'product_id', e.target.value)}
-                      >
-                        {products.map(p => (
-                          <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                        ))}
-                      </TextField>
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        type="number"
-                        fullWidth
-                        size="small"
-                        value={row.qty}
-                        onChange={(e) => handleTransferItemChange(index, 'qty', e.target.value)}
-                        inputProps={{ min: 1 }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        color="error"
-                        disabled={transferItems.length === 1}
-                        onClick={() => handleRemoveTransferItemRow(index)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {transferItems.map((row, index) => {
+                  const lineTotal = (parseInt(row.qty) || 0) * (parseFloat(row.rate) || 0) - (parseFloat(row.discount_amount) || 0);
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <TextField
+                          select
+                          fullWidth
+                          size="small"
+                          value={row.product_id}
+                          onChange={(e) => handleTransferItemChange(index, 'product_id', e.target.value)}
+                        >
+                          {products.map(p => (
+                            <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                          ))}
+                        </TextField>
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={row.qty}
+                          onChange={(e) => handleTransferItemChange(index, 'qty', e.target.value)}
+                          inputProps={{ min: 1 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={row.rate}
+                          onChange={(e) => handleTransferItemChange(index, 'rate', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          fullWidth
+                          size="small"
+                          value={row.discount_amount}
+                          onChange={(e) => handleTransferItemChange(index, 'discount_amount', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          select
+                          fullWidth
+                          size="small"
+                          value={row.tax_rate}
+                          onChange={(e) => handleTransferItemChange(index, 'tax_rate', e.target.value)}
+                        >
+                          <MenuItem value={0}>0%</MenuItem>
+                          <MenuItem value={5}>5%</MenuItem>
+                          <MenuItem value={12}>12%</MenuItem>
+                          <MenuItem value={18}>18%</MenuItem>
+                          <MenuItem value={28}>28%</MenuItem>
+                        </TextField>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          ₹{lineTotal.toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          color="error"
+                          disabled={transferItems.length === 1}
+                          onClick={() => handleRemoveTransferItemRow(index)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -662,6 +764,13 @@ const Inventory = () => {
           <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTransferItemRow}>
             Add Product Row
           </Button>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2 }}>
+            <Typography variant="body2">Subtotal: <strong>₹{transferSubtotal.toFixed(2)}</strong></Typography>
+            <Typography variant="body2">Discount: <strong>-₹{transferDiscount.toFixed(2)}</strong></Typography>
+            <Typography variant="body2">Taxes (GST): <strong>₹{transferTax.toFixed(2)}</strong></Typography>
+            <Typography variant="subtitle1" color="primary.main">Grand Total: <strong>₹{transferGrandTotal.toFixed(2)}</strong></Typography>
+          </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
             <Button onClick={() => setOpenTransferModal(false)} variant="outlined">
@@ -778,31 +887,85 @@ const Inventory = () => {
               <Table size="small">
                 <TableHead sx={{ backgroundColor: '#f8fafc' }}>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} width="60px">S.No.</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} width="50px">S.No.</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }}>Product Description</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} width="180px">SKU Code</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right" width="120px">Quantity</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }}>SKU Code</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right">Qty</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right">Rate (₹)</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right">Discount (₹)</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right">GST %</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right">Total (₹)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {selectedTransfer?.items?.map((item, idx) => (
-                    <TableRow key={item.id || idx}>
-                      <TableCell sx={{ fontSize: '0.85rem' }}>{idx + 1}</TableCell>
-                      <TableCell sx={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.product_name}</TableCell>
-                      <TableCell sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{item.sku}</TableCell>
-                      <TableCell sx={{ fontSize: '0.85rem', fontWeight: 700 }} align="right">{item.qty}</TableCell>
-                    </TableRow>
-                  ))}
+                  {selectedTransfer?.items?.map((item, idx) => {
+                    const totalVal = (item.qty * item.rate) - (item.discount_amount || 0);
+                    return (
+                      <TableRow key={item.id || idx}>
+                        <TableCell sx={{ fontSize: '0.85rem' }}>{idx + 1}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.product_name}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{item.sku}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem', fontWeight: 700 }} align="right">{item.qty}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem' }} align="right">₹{(item.rate || 0).toFixed(2)}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem', color: 'text.secondary' }} align="right">₹{(item.discount_amount || 0).toFixed(2)}</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem' }} align="right">{item.tax_rate || 18}%</TableCell>
+                        <TableCell sx={{ fontSize: '0.85rem', fontWeight: 700 }} align="right">₹{(item.amount || totalVal).toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
 
-            {selectedTransfer?.notes && (
-              <Box sx={{ mb: 4, p: 2, backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 0.5 }}>Remarks / Delivery Instructions:</Typography>
-                <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{selectedTransfer.notes}</Typography>
+            {/* Pricing calculations layout */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+              <Box sx={{ width: '55%' }}>
+                {selectedTransfer?.notes ? (
+                  <Box sx={{ p: 2, backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 0.5 }}>Remarks / Delivery Instructions:</Typography>
+                    <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{selectedTransfer.notes}</Typography>
+                  </Box>
+                ) : <Box />}
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', fontWeight: 700, mt: 2 }}>
+                  Amount in Words: <span style={{ fontWeight: 500, color: '#475569' }}>{selectedTransfer ? numberToWords(selectedTransfer.grand_total) : ''}</span>
+                </Typography>
               </Box>
-            )}
+              <Box sx={{ width: '40%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>Subtotal:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{(selectedTransfer?.total_amount || 0).toFixed(2)}</Typography>
+                </Box>
+                {selectedTransfer?.discount_amount > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Discount:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.main' }}>-₹{selectedTransfer.discount_amount.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                {selectedTransfer?.gst_breakup?.cgst > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>CGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedTransfer.gst_breakup.cgst.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                {selectedTransfer?.gst_breakup?.sgst > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>SGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedTransfer.gst_breakup.sgst.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                {selectedTransfer?.gst_breakup?.igst > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>IGST:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedTransfer.gst_breakup.igst.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                <Divider />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Grand Total:</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main' }}>₹{(selectedTransfer?.grand_total || 0).toFixed(2)}</Typography>
+                </Box>
+              </Box>
+            </Box>
 
             {/* Signature Area */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 8, pt: 4 }}>

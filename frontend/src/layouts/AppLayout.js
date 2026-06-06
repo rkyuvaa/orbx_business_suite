@@ -14,6 +14,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   People as PeopleIcon,
   LocalShipping as SupplierIcon,
+  LocalShipping as DispatchIcon,
   Inventory as ProductIcon,
   ShoppingCart as SalesIcon,
   ReceiptLong as ReceiptIcon,
@@ -91,6 +92,9 @@ const AppLayout = () => {
     if (p.startsWith('/transactions/inventory')) {
       return { title: 'Inventory Module', breadcrumbs: 'Dashboard > Inventory Module' };
     }
+    if (p.startsWith('/transactions/transfers')) {
+      return { title: 'Stock Transfers / DC', breadcrumbs: 'Dashboard > Stock Transfers & Delivery Challans' };
+    }
     if (p.startsWith('/transactions/sales')) {
       return { title: 'Sales Module', breadcrumbs: 'Dashboard > Sales Module' };
     }
@@ -146,9 +150,10 @@ const AppLayout = () => {
         { label: 'Purchase Reports', icon: <ReportIcon />, to: '/reports/purchase' },
       ];
     }
-    if (path.startsWith('/transactions/inventory')) {
+    if (path.startsWith('/transactions/inventory') || path.startsWith('/transactions/transfers')) {
       return [
         { label: 'Inventory Module', icon: <ProductIcon />, to: '/transactions/inventory' },
+        { label: 'Stock Transfers / DC', icon: <DispatchIcon />, to: '/transactions/transfers' },
         { label: 'Product Master', icon: <ProductIcon />, to: '/masters/products' },
         { label: 'Inventory Reports', icon: <ReportIcon />, to: '/reports/inventory' },
       ];

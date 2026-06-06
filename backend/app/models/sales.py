@@ -5,6 +5,7 @@ from sqlalchemy import ForeignKey, String, Float, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+from app.models.inventory import StockTransfer
 
 
 class SalesOrder(Base):

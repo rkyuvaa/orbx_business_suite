@@ -1111,10 +1111,19 @@ class TxServices:
             customer_id=transfer_data.customer_id,
             challan_number=challan_no,
             status="Draft",
-            notes=transfer_data.notes
+            notes=transfer_data.notes,
+            total_amount=0.0,
+            tax_amount=0.0,
+            discount_amount=0.0,
+            grand_total=0.0,
+            gst_breakup={}
         )
         db.add(transfer)
         await db.flush()
+        
+        total_amount = 0.0
+        tax_amount = 0.0
+        discount_amount = 0.0
         
         for item in transfer_data.items:
             # Check if product exists
@@ -1123,13 +1132,68 @@ class TxServices:
             if not product:
                 raise HTTPException(status_code=400, detail="Invalid product ID.")
                 
+            item_amount = item.qty * item.rate
+            item_tax = (item_amount - item.discount_amount) * (item.tax_rate / 100)
+            
+            total_amount += item_amount
+            tax_amount += item_tax
+            discount_amount += item.discount_amount
+            
             transfer_item = StockTransferItem(
                 transfer_id=transfer.id,
                 product_id=item.product_id,
-                qty=item.qty
+                qty=item.qty,
+                rate=item.rate,
+                discount_amount=item.discount_amount,
+                tax_rate=item.tax_rate,
+                tax_amount=item_tax,
+                amount=item_amount - item.discount_amount
             )
             db.add(transfer_item)
             
+        # Calculate GST Breakup (Intra-state vs Inter-state)
+        cgst = 0.0
+        sgst = 0.0
+        igst = 0.0
+        
+        q_src_br = await db.execute(select(Branch).filter(Branch.id == transfer_data.source_branch_id))
+        src_branch = q_src_br.scalar_one_or_none()
+        
+        company_state = "22"
+        if src_branch:
+            q_comp = await db.execute(select(Company).filter(Company.id == src_branch.company_id))
+            company = q_comp.scalar_one_or_none()
+            if company:
+                company_state = company.state_code if company.state_code else (company.gstin[:2] if company.gstin else "22")
+                
+        recipient_state = company_state
+        if transfer_data.customer_id:
+            q_cust = await db.execute(select(Customer).filter(Customer.id == transfer_data.customer_id))
+            customer = q_cust.scalar_one_or_none()
+            if customer and customer.gstin:
+                recipient_state = customer.gstin[:2]
+        elif transfer_data.destination_branch_id:
+            q_dest_br = await db.execute(select(Branch).filter(Branch.id == transfer_data.destination_branch_id))
+            dest_branch = q_dest_br.scalar_one_or_none()
+            if dest_branch:
+                q_dest_comp = await db.execute(select(Company).filter(Company.id == dest_branch.company_id))
+                dest_company = q_dest_comp.scalar_one_or_none()
+                if dest_company:
+                    recipient_state = dest_company.state_code if dest_company.state_code else (dest_company.gstin[:2] if dest_company.gstin else company_state)
+
+        if company_state == recipient_state:
+            cgst = tax_amount / 2
+            sgst = tax_amount / 2
+        else:
+            igst = tax_amount
+            
+        transfer.total_amount = total_amount
+        transfer.tax_amount = tax_amount
+        transfer.discount_amount = discount_amount
+        transfer.grand_total = total_amount - discount_amount + tax_amount
+        transfer.gst_breakup = {"cgst": cgst, "sgst": sgst, "igst": igst}
+        
+        db.add(transfer)
         await db.commit()
         return await TxServices.get_stock_transfer(db, transfer.id)
 

@@ -397,6 +397,9 @@ class SupplierLedgerResponse(BaseModel):
 class StockTransferItemCreate(BaseModel):
     product_id: UUID
     qty: float
+    rate: float = 0.0
+    discount_amount: float = 0.0
+    tax_rate: float = 18.0
 
 
 class StockTransferCreate(BaseModel):
@@ -413,6 +416,11 @@ class StockTransferItemOut(BaseModel):
     product_name: Optional[str] = None
     sku: Optional[str] = None
     qty: float
+    rate: float
+    discount_amount: float
+    tax_rate: float
+    tax_amount: float
+    amount: float
 
     class Config:
         from_attributes = True
@@ -430,6 +438,11 @@ class StockTransferOut(BaseModel):
     date: datetime
     status: str
     notes: Optional[str] = None
+    total_amount: float
+    tax_amount: float
+    discount_amount: float
+    grand_total: float
+    gst_breakup: Dict[str, float] = {}
     items: List[StockTransferItemOut] = []
 
     class Config:

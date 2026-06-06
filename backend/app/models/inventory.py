@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import ForeignKey, String, Float, DateTime, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Float, DateTime, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -53,6 +53,13 @@ class StockTransfer(Base):
     status: Mapped[str] = mapped_column(String(30), default="Draft") # Draft, Transferred, Cancelled
     notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # Values & GST calculations
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    grand_total: Mapped[float] = mapped_column(Float, default=0.0)
+    gst_breakup: Mapped[dict] = mapped_column(JSON, default=dict)
+
     # Relationships
     source_branch: Mapped["Branch"] = relationship(foreign_keys=[source_branch_id])
     destination_branch: Mapped[Optional["Branch"]] = relationship(foreign_keys=[destination_branch_id])
@@ -66,6 +73,12 @@ class StockTransferItem(Base):
     transfer_id: Mapped[UUID] = mapped_column(ForeignKey("stock_transfers.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), index=True)
     qty: Mapped[float] = mapped_column(Float)
+    
+    rate: Mapped[float] = mapped_column(Float, default=0.0)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    tax_rate: Mapped[float] = mapped_column(Float, default=18.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
 
     # Relationships
     transfer: Mapped["StockTransfer"] = relationship(back_populates="items")
