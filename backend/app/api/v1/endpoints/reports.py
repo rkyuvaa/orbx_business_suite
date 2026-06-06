@@ -42,3 +42,35 @@ async def get_supplier_ledger(
 ):
     """Retrieve detailed ledger report and metrics for a Supplier."""
     return await ReportService.get_supplier_ledger(db, supplier_id, start_date, end_date)
+
+
+@router.get("/sales-summary")
+async def get_sales_summary(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    branch_id: Optional[UUID] = Query(None, description="Filter by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("reports", "view"))
+):
+    """Retrieve tabular rows for the Excel sales summary sheet."""
+    return await ReportService.get_sales_summary_data(db, start_date, end_date, branch_id)
+
+
+@router.get("/sales-summary/excel")
+async def get_sales_summary_excel(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    branch_id: Optional[UUID] = Query(None, description="Filter by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("reports", "view"))
+):
+    """Generate and download the professional Excel sales summary sheet."""
+    from fastapi.responses import StreamingResponse
+    rows = await ReportService.get_sales_summary_data(db, start_date, end_date, branch_id)
+    excel_file = ReportService.generate_sales_summary_excel(rows)
+    filename = f"Sales_Summary_{start_date or 'all'}_to_{end_date or 'all'}.xlsx"
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

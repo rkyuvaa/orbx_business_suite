@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, BackgroundTasks, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import deps
@@ -133,3 +133,172 @@ async def update_user(
 ):
     """Update a user's details, active status, branch mapping, or password."""
     return await AdminService.update_user(db, user_id, user_data)
+
+
+# ==========================================
+# BACKUP & RESTORE ENDPOINTS
+# ==========================================
+def run_restore_in_background(temp_zip: str, temp_extract: str):
+    import shutil
+    import zipfile
+    import subprocess
+    import os
+    from app.services.backup_manager import get_db_params, find_pg_tool
+    from app.db.session import engine
+
+    print("[BackgroundRestore] Starting recovery job...")
+    try:
+        # Ensure temp_extract is clean before extraction
+        if os.path.exists(temp_extract):
+            try:
+                shutil.rmtree(temp_extract)
+            except Exception as re:
+                print(f"[BackgroundRestore] Could not remove old temp extract path: {re}")
+        os.makedirs(temp_extract, exist_ok=True)
+
+        # 1. Extract the bundle
+        with zipfile.ZipFile(temp_zip, 'r') as zipf:
+            zipf.extractall(temp_extract)
+        print("[BackgroundRestore] Bundle extracted successfully.")
+        
+        # 2. Restore Database
+        sql_file = os.path.join(temp_extract, "database.sql")
+        if os.path.exists(sql_file):
+            db_params = get_db_params()
+            if db_params:
+                user, password, host, port, dbname = db_params
+                os.environ['PGPASSWORD'] = password
+                
+                tool_path = find_pg_tool("psql")
+                restore_cmd = [
+                    tool_path,
+                    "-h", str(host),
+                    "-p", str(port) if port else "5432",
+                    "-U", str(user),
+                    "-d", str(dbname),
+                    "-f", sql_file
+                ]
+                
+                # Dispose engine pool
+                try:
+                    engine.sync_engine.dispose()
+                    print("[BackgroundRestore] Disposed SQLAlchemy connection pool.")
+                except Exception as de:
+                    print(f"[BackgroundRestore] Error disposing engine pool: {de}")
+                
+                # Clear all existing tables by dropping and recreating public schema
+                reset_cmd = [
+                    tool_path,
+                    "-h", str(host),
+                    "-p", str(port) if port else "5432",
+                    "-U", str(user),
+                    "-d", str(dbname),
+                    "-c", "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+                ]
+                print("[BackgroundRestore] Wiping existing public schema before recovery...")
+                reset_res = subprocess.run(reset_cmd, capture_output=True, text=True)
+                if reset_res.returncode != 0:
+                    print(f"[BackgroundRestore] Warning: Schema wipe output: {reset_res.stderr}")
+                else:
+                    print("[BackgroundRestore] Database schema successfully wiped.")
+                
+                print("[BackgroundRestore] Executing psql restore process...")
+                result = subprocess.run(restore_cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    print(f"[BackgroundRestore] psql error output: {result.stderr}")
+                else:
+                    print("[BackgroundRestore] Database restore completed successfully.")
+            else:
+                print("[BackgroundRestore] Database configuration details could not be parsed.")
+        
+        # 3. Restore .env
+        env_backup_path = os.path.join(temp_extract, ".env")
+        if os.path.exists(env_backup_path):
+            target_env = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env")
+            try:
+                shutil.copy(env_backup_path, target_env)
+                print("[BackgroundRestore] .env environment variables restored.")
+            except Exception as ee:
+                print(f"[BackgroundRestore] Could not copy .env file: {ee}")
+                
+        print("[BackgroundRestore] System recovery completed successfully.")
+        
+    except Exception as e:
+        import traceback
+        print(f"[BackgroundRestore] CRITICAL RECOVERY FAILURE:\n{traceback.format_exc()}")
+    finally:
+        try:
+            if os.path.exists(temp_zip): os.remove(temp_zip)
+        except Exception: pass
+        try:
+            if os.path.exists(temp_extract): shutil.rmtree(temp_extract)
+        except Exception: pass
+        print("[BackgroundRestore] Background cleanup done.")
+
+
+@router.get("/backups")
+def get_backups(current_user = Depends(deps.PermissionChecker("admin", "view"))):
+    """Retrieve lists of database backup files."""
+    from app.services.backup_manager import list_backups
+    return list_backups()
+
+
+@router.post("/backups/generate")
+def generate_backup(current_user = Depends(deps.PermissionChecker("admin", "edit"))):
+    """Manually generate a snapshot ZIP archive of the PostgreSQL database."""
+    from app.services.backup_manager import create_backup, delete_old_backups
+    try:
+        name, err = create_backup()
+        if err:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail=err)
+        delete_old_backups()
+        return {"message": "Backup created successfully", "filename": name}
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Failed to generate backup: {str(e)}")
+
+
+@router.get("/backups/{filename}/download")
+def download_backup(filename: str, current_user = Depends(deps.PermissionChecker("admin", "view"))):
+    """Download a generated backup snapshot ZIP file."""
+    import os
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+    from app.services.backup_manager import BACKUP_DIR
+
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    
+    return FileResponse(path, filename=filename, media_type='application/zip')
+
+
+@router.post("/backups/restore")
+async def restore_backup(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    current_user = Depends(deps.PermissionChecker("admin", "edit"))
+):
+    """Upload a backup snapshot ZIP file to restore the database in the background."""
+    import os
+    import shutil
+    from fastapi import HTTPException
+    from app.services.backup_manager import ensure_backup_dir, BACKUP_DIR
+
+    ensure_backup_dir()
+    temp_zip = os.path.join(BACKUP_DIR, "temp_restore.zip")
+    temp_extract = os.path.join(BACKUP_DIR, "temp_extract")
+    
+    try:
+        # Save the uploaded file temporarily (sync copy)
+        with open(temp_zip, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Spawn the restore execution in the background
+        background_tasks.add_task(run_restore_in_background, temp_zip, temp_extract)
+        
+        return {"message": "Restore started successfully in the background. Systems and files are being recovered."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to initiate restore: {str(e)}")
+

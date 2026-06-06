@@ -20,7 +20,8 @@ import {
   ReceiptLong as ReceiptIcon,
   Assessment as ReportIcon,
   Settings as AdminIcon,
-  Business as BranchIcon
+  Business as BranchIcon,
+  Backup as BackupIcon
 } from '@mui/icons-material';
 
 import { logoutUser } from '../app/slices/authSlice';
@@ -113,6 +114,9 @@ const AppLayout = () => {
     if (p.startsWith('/reports/dashboard')) {
       return { title: 'Reports Dashboard', breadcrumbs: 'Dashboard > Reports Dashboard' };
     }
+    if (p.startsWith('/reports/sales-summary')) {
+      return { title: 'Excel Sales Summary', breadcrumbs: 'Dashboard > Excel Sales Summary' };
+    }
     if (p.startsWith('/reports/sales')) {
       return { title: 'Sales Reports', breadcrumbs: 'Dashboard > Sales Reports' };
     }
@@ -130,6 +134,9 @@ const AppLayout = () => {
     }
     if (p.startsWith('/admin/users')) {
       return { title: 'Users & Roles', breadcrumbs: 'Dashboard > Users & Roles' };
+    }
+    if (p.startsWith('/admin/backup')) {
+      return { title: 'Backup & Restore', breadcrumbs: 'Dashboard > Backup & Restore' };
     }
     return { title: 'App Dashboard', breadcrumbs: 'Dashboard' };
   };
@@ -169,6 +176,7 @@ const AppLayout = () => {
     if (path.startsWith('/reports')) {
       return [
         { label: 'Reports Dashboard', icon: <ReportIcon />, to: '/reports/dashboard' },
+        { label: 'Excel Sales Summary', icon: <ReportIcon />, to: '/reports/sales-summary' },
         { label: 'Sales Reports', icon: <ReportIcon />, to: '/reports/sales' },
         { label: 'Inventory Reports', icon: <ReportIcon />, to: '/reports/inventory' },
         { label: 'Purchase Reports', icon: <ReportIcon />, to: '/reports/purchase' },
@@ -179,6 +187,7 @@ const AppLayout = () => {
         { label: 'Company Config', icon: <AdminIcon />, to: '/admin/company' },
         { label: 'Branches', icon: <BranchIcon />, to: '/admin/branches' },
         { label: 'Users & Roles', icon: <PeopleIcon />, to: '/admin/users' },
+        { label: 'Backup & Restore', icon: <BackupIcon />, to: '/admin/backup' },
       ];
     }
     return [];

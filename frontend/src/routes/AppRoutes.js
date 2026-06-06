@@ -29,11 +29,13 @@ import ReportsDashboard from '../pages/Reports/ReportsDashboard';
 import SalesReport from '../pages/Reports/SalesReport';
 import InventoryReport from '../pages/Reports/InventoryReport';
 import PurchaseReport from '../pages/Reports/PurchaseReport';
+import ExcelSalesSummary from '../pages/Reports/ExcelSalesSummary';
 
 // Admin Module Pages
 import CompanyConfig from '../pages/Admin/CompanyConfig';
 import Branches from '../pages/Admin/Branches';
 import UsersAndRoles from '../pages/Admin/UsersAndRoles';
+import BackupRestore from '../pages/Admin/BackupRestore';
 
 const AppRoutes = () => {
   return (
@@ -80,6 +82,7 @@ const AppRoutes = () => {
           <Route path="sales" element={<SalesReport />} />
           <Route path="inventory" element={<InventoryReport />} />
           <Route path="purchase" element={<PurchaseReport />} />
+          <Route path="sales-summary" element={<ExcelSalesSummary />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
 
@@ -88,6 +91,7 @@ const AppRoutes = () => {
           <Route path="company" element={<CompanyConfig />} />
           <Route path="branches" element={<Branches />} />
           <Route path="users" element={<UsersAndRoles />} />
+          <Route path="backup" element={<BackupRestore />} />
           <Route path="*" element={<Navigate to="company" replace />} />
         </Route>
       </Route>
