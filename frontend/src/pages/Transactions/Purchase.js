@@ -58,7 +58,7 @@ const Purchase = () => {
   }, []);
 
   const handleCancelPO = async (po) => {
-    if (window.confirm(`Are you sure you want to cancel Purchase Order PO-${po.id.substring(0, 6).toUpperCase()}?`)) {
+    if (window.confirm(`Are you sure you want to cancel Purchase Order ${po.po_number || `PO-${po.id.substring(0, 6).toUpperCase()}`}?`)) {
       try {
         await apiClient.post(`/purchase/po/${po.id}/cancel`);
         loadData();
@@ -69,7 +69,7 @@ const Purchase = () => {
   };
 
   const handleCancelGRN = async (grn) => {
-    if (window.confirm(`Are you sure you want to cancel GRN GRN-${grn.id.substring(0, 6).toUpperCase()}?`)) {
+    if (window.confirm(`Are you sure you want to cancel GRN ${grn.grn_number || `GRN-${grn.id.substring(0, 6).toUpperCase()}`}?`)) {
       try {
         await apiClient.post(`/purchase/grn/${grn.id}/cancel`);
         loadData();
@@ -208,7 +208,7 @@ const Purchase = () => {
   // ==========================================
   const handleOpenBill = (grn) => {
     setSelectedGRN(grn);
-    setBillInvoiceNo(`INV-${grn.id.substring(0, 6).toUpperCase()}`);
+    setBillInvoiceNo(`INV-${grn.grn_number || grn.id.substring(0, 6).toUpperCase()}`);
     setBillDueDate(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
     setOpenBillModal(true);
   };
@@ -238,6 +238,7 @@ const Purchase = () => {
   };
 
   const poColumns = [
+    { id: 'po_number', label: 'PO Number', render: (row) => row.po_number || `PO-${row.id.substring(0, 6).toUpperCase()}` },
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
       id: 'supplier_name',
@@ -279,11 +280,12 @@ const Purchase = () => {
   ];
 
   const grnColumns = [
+    { id: 'grn_number', label: 'GRN Number', render: (row) => row.grn_number || `GRN-${row.id.substring(0, 6).toUpperCase()}` },
     { id: 'date', label: 'Received Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
       id: 'purchase_order_id',
       label: 'Linked PO Ref',
-      render: (row) => `PO-${row.purchase_order_id.substring(0, 6).toUpperCase()}`
+      render: (row) => row.po_number || `PO-${row.purchase_order_id.substring(0, 6).toUpperCase()}`
     },
     {
       id: 'branch_id',
@@ -588,7 +590,7 @@ const Purchase = () => {
         maxWidth="md"
       >
         <Typography variant="body1" sx={{ mb: 3 }}>
-          Order reference: <strong>PO-{selectedPO?.id.substring(0, 6).toUpperCase()}</strong>
+          Order reference: <strong>{selectedPO?.po_number || `PO-${selectedPO?.id.substring(0, 6).toUpperCase()}`}</strong>
         </Typography>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>

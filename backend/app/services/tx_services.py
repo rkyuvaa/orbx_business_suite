@@ -81,9 +81,21 @@ class TxServices:
     @staticmethod
     async def create_purchase_order(db: AsyncSession, po_data: PurchaseOrderCreate) -> PurchaseOrder:
         """Create a Purchase Order and calculate dynamic taxes/totals."""
+        q_br = await db.execute(select(Branch).filter(Branch.id == po_data.branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found.")
+            
+        po_seq = branch.po_next_number
+        branch.po_next_number += 1
+        db.add(branch)
+        
+        po_no = f"{branch.po_prefix}{po_seq:05d}{branch.po_suffix}"
+
         po = PurchaseOrder(
             supplier_id=po_data.supplier_id,
             branch_id=po_data.branch_id,
+            po_number=po_no,
             expected_delivery=po_data.expected_delivery,
             status="Draft",
             total_amount=0.0,
@@ -239,9 +251,21 @@ class TxServices:
         if not po:
             raise HTTPException(status_code=404, detail="Purchase Order not found.")
 
+        q_br = await db.execute(select(Branch).filter(Branch.id == grn_data.branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found.")
+            
+        grn_seq = branch.grn_next_number
+        branch.grn_next_number += 1
+        db.add(branch)
+        
+        grn_no = f"{branch.grn_prefix}{grn_seq:05d}{branch.grn_suffix}"
+
         grn = GRN(
             purchase_order_id=grn_data.purchase_order_id,
             branch_id=grn_data.branch_id,
+            grn_number=grn_no,
             received_by_id=received_by_id,
             status="Received"
         )
@@ -280,14 +304,14 @@ class TxServices:
         q_final = await db.execute(
             select(GRN)
             .filter(GRN.id == grn.id)
-            .options(selectinload(GRN.items))
+            .options(selectinload(GRN.items), selectinload(GRN.purchase_order))
         )
         return q_final.scalar_one()
 
     @staticmethod
     async def list_grns(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[GRN]:
         """List GRNs."""
-        stmt = select(GRN).options(selectinload(GRN.items))
+        stmt = select(GRN).options(selectinload(GRN.items), selectinload(GRN.purchase_order))
         if branch_id:
             stmt = stmt.filter(GRN.branch_id == branch_id)
         query = await db.execute(stmt)
@@ -411,9 +435,21 @@ class TxServices:
     @staticmethod
     async def create_sales_order(db: AsyncSession, so_data: SalesOrderCreate) -> SalesOrder:
         """Create a Sales Order with tax/discount sums."""
+        q_br = await db.execute(select(Branch).filter(Branch.id == so_data.branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found.")
+            
+        so_seq = branch.so_next_number
+        branch.so_next_number += 1
+        db.add(branch)
+        
+        so_no = f"{branch.so_prefix}{so_seq:05d}{branch.so_suffix}"
+
         so = SalesOrder(
             customer_id=so_data.customer_id,
             branch_id=so_data.branch_id,
+            so_number=so_no,
             status="Draft",
             total_amount=0.0,
             tax_amount=0.0,
@@ -618,7 +654,7 @@ class TxServices:
         db.add(branch)
 
         # E.g. INV-00005
-        invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}"
+        invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}{branch.invoice_suffix}"
 
         # ---------------------------------------------
         # GST BREAKUP CALCULATION
@@ -831,10 +867,32 @@ class TxServices:
                 invoice.status = "PartiallyPaid"
             db.add(invoice)
 
-        # Auto-generate Receipt Number
-        q_count = await db.execute(select(PaymentReceipt))
-        receipt_seq = len(q_count.scalars().all()) + 1
-        rcpt_no = f"RCPT-{receipt_seq:05d}"
+        # Configurable receipt number
+        branch_id = None
+        if invoice:
+            branch_id = invoice.branch_id
+        else:
+            q_cust = await db.execute(select(Customer).filter(Customer.id == pay_data.customer_id))
+            customer = q_cust.scalar_one_or_none()
+            if customer:
+                branch_id = customer.branch_id
+        
+        if not branch_id:
+            q_br = await db.execute(select(Branch))
+            branch = q_br.scalars().first()
+        else:
+            q_br = await db.execute(select(Branch).filter(Branch.id == branch_id))
+            branch = q_br.scalar_one_or_none()
+
+        if branch:
+            receipt_seq = branch.receipt_next_number
+            branch.receipt_next_number += 1
+            db.add(branch)
+            rcpt_no = f"{branch.receipt_prefix}{receipt_seq:05d}{branch.receipt_suffix}"
+        else:
+            q_count = await db.execute(select(PaymentReceipt))
+            receipt_seq = len(q_count.scalars().all()) + 1
+            rcpt_no = f"RCPT-{receipt_seq:05d}"
 
         # Create Receipt record
         receipt = PaymentReceipt(
@@ -998,7 +1056,7 @@ class TxServices:
         q_grn = await db.execute(
             select(GRN)
             .filter(GRN.id == grn_id)
-            .options(selectinload(GRN.purchase_entries))
+            .options(selectinload(GRN.purchase_entries), selectinload(GRN.purchase_order))
         )
         grn = q_grn.scalar_one_or_none()
         if not grn:
@@ -1112,10 +1170,17 @@ class TxServices:
         if transfer_data.destination_branch_id == transfer_data.source_branch_id:
             raise HTTPException(status_code=400, detail="Source and destination branches cannot be the same.")
             
-        # Count all existing transfers to generate a unique sequence
-        q_count = await db.execute(select(StockTransfer))
-        seq = len(q_count.scalars().all()) + 1
-        challan_no = f"CHLN-{seq:05d}"
+        # Configurable challan / delivery challan number
+        q_br = await db.execute(select(Branch).filter(Branch.id == transfer_data.source_branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Source branch not found.")
+            
+        challan_seq = branch.challan_next_number
+        branch.challan_next_number += 1
+        db.add(branch)
+        
+        challan_no = f"{branch.challan_prefix}{challan_seq:05d}{branch.challan_suffix}"
         
         transfer = StockTransfer(
             source_branch_id=transfer_data.source_branch_id,

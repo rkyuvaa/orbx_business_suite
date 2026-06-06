@@ -12,6 +12,7 @@ class PurchaseOrder(Base):
 
     supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    po_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     expected_delivery: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="Draft") # Draft, Confirmed, Received, Cancelled
@@ -48,6 +49,7 @@ class GRN(Base):
 
     purchase_order_id: Mapped[UUID] = mapped_column(ForeignKey("purchase_orders.id", ondelete="RESTRICT"), index=True)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    grn_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     received_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="Received") # Draft, Received, Cancelled
@@ -57,6 +59,10 @@ class GRN(Base):
     branch: Mapped["Branch"] = relationship()
     items: Mapped[List["GRNItem"]] = relationship(back_populates="grn", cascade="all, delete-orphan")
     purchase_entries: Mapped[List["PurchaseEntry"]] = relationship(back_populates="grn")
+
+    @property
+    def po_number(self) -> Optional[str]:
+        return self.purchase_order.po_number if self.purchase_order else None
 
 
 class GRNItem(Base):

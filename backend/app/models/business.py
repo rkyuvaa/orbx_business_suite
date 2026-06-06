@@ -30,9 +30,31 @@ class Branch(Base):
     address: Mapped[str] = mapped_column(String(255))
     code: Mapped[str] = mapped_column(String(20), unique=True, index=True) # E.g. "HQ", "BR1"
 
-    # Invoice config attributes embedded per branch (as requested)
+    # Configurable Document Sequences
+    so_prefix: Mapped[str] = mapped_column(String(20), default="SO-")
+    so_suffix: Mapped[str] = mapped_column(String(20), default="")
+    so_next_number: Mapped[int] = mapped_column(default=1)
+
     invoice_prefix: Mapped[str] = mapped_column(String(20), default="INV-")
+    invoice_suffix: Mapped[str] = mapped_column(String(20), default="")
     invoice_next_number: Mapped[int] = mapped_column(default=1)
+
+    challan_prefix: Mapped[str] = mapped_column(String(20), default="DC-")
+    challan_suffix: Mapped[str] = mapped_column(String(20), default="")
+    challan_next_number: Mapped[int] = mapped_column(default=1)
+
+    po_prefix: Mapped[str] = mapped_column(String(20), default="PO-")
+    po_suffix: Mapped[str] = mapped_column(String(20), default="")
+    po_next_number: Mapped[int] = mapped_column(default=1)
+
+    grn_prefix: Mapped[str] = mapped_column(String(20), default="GRN-")
+    grn_suffix: Mapped[str] = mapped_column(String(20), default="")
+    grn_next_number: Mapped[int] = mapped_column(default=1)
+
+    receipt_prefix: Mapped[str] = mapped_column(String(20), default="RCPT-")
+    receipt_suffix: Mapped[str] = mapped_column(String(20), default="")
+    receipt_next_number: Mapped[int] = mapped_column(default=1)
+
     invoice_terms: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     invoice_footer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 

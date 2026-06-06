@@ -51,8 +51,24 @@ class BranchCreate(BaseModel):
     branch_name: str
     address: str
     code: str
+    so_prefix: str = "SO-"
+    so_suffix: str = ""
+    so_next_number: int = 1
     invoice_prefix: str = "INV-"
+    invoice_suffix: str = ""
     invoice_next_number: int = 1
+    challan_prefix: str = "DC-"
+    challan_suffix: str = ""
+    challan_next_number: int = 1
+    po_prefix: str = "PO-"
+    po_suffix: str = ""
+    po_next_number: int = 1
+    grn_prefix: str = "GRN-"
+    grn_suffix: str = ""
+    grn_next_number: int = 1
+    receipt_prefix: str = "RCPT-"
+    receipt_suffix: str = ""
+    receipt_next_number: int = 1
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
 
@@ -61,8 +77,24 @@ class BranchUpdate(BaseModel):
     branch_name: Optional[str] = None
     address: Optional[str] = None
     code: Optional[str] = None
+    so_prefix: Optional[str] = None
+    so_suffix: Optional[str] = None
+    so_next_number: Optional[int] = None
     invoice_prefix: Optional[str] = None
+    invoice_suffix: Optional[str] = None
     invoice_next_number: Optional[int] = None
+    challan_prefix: Optional[str] = None
+    challan_suffix: Optional[str] = None
+    challan_next_number: Optional[int] = None
+    po_prefix: Optional[str] = None
+    po_suffix: Optional[str] = None
+    po_next_number: Optional[int] = None
+    grn_prefix: Optional[str] = None
+    grn_suffix: Optional[str] = None
+    grn_next_number: Optional[int] = None
+    receipt_prefix: Optional[str] = None
+    receipt_suffix: Optional[str] = None
+    receipt_next_number: Optional[int] = None
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
     is_active: Optional[bool] = None
@@ -74,8 +106,24 @@ class BranchOut(BaseModel):
     branch_name: str
     address: str
     code: str
+    so_prefix: str
+    so_suffix: str
+    so_next_number: int
     invoice_prefix: str
+    invoice_suffix: str
     invoice_next_number: int
+    challan_prefix: str
+    challan_suffix: str
+    challan_next_number: int
+    po_prefix: str
+    po_suffix: str
+    po_next_number: int
+    grn_prefix: str
+    grn_suffix: str
+    grn_next_number: int
+    receipt_prefix: str
+    receipt_suffix: str
+    receipt_next_number: int
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
     is_active: bool

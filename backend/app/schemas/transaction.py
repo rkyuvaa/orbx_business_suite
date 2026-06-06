@@ -42,6 +42,7 @@ class PurchaseOrderOut(BaseModel):
     supplier_id: UUID
     supplier_name: Optional[str] = None
     branch_id: UUID
+    po_number: Optional[str] = None
     date: datetime
     expected_delivery: Optional[datetime] = None
     status: str
@@ -85,6 +86,7 @@ class GRNOut(BaseModel):
     id: UUID
     purchase_order_id: UUID
     branch_id: UUID
+    grn_number: Optional[str] = None
     date: datetime
     received_by_id: Optional[UUID] = None
     status: str
@@ -204,6 +206,7 @@ class SalesOrderOut(BaseModel):
     customer_billing_address: Optional[str] = None
     customer_shipping_address: Optional[str] = None
     branch_id: UUID
+    so_number: Optional[str] = None
     date: datetime
     status: str
     total_amount: float

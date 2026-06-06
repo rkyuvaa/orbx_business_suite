@@ -13,6 +13,7 @@ class SalesOrder(Base):
 
     customer_id: Mapped[UUID] = mapped_column(ForeignKey("customers.id", ondelete="RESTRICT"), index=True)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    so_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(30), default="Draft") # Draft, Confirmed, Delivered, Cancelled
     

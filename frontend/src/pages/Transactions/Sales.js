@@ -63,7 +63,7 @@ const Sales = () => {
   }, []);
 
   const handleCancelSO = async (so) => {
-    if (window.confirm(`Are you sure you want to cancel Sales Order SO-${so.id.substring(0, 6).toUpperCase()}?`)) {
+    if (window.confirm(`Are you sure you want to cancel Sales Order ${so.so_number || `SO-${so.id.substring(0, 6).toUpperCase()}`}?`)) {
       try {
         await apiClient.post(`/sales/so/${so.id}/cancel`);
         loadData();
@@ -337,6 +337,7 @@ const Sales = () => {
 
 
   const soColumns = [
+    { id: 'so_number', label: 'SO Number', render: (row) => row.so_number || `SO-${row.id.substring(0, 6).toUpperCase()}` },
     { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
       id: 'customer_name',
@@ -427,7 +428,7 @@ const Sales = () => {
       const sgst = isIntrastate ? selectedSO.tax_amount / 2 : 0;
       const igst = !isIntrastate ? selectedSO.tax_amount : 0;
       return {
-        invoice_number: `SO-${selectedSO.id.substring(0, 6).toUpperCase()}`,
+        invoice_number: selectedSO.so_number || `SO-${selectedSO.id.substring(0, 6).toUpperCase()}`,
         date: selectedSO.date,
         customer_name: selectedSO.customer_name,
         customer_gstin: selectedSO.customer_gstin,
@@ -735,7 +736,7 @@ const Sales = () => {
         title="Create Tax Invoice"
       >
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Generating sequential tax invoice for order: <strong>SO-{selectedSO?.id.substring(0, 6).toUpperCase()}</strong>
+          Generating sequential tax invoice for order: <strong>{selectedSO?.so_number || `SO-${selectedSO?.id.substring(0, 6).toUpperCase()}`}</strong>
         </Typography>
         
         {availableDCs.length > 0 ? (
