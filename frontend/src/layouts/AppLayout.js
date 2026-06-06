@@ -24,7 +24,7 @@ import {
   Backup as BackupIcon
 } from '@mui/icons-material';
 
-import { logoutUser } from '../app/slices/authSlice';
+import { logoutUser, fetchUserProfile } from '../app/slices/authSlice';
 import { fetchBranches, setActiveBranch } from '../app/slices/branchSlice';
 
 const AppLayout = () => {
@@ -37,11 +37,17 @@ const AppLayout = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { branches, activeBranch, activeBranchId } = useSelector((state) => state.branch);
 
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && !user) {
+      dispatch(fetchUserProfile());
+    }
+  }, [dispatch, isAuthenticated, user]);
 
   useEffect(() => {
     dispatch(fetchBranches());
