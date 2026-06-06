@@ -309,12 +309,23 @@ const SupplierLedger = () => {
         <Box
           ref={printRef}
           sx={{
-            p: 5,
+            width: '100%',
+            maxWidth: '180mm',
+            minHeight: '265mm',
+            mx: 'auto',
+            boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             color: '#000000',
-            fontFamily: 'Roboto, Arial, sans-serif',
+            fontFamily: '"Outfit", sans-serif',
+            boxShadow: 'none',
             '@media print': {
-              p: 0,
+              width: '210mm !important',
+              maxWidth: '210mm !important',
+              minHeight: '297mm !important',
+              padding: '12mm 15mm !important',
+              margin: '0 !important',
+              boxShadow: 'none !important',
+              boxSizing: 'border-box !important',
             }
           }}
         >
