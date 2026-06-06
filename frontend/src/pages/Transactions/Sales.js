@@ -30,6 +30,8 @@ const Sales = () => {
   const [selectedSO, setSelectedSO] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [printDocType, setPrintDocType] = useState('Invoice');
+  const [availableDCs, setAvailableDCs] = useState([]);
+  const [selectedDCId, setSelectedDCId] = useState('');
 
   // Sales Order Form Local States
   const [soCustomerId, setSoCustomerId] = useState('');
@@ -167,6 +169,17 @@ const Sales = () => {
   // ==========================================
   const handleOpenInvoice = (so) => {
     setSelectedSO(so);
+    setSelectedDCId('');
+    setAvailableDCs([]);
+    
+    // Fetch transferred DCs for this customer
+    apiClient.get(`/inventory/transfers?customer_id=${so.customer_id}`)
+      .then(res => {
+        const activeDCs = res.data.filter(dc => dc.status === 'Transferred');
+        setAvailableDCs(activeDCs);
+      })
+      .catch(err => console.error('Error fetching delivery challans', err));
+
     setOpenInvoiceModal(true);
   };
 
@@ -174,6 +187,7 @@ const Sales = () => {
     try {
       const payload = {
         sales_order_id: selectedSO.id,
+        delivery_challan_id: selectedDCId || null,
         due_date: new Date(Date.now() + 15 * 86400000).toISOString()
       };
       await apiClient.post('/sales/invoices', payload);
@@ -359,6 +373,15 @@ const Sales = () => {
 
   const invoiceColumns = [
     { id: 'invoice_number', label: 'Invoice No.' },
+    {
+      id: 'delivery_challan_number',
+      label: 'Ref. Challan',
+      render: (row) => row.delivery_challan_number ? (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+          {row.delivery_challan_number}
+        </Typography>
+      ) : '-'
+    },
     { id: 'date', label: 'Billing Date', render: (row) => new Date(row.date).toLocaleDateString() },
     {
       id: 'customer_name',
@@ -711,9 +734,35 @@ const Sales = () => {
         onClose={() => setOpenInvoiceModal(false)}
         title="Create Tax Invoice"
       >
-        <Typography variant="body1" sx={{ mb: 3 }}>
+        <Typography variant="body1" sx={{ mb: 2 }}>
           Generating sequential tax invoice for order: <strong>SO-{selectedSO?.id.substring(0, 6).toUpperCase()}</strong>
         </Typography>
+        
+        {availableDCs.length > 0 ? (
+          <TextField
+            select
+            fullWidth
+            label="Refer / Link Delivery Challan"
+            value={selectedDCId}
+            onChange={(e) => setSelectedDCId(e.target.value)}
+            sx={{ mb: 3 }}
+            helperText="Selecting a Delivery Challan will link this invoice and skip deducting inventory twice."
+          >
+            <MenuItem value="">
+              <em>None (Deduct items directly from stock)</em>
+            </MenuItem>
+            {availableDCs.map((dc) => (
+              <MenuItem key={dc.id} value={dc.id}>
+                {dc.challan_number} (Created: {new Date(dc.date).toLocaleDateString()})
+              </MenuItem>
+            ))}
+          </TextField>
+        ) : (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            No pending Delivery Challans found for this customer. Stock will be deducted from inventory.
+          </Typography>
+        )}
+
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button onClick={() => setOpenInvoiceModal(false)} variant="outlined">Cancel</Button>
           <Button onClick={submitInvoice} variant="contained">Generate invoice</Button>
@@ -781,6 +830,11 @@ const Sales = () => {
                 {printDocType === 'Invoice' ? 'Invoice No: ' : 'Order No: '}
                 <strong>{printData?.invoice_number}</strong>
               </Typography>
+              {printDocType === 'Invoice' && printData?.delivery_challan_number && (
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                  Challan No: <strong>{printData.delivery_challan_number}</strong>
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
                 {printDocType === 'Invoice' ? 'Billing Date: ' : 'Order Date: '}
                 <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>

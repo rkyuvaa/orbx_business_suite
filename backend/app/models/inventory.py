@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import ForeignKey, String, Float, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,3 +40,33 @@ class CurrentStock(Base):
     # Relationships
     product: Mapped["Product"] = relationship()
     branch: Mapped["Branch"] = relationship()
+
+
+class StockTransfer(Base):
+    __tablename__ = "stock_transfers"
+
+    source_branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    destination_branch_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), nullable=True, index=True)
+    customer_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("customers.id", ondelete="RESTRICT"), nullable=True, index=True)
+    challan_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    status: Mapped[str] = mapped_column(String(30), default="Draft") # Draft, Transferred, Cancelled
+    notes: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Relationships
+    source_branch: Mapped["Branch"] = relationship(foreign_keys=[source_branch_id])
+    destination_branch: Mapped[Optional["Branch"]] = relationship(foreign_keys=[destination_branch_id])
+    customer: Mapped[Optional["Customer"]] = relationship()
+    items: Mapped[List["StockTransferItem"]] = relationship(back_populates="transfer", cascade="all, delete-orphan")
+
+
+class StockTransferItem(Base):
+    __tablename__ = "stock_transfer_items"
+
+    transfer_id: Mapped[UUID] = mapped_column(ForeignKey("stock_transfers.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), index=True)
+    qty: Mapped[float] = mapped_column(Float)
+
+    # Relationships
+    transfer: Mapped["StockTransfer"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship()

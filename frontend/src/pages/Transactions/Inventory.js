@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Chip } from '@mui/material';
-import { Add as AddIcon, Warning as WarningIcon } from '@mui/icons-material';
+import { useReactToPrint } from 'react-to-print';
+import {
+  Button, Box, Alert, Typography, Tabs, Tab, Paper, Chip, MenuItem, TextField,
+  Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer, Grid
+} from '@mui/material';
+import {
+  Add as AddIcon, Warning as WarningIcon, Print as PrintIcon,
+  Block as CancelIcon, LocalShipping as DispatchIcon, Delete as DeleteIcon
+} from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -19,14 +26,49 @@ const schema = yup.object().shape({
   reason: yup.string().nullable(),
 });
 
+// Helper to load external JS scripts dynamically (for PDF download libraries)
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = (err) => reject(err);
+    document.head.appendChild(script);
+  });
+};
+
 const Inventory = () => {
   const [tabIndex, setTabIndex] = useState(0);
   const [stockPositions, setStockPositions] = useState([]);
   const [ledger, setLedger] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [products, setProducts] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [company, setCompany] = useState(null);
+
+  // Modals
   const [openModal, setOpenModal] = useState(false);
+  const [openTransferModal, setOpenTransferModal] = useState(false);
+  const [openPrintModal, setOpenPrintModal] = useState(false);
+
+  // States for Stock Transfer Form
+  const [transferSourceBranch, setTransferSourceBranch] = useState('');
+  const [transferType, setTransferType] = useState('branch'); // branch or customer
+  const [transferDestBranch, setTransferDestBranch] = useState('');
+  const [transferCustomerId, setTransferCustomerId] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [transferItems, setTransferItems] = useState([{ product_id: '', qty: 1 }]);
+
+  // Selected Transfer for printing
+  const [selectedTransfer, setSelectedTransfer] = useState(null);
+
   const [error, setError] = useState(null);
+  const printRef = useRef();
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
@@ -36,15 +78,21 @@ const Inventory = () => {
     try {
       const sRes = await apiClient.get('/inventory/stock');
       const lRes = await apiClient.get('/inventory/ledger');
+      const tRes = await apiClient.get('/inventory/transfers');
       const pRes = await apiClient.get('/products/');
       const bRes = await apiClient.get('/admin/branches');
+      const cRes = await apiClient.get('/customers/');
+      const compRes = await apiClient.get('/admin/company');
 
       setStockPositions(sRes.data);
       setLedger(lRes.data);
+      setTransfers(tRes.data);
       setProducts(pRes.data);
       setBranches(bRes.data);
+      setCustomers(cRes.data);
+      setCompany(compRes.data);
     } catch (err) {
-      setError('Failed to load inventory stocks records.');
+      setError('Failed to load inventory records.');
     }
   };
 
@@ -73,6 +121,157 @@ const Inventory = () => {
     }
   };
 
+  // ==========================================
+  // STOCK TRANSFER / DELIVERY CHALLAN FLOWS
+  // ==========================================
+  const handleOpenTransferModal = () => {
+    setTransferSourceBranch(branches.length > 0 ? branches[0].id : '');
+    setTransferType('branch');
+    setTransferDestBranch(branches.length > 1 ? branches[1].id : '');
+    setTransferCustomerId('');
+    setTransferNotes('');
+    setTransferItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1 }]);
+    setOpenTransferModal(true);
+  };
+
+  const handleAddTransferItemRow = () => {
+    setTransferItems([...transferItems, { product_id: products.length > 0 ? products[0].id : '', qty: 1 }]);
+  };
+
+  const handleRemoveTransferItemRow = (index) => {
+    const updated = [...transferItems];
+    updated.splice(index, 1);
+    setTransferItems(updated);
+  };
+
+  const handleTransferItemChange = (index, field, value) => {
+    const updated = [...transferItems];
+    updated[index][field] = value;
+    setTransferItems(updated);
+  };
+
+  const submitTransfer = async () => {
+    try {
+      if (transferItems.some(i => !i.product_id || !i.qty)) {
+        setError('Please verify all transfer item rows are complete.');
+        return;
+      }
+      const payload = {
+        source_branch_id: transferSourceBranch,
+        destination_branch_id: transferType === 'branch' ? transferDestBranch : null,
+        customer_id: transferType === 'customer' ? transferCustomerId : null,
+        notes: transferNotes,
+        items: transferItems.map(i => ({ product_id: i.product_id, qty: parseFloat(i.qty) }))
+      };
+      await apiClient.post('/inventory/transfers', payload);
+      setOpenTransferModal(false);
+      loadData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to create Stock Transfer.');
+    }
+  };
+
+  const handleDispatchTransfer = async (id) => {
+    try {
+      await apiClient.post(`/inventory/transfers/${id}/dispatch`);
+      loadData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to dispatch Stock Transfer.');
+    }
+  };
+
+  const handleCancelTransfer = async (id) => {
+    try {
+      await apiClient.post(`/inventory/transfers/${id}/cancel`);
+      loadData();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to cancel Stock Transfer.');
+    }
+  };
+
+  const handleOpenPrint = (transfer) => {
+    setSelectedTransfer(transfer);
+    setOpenPrintModal(true);
+  };
+
+  // Printing & PDF downloading
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    pageStyle: `
+      @page { size: A4 portrait; margin: 0 !important; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; }
+      }
+    `
+  });
+
+  const downloadPDF = async () => {
+    if (!window.html2canvas || !window.jspdf) {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      } catch (err) {
+        setError("Failed to load PDF libraries.");
+        return;
+      }
+    }
+
+    try {
+      const element = printRef.current;
+      const { jsPDF } = window.jspdf;
+      
+      const originalStyle = element.style.cssText;
+      element.style.cssText += '; width: 800px !important; max-width: none !important; padding: 0 !important; margin: 0 !important;';
+      
+      const canvas = await window.html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: 800
+      });
+      
+      element.style.cssText = originalStyle;
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const margin = 15;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imgWidth = pageWidth - (margin * 2); 
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F');
+      
+      const heightShown = pageHeight - (margin * 2);
+      heightLeft -= heightShown;
+
+      while (heightLeft > 0) {
+        position -= heightShown;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pageWidth, margin, 'F'); 
+        pdf.rect(0, pageHeight - margin, pageWidth, margin, 'F'); 
+        heightLeft -= heightShown;
+      }
+
+      pdf.save(`DeliveryChallan_${selectedTransfer?.challan_number || 'Document'}.pdf`);
+    } catch (err) {
+      setError("Error creating PDF document.");
+    }
+  };
+
+  // ==========================================
+  // TABLE COLUMNS SETUP
+  // ==========================================
   const stockColumns = [
     {
       id: 'product_id',
@@ -160,6 +359,66 @@ const Inventory = () => {
     { id: 'reason', label: 'Reason/Notes' },
   ];
 
+  const transferColumns = [
+    { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
+    { id: 'challan_number', label: 'Challan No.', render: (row) => <strong>{row.challan_number}</strong> },
+    { id: 'source_branch_name', label: 'From Branch' },
+    {
+      id: 'recipient',
+      label: 'To Branch / Customer',
+      render: (row) => row.customer_name ? (
+        <Box>
+          <Chip size="small" label="Customer" color="info" sx={{ mr: 1, fontWeight: 600 }} />
+          {row.customer_name}
+        </Box>
+      ) : (
+        <Box>
+          <Chip size="small" label="Branch" color="primary" sx={{ mr: 1, fontWeight: 600 }} />
+          {row.destination_branch_name}
+        </Box>
+      )
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (row) => (
+        <Chip
+          size="small"
+          label={row.status}
+          color={row.status === 'Transferred' ? 'success' : row.status === 'Draft' ? 'warning' : 'default'}
+          sx={{ fontWeight: 600 }}
+        />
+      )
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      render: (row) => (
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {row.status === 'Draft' && (
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              startIcon={<DispatchIcon />}
+              onClick={() => handleDispatchTransfer(row.id)}
+            >
+              Dispatch
+            </Button>
+          )}
+          {row.status !== 'Cancelled' && (
+            <IconButton size="small" color="error" title="Cancel Challan" onClick={() => handleCancelTransfer(row.id)}>
+              <CancelIcon />
+            </IconButton>
+          )}
+          <IconButton size="small" color="primary" title="Print Challan" onClick={() => handleOpenPrint(row)}>
+            <PrintIcon />
+          </IconButton>
+        </Box>
+      )
+    }
+  ];
+
   const productOptions = products.map((p) => ({ value: p.id, label: p.name }));
   const branchOptions = branches.map((b) => ({ value: b.id, label: b.branch_name }));
   const txTypeOptions = [
@@ -168,8 +427,14 @@ const Inventory = () => {
     { value: 'Adjustment', label: 'Physical Adjustment (Variance Correction)' },
   ];
 
+  // Map chosen print transfer branch
+  const printSourceBranch = selectedTransfer ? branches.find(b => b.id === selectedTransfer.source_branch_id) : null;
+  const printDestBranch = selectedTransfer ? branches.find(b => b.id === selectedTransfer.destination_branch_id) : null;
+
   return (
     <Box>
+      <PageHeader title="Inventory Warehouse Management" subtitle="Manage stock balances, view logs, and issue stock delivery challans." />
+
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           {error}
@@ -180,10 +445,11 @@ const Inventory = () => {
         <Tabs value={tabIndex} onChange={(e, idx) => setTabIndex(idx)} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
           <Tab label="Current Stock Balances" sx={{ fontWeight: 600 }} />
           <Tab label="Inventory Ledger History" sx={{ fontWeight: 600 }} />
+          <Tab label="Stock Transfers (Delivery Challan)" sx={{ fontWeight: 600 }} />
         </Tabs>
       </Paper>
 
-      {tabIndex === 0 ? (
+      {tabIndex === 0 && (
         <CommonTable
           columns={stockColumns}
           rows={stockPositions}
@@ -194,10 +460,26 @@ const Inventory = () => {
             </Button>
           }
         />
-      ) : (
+      )}
+
+      {tabIndex === 1 && (
         <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
       )}
 
+      {tabIndex === 2 && (
+        <CommonTable
+          columns={transferColumns}
+          rows={transfers}
+          searchKey="challan_number"
+          tableActions={
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenTransferModal}>
+              New Transfer / DC
+            </Button>
+          }
+        />
+      )}
+
+      {/* ADJUSTMENT MODAL */}
       <CommonModal
         open={openModal}
         onClose={() => setOpenModal(false)}
@@ -249,6 +531,293 @@ const Inventory = () => {
             </Button>
           </Box>
         </form>
+      </CommonModal>
+
+      {/* NEW TRANSFER / DELIVERY CHALLAN MODAL */}
+      <CommonModal
+        open={openTransferModal}
+        onClose={() => setOpenTransferModal(false)}
+        title="Issue Stock Transfer / Delivery Challan"
+        maxWidth="md"
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Source Branch (From)"
+                value={transferSourceBranch}
+                onChange={(e) => setTransferSourceBranch(e.target.value)}
+              >
+                {branches.map(b => (
+                  <MenuItem key={b.id} value={b.id}>{b.branch_name}</MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Destination Type"
+                value={transferType}
+                onChange={(e) => {
+                  setTransferType(e.target.value);
+                  setTransferDestBranch('');
+                  setTransferCustomerId('');
+                }}
+              >
+                <MenuItem value="branch">Branch Transfer (Warehouse Move)</MenuItem>
+                <MenuItem value="customer">Customer Delivery Challan (DC)</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
+          {transferType === 'branch' ? (
+            <TextField
+              select
+              fullWidth
+              label="Destination Branch (To)"
+              value={transferDestBranch}
+              onChange={(e) => setTransferDestBranch(e.target.value)}
+            >
+              {branches.filter(b => b.id !== transferSourceBranch).map(b => (
+                <MenuItem key={b.id} value={b.id}>{b.branch_name}</MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              select
+              fullWidth
+              label="Select Customer"
+              value={transferCustomerId}
+              onChange={(e) => setTransferCustomerId(e.target.value)}
+            >
+              {customers.map(c => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
+          )}
+
+          <TextField
+            fullWidth
+            label="Internal Auditing Remarks"
+            value={transferNotes}
+            onChange={(e) => setTransferNotes(e.target.value)}
+          />
+
+          <Divider />
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Line Items to Transfer</Typography>
+
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead sx={{ backgroundColor: 'action.hover' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Product Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="150px">Quantity</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }} width="80px">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {transferItems.map((row, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        value={row.product_id}
+                        onChange={(e) => handleTransferItemChange(index, 'product_id', e.target.value)}
+                      >
+                        {products.map(p => (
+                          <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                        ))}
+                      </TextField>
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        type="number"
+                        fullWidth
+                        size="small"
+                        value={row.qty}
+                        onChange={(e) => handleTransferItemChange(index, 'qty', e.target.value)}
+                        inputProps={{ min: 1 }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        color="error"
+                        disabled={transferItems.length === 1}
+                        onClick={() => handleRemoveTransferItemRow(index)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTransferItemRow}>
+            Add Product Row
+          </Button>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+            <Button onClick={() => setOpenTransferModal(false)} variant="outlined">
+              Cancel
+            </Button>
+            <Button onClick={submitTransfer} variant="contained" color="primary">
+              Create Draft Challan
+            </Button>
+          </Box>
+        </Box>
+      </CommonModal>
+
+      {/* PRINT DIALOG */}
+      <CommonModal
+        open={openPrintModal}
+        onClose={() => setOpenPrintModal(false)}
+        title="Print Delivery Challan"
+        maxWidth="md"
+        actions={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" onClick={downloadPDF}>Download PDF</Button>
+            <Button variant="contained" onClick={handlePrint}>Print Document</Button>
+          </Box>
+        }
+      >
+        <Box sx={{ p: 4, '@media print': { p: 0 } }}>
+          <Box
+            ref={printRef}
+            sx={{
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              fontFamily: '"Outfit", sans-serif',
+              boxShadow: 'none',
+              '@media print': {
+                width: '210mm !important',
+                maxWidth: '210mm !important',
+                minHeight: '297mm !important',
+                padding: '12mm 15mm !important',
+                margin: '0 !important',
+                boxShadow: 'none !important',
+                boxSizing: 'border-box !important',
+              }
+            }}
+          >
+            {/* Header */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+              <Box>
+                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
+                  {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address || ''}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin || ''}</strong></Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                  Email: {company?.email || ''} | Phone: {company?.phone || ''}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
+                  DELIVERY CHALLAN
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                  Challan No: <strong>{selectedTransfer?.challan_number}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                  Date: <strong>{selectedTransfer ? new Date(selectedTransfer.date).toLocaleDateString() : ''}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                  Status: <strong>{selectedTransfer?.status}</strong>
+                </Typography>
+              </Box>
+            </Box>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Addresses */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              <Box sx={{ width: '48%' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>DISPATCHED FROM (SENDER):</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedTransfer?.source_branch_name}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                  {printSourceBranch?.address || 'Source Branch Warehouse'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Branch Code: <strong>{printSourceBranch?.code}</strong></Typography>
+              </Box>
+              <Box sx={{ width: '48%', textAlign: 'right' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>DELIVER TO (RECIPIENT):</Typography>
+                {selectedTransfer?.customer_name ? (
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedTransfer.customer_name}</Typography>
+                    {(() => {
+                      const cust = customers.find(c => c.id === selectedTransfer.customer_id);
+                      return cust ? (
+                        <Box>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{cust.billing_address || cust.shipping_address}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>GSTIN: <strong>{cust.gstin || 'N/A'}</strong></Typography>
+                        </Box>
+                      ) : null;
+                    })()}
+                  </Box>
+                ) : (
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedTransfer?.destination_branch_name}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                      {printDestBranch?.address || 'Destination Warehouse'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>Branch Code: <strong>{printDestBranch?.code}</strong></Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+
+            {/* Items Table */}
+            <TableContainer sx={{ mb: 4, borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+              <Table size="small">
+                <TableHead sx={{ backgroundColor: '#f8fafc' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} width="60px">S.No.</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }}>Product Description</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} width="180px">SKU Code</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: '0.85rem' }} align="right" width="120px">Quantity</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {selectedTransfer?.items?.map((item, idx) => (
+                    <TableRow key={item.id || idx}>
+                      <TableCell sx={{ fontSize: '0.85rem' }}>{idx + 1}</TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.product_name}</TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{item.sku}</TableCell>
+                      <TableCell sx={{ fontSize: '0.85rem', fontWeight: 700 }} align="right">{item.qty}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {selectedTransfer?.notes && (
+              <Box sx={{ mb: 4, p: 2, backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 0.5 }}>Remarks / Delivery Instructions:</Typography>
+                <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{selectedTransfer.notes}</Typography>
+              </Box>
+            )}
+
+            {/* Signature Area */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 8, pt: 4 }}>
+              <Box sx={{ textAlign: 'center', width: '200px' }}>
+                <Divider />
+                <Typography sx={{ fontSize: '0.8rem', mt: 1, color: 'text.secondary' }}>Receiver's Signature</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center', width: '250px' }}>
+                <Divider />
+                <Typography sx={{ fontSize: '0.8rem', mt: 1, fontWeight: 600 }}>For {company?.name ? company.name.trim() : 'ORBX CORPORATION'}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Authorized Signatory</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       </CommonModal>
     </Box>
   );

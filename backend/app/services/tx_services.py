@@ -10,13 +10,13 @@ from app.models.auth import User
 from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product
 from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry
-from app.models.inventory import StockTransaction, CurrentStock
+from app.models.inventory import StockTransaction, CurrentStock, StockTransfer, StockTransferItem
 from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem
 from app.models.finance import Payment, PaymentReceipt
 from app.schemas.transaction import (
     PurchaseOrderCreate, GRNCreate, PurchaseEntryCreate,
     StockTransactionCreate, SalesOrderCreate, InvoiceCreate,
-    PaymentCreate
+    PaymentCreate, StockTransferCreate
 )
 
 
@@ -584,6 +584,8 @@ class TxServices:
 
         # Check if we should decrement inventory stock levels (only if not already invoiced/delivered)
         should_decrement_stock = so.status not in ["Delivered", "Invoiced"]
+        if inv_data.delivery_challan_id:
+            should_decrement_stock = False
 
         # Fetch Branch to get Invoice Config and update sequences
         q_br = await db.execute(select(Branch).filter(Branch.id == so.branch_id))
@@ -631,6 +633,7 @@ class TxServices:
         # Create Invoice record
         invoice = Invoice(
             sales_order_id=so.id,
+            delivery_challan_id=inv_data.delivery_challan_id,
             branch_id=so.branch_id,
             invoice_number=invoice_no,
             date=datetime.utcnow(),
@@ -686,11 +689,13 @@ class TxServices:
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
                 selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
-                selectinload(Invoice.payments)
+                selectinload(Invoice.payments),
+                selectinload(Invoice.delivery_challan)
             )
         )
         inv = q_final.scalar_one()
         inv.outstanding_amount = inv.total_amount
+        inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
         if inv.sales_order and inv.sales_order.customer:
             inv.customer_name = inv.sales_order.customer.name
             inv.customer_id = inv.sales_order.customer.id
@@ -711,7 +716,8 @@ class TxServices:
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
                 selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
-                selectinload(Invoice.payments)
+                selectinload(Invoice.payments),
+                selectinload(Invoice.delivery_challan)
             )
         )
         if branch_id:
@@ -721,6 +727,7 @@ class TxServices:
         for inv in invoices:
             total_paid = sum([p.amount_paid for p in inv.payments])
             inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
+            inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
@@ -751,7 +758,8 @@ class TxServices:
             .options(
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
                 selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
-                selectinload(Invoice.payments)
+                selectinload(Invoice.payments),
+                selectinload(Invoice.delivery_challan)
             )
         )
         if customer_id:
@@ -761,6 +769,7 @@ class TxServices:
         for inv in invoices:
             total_paid = sum([p.amount_paid for p in inv.payments])
             inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
+            inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
@@ -1077,4 +1086,193 @@ class TxServices:
             db.add(invoice)
             
         await db.commit()
+
+    # ==========================================
+    # STOCK TRANSFER & DELIVERY CHALLAN SERVICES
+    # ==========================================
+    @staticmethod
+    async def create_stock_transfer(db: AsyncSession, transfer_data: StockTransferCreate) -> StockTransfer:
+        """Create a new stock transfer or customer delivery challan in Draft state."""
+        if not transfer_data.destination_branch_id and not transfer_data.customer_id:
+            raise HTTPException(status_code=400, detail="Either destination branch or customer must be specified.")
+        if transfer_data.destination_branch_id and transfer_data.customer_id:
+            raise HTTPException(status_code=400, detail="Cannot specify both destination branch and customer.")
+        if transfer_data.destination_branch_id == transfer_data.source_branch_id:
+            raise HTTPException(status_code=400, detail="Source and destination branches cannot be the same.")
+            
+        # Count all existing transfers to generate a unique sequence
+        q_count = await db.execute(select(StockTransfer))
+        seq = len(q_count.scalars().all()) + 1
+        challan_no = f"CHLN-{seq:05d}"
+        
+        transfer = StockTransfer(
+            source_branch_id=transfer_data.source_branch_id,
+            destination_branch_id=transfer_data.destination_branch_id,
+            customer_id=transfer_data.customer_id,
+            challan_number=challan_no,
+            status="Draft",
+            notes=transfer_data.notes
+        )
+        db.add(transfer)
+        await db.flush()
+        
+        for item in transfer_data.items:
+            # Check if product exists
+            q_p = await db.execute(select(Product).filter(Product.id == item.product_id))
+            product = q_p.scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=400, detail="Invalid product ID.")
+                
+            transfer_item = StockTransferItem(
+                transfer_id=transfer.id,
+                product_id=item.product_id,
+                qty=item.qty
+            )
+            db.add(transfer_item)
+            
+        await db.commit()
+        return await TxServices.get_stock_transfer(db, transfer.id)
+
+    @staticmethod
+    async def get_stock_transfer(db: AsyncSession, transfer_id: UUID) -> StockTransfer:
+        stmt = (
+            select(StockTransfer)
+            .filter(StockTransfer.id == transfer_id)
+            .options(
+                selectinload(StockTransfer.source_branch),
+                selectinload(StockTransfer.destination_branch),
+                selectinload(StockTransfer.customer),
+                selectinload(StockTransfer.items).selectinload(StockTransferItem.product)
+            )
+        )
+        q = await db.execute(stmt)
+        t = q.scalar_one_or_none()
+        if not t:
+            raise HTTPException(status_code=404, detail="Stock Transfer / Delivery Challan not found.")
+            
+        t.source_branch_name = t.source_branch.branch_name if t.source_branch else "Unknown"
+        t.destination_branch_name = t.destination_branch.branch_name if t.destination_branch else None
+        t.customer_name = t.customer.name if t.customer else None
+        for item in t.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+        return t
+
+    @staticmethod
+    async def list_stock_transfers(db: AsyncSession, branch_id: Optional[UUID] = None, customer_id: Optional[UUID] = None) -> List[StockTransfer]:
+        stmt = (
+            select(StockTransfer)
+            .options(
+                selectinload(StockTransfer.source_branch),
+                selectinload(StockTransfer.destination_branch),
+                selectinload(StockTransfer.customer),
+                selectinload(StockTransfer.items).selectinload(StockTransferItem.product)
+            )
+            .order_by(StockTransfer.date.desc())
+        )
+        if branch_id:
+            stmt = stmt.filter(
+                (StockTransfer.source_branch_id == branch_id) |
+                (StockTransfer.destination_branch_id == branch_id)
+            )
+        if customer_id:
+            stmt = stmt.filter(StockTransfer.customer_id == customer_id)
+            
+        q = await db.execute(stmt)
+        transfers = list(q.scalars().all())
+        for t in transfers:
+            t.source_branch_name = t.source_branch.branch_name if t.source_branch else "Unknown"
+            t.destination_branch_name = t.destination_branch.branch_name if t.destination_branch else None
+            t.customer_name = t.customer.name if t.customer else None
+            for item in t.items:
+                item.product_name = item.product.name if item.product else "Unknown"
+                item.sku = item.product.sku if item.product else ""
+        return transfers
+
+    @staticmethod
+    async def dispatch_stock_transfer(db: AsyncSession, transfer_id: UUID) -> StockTransfer:
+        t = await TxServices.get_stock_transfer(db, transfer_id)
+        if t.status != "Draft":
+            raise HTTPException(status_code=400, detail="Only Draft transfers can be dispatched.")
+            
+        t.status = "Transferred"
+        db.add(t)
+        
+        # Execute stock changes
+        for item in t.items:
+            # Decrease at source branch
+            await TxServices.update_stock(
+                db=db,
+                product_id=item.product_id,
+                branch_id=t.source_branch_id,
+                qty_change=-item.qty,
+                tx_type="Out",
+                ref_type="StockTransfer",
+                ref_id=t.id,
+                reason=f"Stock transfer outbound (Challan: {t.challan_number})"
+            )
+            if t.destination_branch_id:
+                # Increase at destination branch (if it's a branch transfer)
+                await TxServices.update_stock(
+                    db=db,
+                    product_id=item.product_id,
+                    branch_id=t.destination_branch_id,
+                    qty_change=item.qty,
+                    tx_type="In",
+                    ref_type="StockTransfer",
+                    ref_id=t.id,
+                    reason=f"Stock transfer inbound (Challan: {t.challan_number})"
+                )
+            
+        await db.commit()
+        return await TxServices.get_stock_transfer(db, t.id)
+
+    @staticmethod
+    async def cancel_stock_transfer(db: AsyncSession, transfer_id: UUID) -> StockTransfer:
+        t = await TxServices.get_stock_transfer(db, transfer_id)
+        if t.status == "Cancelled":
+            raise HTTPException(status_code=400, detail="Transfer is already cancelled.")
+            
+        # Check if any invoices are linked to this delivery challan
+        q_inv = await db.execute(select(Invoice).filter(Invoice.delivery_challan_id == transfer_id, Invoice.status != "Cancelled"))
+        active_invoices = q_inv.scalars().all()
+        if active_invoices:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot cancel Delivery Challan because it is linked to active invoice(s): {', '.join([i.invoice_number for i in active_invoices])}"
+            )
+            
+        old_status = t.status
+        t.status = "Cancelled"
+        db.add(t)
+        
+        # If it was already transferred, reverse the stock adjustment
+        if old_status == "Transferred":
+            for item in t.items:
+                # Add back to source
+                await TxServices.update_stock(
+                    db=db,
+                    product_id=item.product_id,
+                    branch_id=t.source_branch_id,
+                    qty_change=item.qty,
+                    tx_type="In",
+                    ref_type="StockTransferCancel",
+                    ref_id=t.id,
+                    reason=f"Stock transfer reversal/cancellation (Challan: {t.challan_number})"
+                )
+                if t.destination_branch_id:
+                    # Remove from destination (if it was a branch transfer)
+                    await TxServices.update_stock(
+                        db=db,
+                        product_id=item.product_id,
+                        branch_id=t.destination_branch_id,
+                        qty_change=-item.qty,
+                        tx_type="Out",
+                        ref_type="StockTransferCancel",
+                        ref_id=t.id,
+                        reason=f"Stock transfer reversal/cancellation (Challan: {t.challan_number})"
+                    )
+                
+        await db.commit()
+        return await TxServices.get_stock_transfer(db, t.id)
 

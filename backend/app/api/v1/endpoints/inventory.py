@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import deps
-from app.schemas.transaction import CurrentStockOut, StockTransactionOut, StockTransactionCreate
+from app.schemas.transaction import (
+    CurrentStockOut, StockTransactionOut, StockTransactionCreate,
+    StockTransferOut, StockTransferCreate
+)
 from app.services.tx_services import TxServices
 
 router = APIRouter()
@@ -38,3 +41,54 @@ async def manual_inventory_transaction(
 ):
     """Execute a manual stock adjust correction, manual intake, or manual stock write-off."""
     return await TxServices.manual_stock_transaction(db, tx_data)
+
+
+@router.post("/transfers", response_model=StockTransferOut)
+async def create_transfer(
+    transfer_data: StockTransferCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "create"))
+):
+    """Create a stock transfer or customer delivery challan in Draft state."""
+    return await TxServices.create_stock_transfer(db, transfer_data)
+
+
+@router.get("/transfers", response_model=List[StockTransferOut])
+async def list_transfers(
+    branch_id: Optional[UUID] = Query(None),
+    customer_id: Optional[UUID] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "view"))
+):
+    """List stock transfers / delivery challans."""
+    return await TxServices.list_stock_transfers(db, branch_id=branch_id, customer_id=customer_id)
+
+
+@router.get("/transfers/{transfer_id}", response_model=StockTransferOut)
+async def get_transfer_by_id(
+    transfer_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "view"))
+):
+    """Fetch details of a single stock transfer / delivery challan."""
+    return await TxServices.get_stock_transfer(db, transfer_id)
+
+
+@router.post("/transfers/{transfer_id}/dispatch", response_model=StockTransferOut)
+async def dispatch_transfer(
+    transfer_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "create"))
+):
+    """Dispatch the stock transfer / delivery challan (decrements source branch, increments destination branch if applicable)."""
+    return await TxServices.dispatch_stock_transfer(db, transfer_id)
+
+
+@router.post("/transfers/{transfer_id}/cancel", response_model=StockTransferOut)
+async def cancel_transfer(
+    transfer_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "create"))
+):
+    """Cancel the stock transfer / delivery challan (reverses stock adjustments if already transferred)."""
+    return await TxServices.cancel_stock_transfer(db, transfer_id)

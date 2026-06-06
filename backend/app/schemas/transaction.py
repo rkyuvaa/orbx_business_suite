@@ -235,13 +235,16 @@ class InvoiceItemOut(BaseModel):
 
 
 class InvoiceCreate(BaseModel):
-    sales_order_id: UUID
+    sales_order_id: Optional[UUID] = None
+    delivery_challan_id: Optional[UUID] = None
     due_date: Optional[datetime] = None
 
 
 class InvoiceOut(BaseModel):
     id: UUID
     sales_order_id: Optional[UUID] = None
+    delivery_challan_id: Optional[UUID] = None
+    delivery_challan_number: Optional[str] = None
     customer_name: Optional[str] = None
     customer_id: Optional[UUID] = None
     customer_gstin: Optional[str] = None
@@ -386,3 +389,48 @@ class SupplierLedgerResponse(BaseModel):
     total_paid: float
     balance: float
     transactions: List[LedgerEntry]
+
+
+# ==========================================
+# 5. STOCK TRANSFER MODULE SCHEMAS
+# ==========================================
+class StockTransferItemCreate(BaseModel):
+    product_id: UUID
+    qty: float
+
+
+class StockTransferCreate(BaseModel):
+    source_branch_id: UUID
+    destination_branch_id: Optional[UUID] = None
+    customer_id: Optional[UUID] = None
+    notes: Optional[str] = None
+    items: List[StockTransferItemCreate]
+
+
+class StockTransferItemOut(BaseModel):
+    id: UUID
+    product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
+    qty: float
+
+    class Config:
+        from_attributes = True
+
+
+class StockTransferOut(BaseModel):
+    id: UUID
+    source_branch_id: UUID
+    source_branch_name: Optional[str] = None
+    destination_branch_id: Optional[UUID] = None
+    destination_branch_name: Optional[str] = None
+    customer_id: Optional[UUID] = None
+    customer_name: Optional[str] = None
+    challan_number: str
+    date: datetime
+    status: str
+    notes: Optional[str] = None
+    items: List[StockTransferItemOut] = []
+
+    class Config:
+        from_attributes = True

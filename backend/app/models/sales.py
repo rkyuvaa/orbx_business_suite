@@ -48,6 +48,7 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     sales_order_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("sales_orders.id", ondelete="SET NULL"), nullable=True, index=True)
+    delivery_challan_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("stock_transfers.id", ondelete="SET NULL"), nullable=True, index=True)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
     invoice_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
@@ -67,6 +68,7 @@ class Invoice(Base):
 
     # Relationships
     sales_order: Mapped[Optional["SalesOrder"]] = relationship(back_populates="invoices")
+    delivery_challan: Mapped[Optional["StockTransfer"]] = relationship()
     branch: Mapped["Branch"] = relationship()
     items: Mapped[List["InvoiceItem"]] = relationship(back_populates="invoice", cascade="all, delete-orphan")
     payments: Mapped[List["Payment"]] = relationship(back_populates="invoice")
