@@ -25,7 +25,6 @@ class SalesOrder(Base):
     branch: Mapped["Branch"] = relationship()
     items: Mapped[List["SalesOrderItem"]] = relationship(back_populates="sales_order", cascade="all, delete-orphan")
     invoices: Mapped[List["Invoice"]] = relationship(back_populates="sales_order")
-    deliveries: Mapped[List["Delivery"]] = relationship(back_populates="sales_order")
 
 
 class SalesOrderItem(Base):
@@ -90,14 +89,3 @@ class InvoiceItem(Base):
     product: Mapped["Product"] = relationship()
 
 
-class Delivery(Base):
-    __tablename__ = "deliveries"
-
-    sales_order_id: Mapped[UUID] = mapped_column(ForeignKey("sales_orders.id", ondelete="RESTRICT"), index=True)
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    delivery_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    status: Mapped[str] = mapped_column(String(30), default="Pending") # Pending, Delivered, Cancelled
-    qty_delivered: Mapped[float] = mapped_column(Float, default=0.0)
-
-    # Relationships
-    sales_order: Mapped["SalesOrder"] = relationship(back_populates="deliveries")

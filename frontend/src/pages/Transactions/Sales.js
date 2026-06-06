@@ -5,7 +5,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer
 } from '@mui/material';
 import {
-  Add as AddIcon, Delete as DeleteIcon, LocalShipping as ShipIcon,
+  Add as AddIcon, Delete as DeleteIcon,
   Receipt as InvoiceIcon, Print as PrintIcon
 } from '@mui/icons-material';
 
@@ -19,12 +19,10 @@ const Sales = () => {
   const [tabIndex, setTabIndex] = useState(0);
   const [sos, setSos] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [deliveries, setDeliveries] = useState([]);
   const [branches, setBranches] = useState([]);
   const [company, setCompany] = useState(null);
 
   const [openSOModal, setOpenSOModal] = useState(false);
-  const [openDeliveryModal, setOpenDeliveryModal] = useState(false);
   const [openInvoiceModal, setOpenInvoiceModal] = useState(false);
   const [openPrintModal, setOpenPrintModal] = useState(false);
 
@@ -36,9 +34,6 @@ const Sales = () => {
   const [soBranchId, setSoBranchId] = useState('');
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
-  // Delivery Form Local States
-  const [delNote, setDelNote] = useState('');
-
   const [error, setError] = useState(null);
   const printRef = useRef();
 
@@ -46,13 +41,11 @@ const Sales = () => {
     try {
       const soRes = await apiClient.get('/sales/so');
       const invRes = await apiClient.get('/sales/invoices');
-      const delRes = await apiClient.get('/sales/deliveries');
       const brRes = await apiClient.get('/admin/branches');
       const compRes = await apiClient.get('/admin/company');
 
       setSos(soRes.data);
       setInvoices(invRes.data);
-      setDeliveries(delRes.data);
       setBranches(brRes.data);
       setCompany(compRes.data);
     } catch (err) {
@@ -105,30 +98,7 @@ const Sales = () => {
     }
   };
 
-  // ==========================================
-  // DELIVERY MANAGEMENT FLOWS
-  // ==========================================
-  const handleOpenDelivery = (so) => {
-    setSelectedSO(so);
-    setDelNote('Standard logistics shipment delivery');
-    setOpenDeliveryModal(true);
-  };
 
-  const submitDelivery = async () => {
-    try {
-      const totalQty = selectedSO.items.reduce((acc, item) => acc + item.qty, 0);
-      const payload = {
-        sales_order_id: selectedSO.id,
-        delivery_note: delNote,
-        qty_delivered: totalQty
-      };
-      await apiClient.post('/sales/deliveries', payload);
-      setOpenDeliveryModal(false);
-      loadData();
-    } catch (err) {
-      setError('Failed to process shipment delivery.');
-    }
-  };
 
   // ==========================================
   // INVOICE MANAGEMENT FLOWS
@@ -303,9 +273,11 @@ const Sales = () => {
             borderRadius: '4px',
             fontWeight: 600,
             backgroundColor:
+              row.status === 'Invoiced' ? 'rgba(45, 106, 79, 0.1)' :
               row.status === 'Delivered' ? 'rgba(45, 106, 79, 0.1)' :
               row.status === 'Draft' ? 'rgba(100, 116, 139, 0.1)' : 'rgba(255, 143, 0, 0.1)',
             color:
+              row.status === 'Invoiced' ? '#2d6a4f' :
               row.status === 'Delivered' ? '#2d6a4f' :
               row.status === 'Draft' ? '#64748b' : '#ff8f00',
           }}
@@ -314,17 +286,6 @@ const Sales = () => {
         </Typography>
       )
     }
-  ];
-
-  const deliveryColumns = [
-    { id: 'date', label: 'Delivery Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    {
-      id: 'sales_order_id',
-      label: 'SO Ref ID',
-      render: (row) => `SO-${row.sales_order_id.substring(0, 6).toUpperCase()}`
-    },
-    { id: 'qty_delivered', label: 'Shipped Qty' },
-    { id: 'delivery_note', label: 'Logistics Notes' }
   ];
 
   const invoiceColumns = [
@@ -420,7 +381,6 @@ const Sales = () => {
       <Paper sx={{ mb: 3, borderRadius: '8px' }}>
         <Tabs value={tabIndex} onChange={(e, idx) => setTabIndex(idx)} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
           <Tab label="Sales Orders" sx={{ fontWeight: 600 }} />
-          <Tab label="Shipment Deliveries" sx={{ fontWeight: 600 }} />
           <Tab label="Tax Invoices" sx={{ fontWeight: 600 }} />
         </Tabs>
       </Paper>
@@ -430,13 +390,6 @@ const Sales = () => {
           columns={soColumns}
           rows={sos}
           actions={[
-            {
-              icon: <ShipIcon />,
-              label: 'Process Cargo Delivery',
-              condition: (row) => row.status === 'Draft',
-              onClick: handleOpenDelivery,
-              color: 'success'
-            },
             {
               icon: <InvoiceIcon />,
               label: 'Generate Tax Invoice',
@@ -458,10 +411,6 @@ const Sales = () => {
       )}
 
       {tabIndex === 1 && (
-        <CommonTable columns={deliveryColumns} rows={deliveries} searchKey="status" />
-      )}
-
-      {tabIndex === 2 && (
         <CommonTable
           columns={invoiceColumns}
           rows={invoices}
@@ -614,28 +563,6 @@ const Sales = () => {
         </Box>
       </CommonModal>
 
-      {/* PROCESS DELIVERY MODAL */}
-      <CommonModal
-        open={openDeliveryModal}
-        onClose={() => setOpenDeliveryModal(false)}
-        title="Fulfill Shipment Delivery"
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="body1">
-            Order Ref: <strong>SO-{selectedSO?.id.substring(0, 6).toUpperCase()}</strong>
-          </Typography>
-          <TextField
-            label="Logistics Note / Airway Bill"
-            fullWidth
-            value={delNote}
-            onChange={(e) => setDelNote(e.target.value)}
-          />
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 4 }}>
-          <Button onClick={() => setOpenDeliveryModal(false)} variant="outlined">Cancel</Button>
-          <Button onClick={submitDelivery} variant="contained">Dispatch Cargo</Button>
-        </Box>
-      </CommonModal>
 
       {/* GENERATE INVOICE MODAL */}
       <CommonModal

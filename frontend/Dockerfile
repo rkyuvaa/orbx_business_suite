@@ -3,10 +3,10 @@ FROM node:18-alpine AS build-stage
 
 WORKDIR /app
 
-COPY package.json /app/package.json
+COPY package*.json ./
 RUN npm install --silent
 
-COPY . /app
+COPY . .
 RUN npm run build
 
 # Stage 2: Production Nginx Server

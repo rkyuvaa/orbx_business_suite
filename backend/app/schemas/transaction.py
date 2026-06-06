@@ -260,23 +260,6 @@ class InvoiceOut(BaseModel):
         from_attributes = True
 
 
-class DeliveryCreate(BaseModel):
-    sales_order_id: UUID
-    delivery_note: Optional[str] = None
-    qty_delivered: float
-
-
-class DeliveryOut(BaseModel):
-    id: UUID
-    sales_order_id: UUID
-    date: datetime
-    delivery_note: Optional[str] = None
-    status: str
-    qty_delivered: float
-
-    class Config:
-        from_attributes = True
-
 
 # ==========================================
 # 4. PAYMENTS MODULE SCHEMAS

@@ -11,12 +11,12 @@ from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product
 from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry
 from app.models.inventory import StockTransaction, CurrentStock
-from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem, Delivery
+from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem
 from app.models.finance import Payment, PaymentReceipt
 from app.schemas.transaction import (
     PurchaseOrderCreate, GRNCreate, PurchaseEntryCreate,
     StockTransactionCreate, SalesOrderCreate, InvoiceCreate,
-    DeliveryCreate, PaymentCreate
+    PaymentCreate
 )
 
 
@@ -420,54 +420,6 @@ class TxServices:
         return orders
 
     @staticmethod
-    async def create_delivery(db: AsyncSession, delivery_data: DeliveryCreate) -> Delivery:
-        """Create delivery tracking, reduce active stock, and log transaction movements."""
-        q_so = await db.execute(
-            select(SalesOrder)
-            .filter(SalesOrder.id == delivery_data.sales_order_id)
-            .options(selectinload(SalesOrder.items))
-        )
-        so = q_so.scalar_one_or_none()
-        if not so:
-            raise HTTPException(status_code=404, detail="Sales Order not found.")
-
-        # Create Delivery
-        delivery = Delivery(
-            sales_order_id=delivery_data.sales_order_id,
-            delivery_note=delivery_data.delivery_note,
-            status="Delivered",
-            qty_delivered=delivery_data.qty_delivered
-        )
-        db.add(delivery)
-        await db.flush()
-
-        # Decrement stocks for each item in the Sales Order!
-        for item in so.items:
-            await TxServices.update_stock(
-                db=db,
-                product_id=item.product_id,
-                branch_id=so.branch_id,
-                qty_change=-item.qty,  # Subtract
-                tx_type="Out",
-                ref_type="Sales Delivery",
-                ref_id=delivery.id,
-                reason=f"Fulfillment for Sales Order: {so.id}"
-            )
-
-        so.status = "Delivered"
-        db.add(so)
-
-        await db.commit()
-        await db.refresh(delivery)
-        return delivery
-
-    @staticmethod
-    async def list_deliveries(db: AsyncSession) -> List[Delivery]:
-        """List deliveries."""
-        query = await db.execute(select(Delivery))
-        return list(query.scalars().all())
-
-    @staticmethod
     async def create_invoice(db: AsyncSession, inv_data: InvoiceCreate) -> Invoice:
         """
         Create a Tax Invoice from a Sales Order.
@@ -483,32 +435,8 @@ class TxServices:
         if not so:
             raise HTTPException(status_code=404, detail="Sales Order not found.")
 
-        # Auto-fulfill/deliver if not already delivered to maintain inventory integrity
-        if so.status != "Delivered":
-            # Create Delivery record to decrement stock
-            delivery = Delivery(
-                sales_order_id=so.id,
-                delivery_note="Auto-delivered on Invoice generation",
-                status="Delivered",
-                qty_delivered=sum(item.qty for item in so.items)
-            )
-            db.add(delivery)
-            await db.flush()
-
-            # Decrement stocks for each item in the Sales Order
-            for item in so.items:
-                await TxServices.update_stock(
-                    db=db,
-                    product_id=item.product_id,
-                    branch_id=so.branch_id,
-                    qty_change=-item.qty,  # Subtract
-                    tx_type="Out",
-                    ref_type="Sales Delivery",
-                    ref_id=delivery.id,
-                    reason=f"Auto-fulfillment on Invoice generation: {so.id}"
-                )
-            so.status = "Delivered"
-            db.add(so)
+        # Check if we should decrement inventory stock levels (only if not already invoiced/delivered)
+        should_decrement_stock = so.status not in ["Delivered", "Invoiced"]
 
         # Fetch Branch to get Invoice Config and update sequences
         q_br = await db.execute(select(Branch).filter(Branch.id == so.branch_id))
@@ -569,6 +497,24 @@ class TxServices:
         )
         db.add(invoice)
         await db.flush()
+
+        # Decrement stock directly referencing this invoice if not already processed
+        if should_decrement_stock:
+            for item in so.items:
+                await TxServices.update_stock(
+                    db=db,
+                    product_id=item.product_id,
+                    branch_id=so.branch_id,
+                    qty_change=-item.qty,  # Subtract
+                    tx_type="Out",
+                    ref_type="Invoice",
+                    ref_id=invoice.id,
+                    reason=f"Stock decrement for Tax Invoice: {invoice_no}"
+                )
+
+        # Transition Sales Order status to Invoiced
+        so.status = "Invoiced"
+        db.add(so)
 
         # Clone items from Sales Order to Invoice Items
         for item in so.items:

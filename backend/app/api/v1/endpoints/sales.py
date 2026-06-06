@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import deps
 from app.schemas.transaction import (
     SalesOrderOut, SalesOrderCreate,
-    DeliveryOut, DeliveryCreate,
     InvoiceOut, InvoiceCreate
 )
 from app.services.tx_services import TxServices
@@ -37,26 +36,7 @@ async def create_sales_order(
     return await TxServices.create_sales_order(db, so_data)
 
 
-# ==========================================
-# DELIVERIES ENDPOINTS
-# ==========================================
-@router.get("/deliveries", response_model=List[DeliveryOut])
-async def list_deliveries(
-    db: AsyncSession = Depends(deps.get_db),
-    current_user = Depends(deps.PermissionChecker("sales", "view"))
-):
-    """List all shipment deliveries."""
-    return await TxServices.list_deliveries(db)
 
-
-@router.post("/deliveries", response_model=DeliveryOut, status_code=status.HTTP_201_CREATED)
-async def record_delivery(
-    delivery_data: DeliveryCreate,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user = Depends(deps.PermissionChecker("sales", "create"))
-):
-    """Record a cargo delivery and decrement live warehouse stock."""
-    return await TxServices.create_delivery(db, delivery_data)
 
 
 # ==========================================
