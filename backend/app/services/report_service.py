@@ -206,7 +206,11 @@ class ReportService:
                 pass
 
         # 2. Fetch Invoices
-        stmt_inv = select(Invoice).filter(Invoice.customer_id == customer_id, Invoice.status != "Cancelled")
+        stmt_inv = (
+            select(Invoice)
+            .join(SalesOrder, Invoice.sales_order_id == SalesOrder.id)
+            .filter(SalesOrder.customer_id == customer_id, Invoice.status != "Cancelled")
+        )
         if start_dt:
             stmt_inv = stmt_inv.filter(Invoice.date >= start_dt)
         if end_dt:
