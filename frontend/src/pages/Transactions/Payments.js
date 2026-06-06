@@ -1,42 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { Button, Box, Alert, MenuItem, TextField, Typography } from '@mui/material';
+import { Button, Box, Alert, MenuItem, TextField, Typography, Autocomplete } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
-import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
-import FormInput from '../../components/FormInput';
-import FormAutocomplete from '../../components/FormAutocomplete';
-
-const schema = yup.object().shape({
-  customer_id: yup.string().required('Customer is required'),
-  invoice_id: yup.string().nullable().optional(),
-  payment_mode: yup.string().required('Payment mode is required'),
-  reference_number: yup.string().nullable(),
-  amount_paid: yup.number().typeError('Must be a number').required('Amount is required'),
-  notes: yup.string().nullable(),
-});
 
 const Payments = () => {
   const [outstandings, setOutstandings] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  
+  // Outstanding invoices mapping for checked selection and amounts
+  const [checkedInvoices, setCheckedInvoices] = useState({}); // { [invoiceId]: { checked: bool, amount: number, maxAmount: number, invoiceNumber: string } }
+  
+  // Payment metadata states
+  const [paymentMode, setPaymentMode] = useState('UPI');
+  const [referenceNumber, setReferenceNumber] = useState('');
+  const [advanceAmount, setAdvanceAmount] = useState(0);
+  const [notes, setNotes] = useState('Payment collection entry.');
+
   const [openModal, setOpenModal] = useState(false);
   const [error, setError] = useState(null);
-
-  const { control, handleSubmit, reset, watch, setValue } = useForm({
-    resolver: yupResolver(schema),
-  });
-
-  const selectedCustomerId = watch('customer_id');
-  const selectedInvoiceId = watch('invoice_id');
 
   const loadData = async () => {
     try {
       const oRes = await apiClient.get('/payments/outstanding');
       setOutstandings(oRes.data);
+      
+      const custRes = await apiClient.get('/customers/');
+      setCustomers(custRes.data.filter(c => c.is_active !== false));
     } catch (err) {
       setError('Failed to load outstanding invoice data.');
     }
@@ -46,47 +39,88 @@ const Payments = () => {
     loadData();
   }, []);
 
-  // Autofill amount when invoice is selected
+  // Update checkable outstanding invoices list whenever selected customer changes
   useEffect(() => {
-    if (selectedInvoiceId) {
-      const inv = outstandings.find((i) => i.id === selectedInvoiceId);
-      if (inv) {
-        setValue('amount_paid', inv.total_amount);
-      }
+    if (selectedCustomer) {
+      const customerInvoices = outstandings.filter(inv => inv.customer_id === selectedCustomer.id);
+      const invoiceState = {};
+      customerInvoices.forEach(inv => {
+        invoiceState[inv.id] = {
+          checked: false,
+          amount: inv.total_amount,
+          maxAmount: inv.total_amount,
+          invoiceNumber: inv.invoice_number
+        };
+      });
+      setCheckedInvoices(invoiceState);
+    } else {
+      setCheckedInvoices({});
     }
-  }, [selectedInvoiceId, outstandings, setValue]);
+  }, [selectedCustomer, outstandings]);
 
   const handleOpenAdd = () => {
-    reset({
-      customer_id: '',
-      invoice_id: 'none',
-      payment_mode: 'UPI',
-      reference_number: '',
-      amount_paid: 0,
-      notes: 'Payment collection entry.',
-    });
+    setSelectedCustomer(null);
+    setCheckedInvoices({});
+    setPaymentMode('UPI');
+    setReferenceNumber('');
+    setAdvanceAmount(0);
+    setNotes('Payment collection entry.');
     setOpenModal(true);
   };
 
-  const onSubmit = async (data) => {
+  const handleSubmitPayments = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    const selectedInvs = Object.keys(checkedInvoices).filter(
+      (id) => checkedInvoices[id].checked && checkedInvoices[id].amount > 0
+    );
+
+    if (selectedInvs.length === 0 && parseFloat(advanceAmount) <= 0) {
+      setError('Please select at least one invoice or specify an advance payment amount.');
+      return;
+    }
+
     try {
-      const payload = { ...data };
-      if (!payload.invoice_id || payload.invoice_id === 'none') {
-        payload.invoice_id = null;
+      // 1. Process all selected invoices (post separate collections)
+      for (const invId of selectedInvs) {
+        const inv = checkedInvoices[invId];
+        const payload = {
+          customer_id: selectedCustomer.id,
+          invoice_id: invId,
+          payment_mode: paymentMode,
+          reference_number: referenceNumber,
+          amount_paid: parseFloat(inv.amount),
+          notes: notes
+        };
+        await apiClient.post('/payments/', payload);
       }
-      await apiClient.post('/payments/', payload);
+
+      // 2. Process advance payment if specified
+      if (parseFloat(advanceAmount) > 0) {
+        const payload = {
+          customer_id: selectedCustomer.id,
+          invoice_id: null,
+          payment_mode: paymentMode,
+          reference_number: referenceNumber,
+          amount_paid: parseFloat(advanceAmount),
+          notes: `${notes} (Advance Payment)`
+        };
+        await apiClient.post('/payments/', payload);
+      }
+
       setOpenModal(false);
       loadData();
     } catch (err) {
-      setError('Failed to log payment.');
+      setError(err.response?.data?.detail || 'Failed to record customer payments.');
     }
   };
 
-  // Filter invoices for selected customer
-  const filteredInvoices = outstandings.filter((inv) => {
-    if (!selectedCustomerId) return true;
-    return inv.customer_id === selectedCustomerId;
-  });
+  const totalAmountCollected =
+    Object.values(checkedInvoices)
+      .filter((inv) => inv.checked)
+      .reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0) +
+    (parseFloat(advanceAmount) || 0);
 
   const columns = [
     { id: 'invoice_number', label: 'Invoice Reference' },
@@ -143,40 +177,151 @@ const Payments = () => {
         }
       />
 
-      <CommonModal open={openModal} onClose={() => setOpenModal(false)} title="Collect Customer Payment">
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <FormAutocomplete
-              name="customer_id"
-              control={control}
-              label="Select Customer"
-              endpoint="/customers/"
-              onChangeOverride={() => setValue('invoice_id', 'none')}
+      <CommonModal open={openModal} onClose={() => setOpenModal(false)} title="Collect Customer Payment" maxWidth="sm">
+        <form onSubmit={handleSubmitPayments}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            
+            <Autocomplete
+              options={customers}
+              getOptionLabel={(option) => `${option.name} (${option.code || 'N/A'})`}
+              value={selectedCustomer}
+              onChange={(event, newValue) => setSelectedCustomer(newValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="Select Customer" variant="outlined" size="small" required fullWidth />
+              )}
             />
 
-            <FormInput
-              name="invoice_id"
-              control={control}
-              label="Select Outstanding Invoice"
-              type="select"
-              options={[
-                { value: 'none', label: 'None (Advance Payment)' },
-                ...filteredInvoices.map((i) => ({ value: i.id, label: `${i.invoice_number} (₹${i.total_amount.toFixed(2)})` }))
-              ]}
-            />
+            {/* Invoices Checklist (Renders only if customer is selected) */}
+            {selectedCustomer && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#475569' }}>
+                  Select Outstanding Invoices to Apply Payment:
+                </Typography>
+                
+                {Object.keys(checkedInvoices).length === 0 ? (
+                  <Alert severity="info" sx={{ py: 0.5 }}>
+                    No outstanding invoices. Payment will be processed as Advance.
+                  </Alert>
+                ) : (
+                  <Box sx={{
+                    maxHeight: 180,
+                    overflowY: 'auto',
+                    p: 1.5,
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    backgroundColor: '#f8fafc'
+                  }}>
+                    {Object.keys(checkedInvoices).map((invId) => {
+                      const inv = checkedInvoices[invId];
+                      return (
+                        <Box key={invId} sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          mb: 1.5,
+                          '&:last-child': { mb: 0 }
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={inv.checked}
+                              onChange={(e) => {
+                                setCheckedInvoices(prev => ({
+                                  ...prev,
+                                  [invId]: { ...prev[invId], checked: e.target.checked }
+                                }));
+                              }}
+                              style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }}
+                            />
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {inv.invoiceNumber} (₹{inv.maxAmount.toFixed(2)})
+                            </Typography>
+                          </Box>
+                          
+                          {inv.checked && (
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Amount (₹)"
+                              value={inv.amount}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setCheckedInvoices(prev => ({
+                                  ...prev,
+                                  [invId]: { ...prev[invId], amount: val }
+                                }));
+                              }}
+                              sx={{ width: 120, backgroundColor: '#ffffff' }}
+                              inputProps={{ min: 0, max: inv.maxAmount, step: 'any' }}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
+              </Box>
+            )}
 
-            <FormInput
-              name="payment_mode"
-              control={control}
+            {/* Advance Payment Field */}
+            {selectedCustomer && (
+              <TextField
+                label="Advance Payment Amount (₹)"
+                type="number"
+                size="small"
+                value={advanceAmount === 0 ? '' : advanceAmount}
+                onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
+                fullWidth
+                inputProps={{ min: 0, step: 'any' }}
+              />
+            )}
+
+            <TextField
+              select
               label="Payment Mode"
-              type="select"
-              options={payModes}
+              size="small"
+              value={paymentMode}
+              onChange={(e) => setPaymentMode(e.target.value)}
+              fullWidth
+              required
+            >
+              {payModes.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Transaction ID / Cheque Ref #"
+              size="small"
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              fullWidth
             />
 
-            <FormInput name="reference_number" control={control} label="Transaction ID / Cheque Ref #" />
-            <FormInput name="amount_paid" control={control} label="Amount Collected (₹)" type="number" />
-            <FormInput name="notes" control={control} label="Reference Notes" type="textarea" rows={2} />
+            {/* Computed Auto-Summed Amount */}
+            <TextField
+              label="Total Amount Collected (₹)"
+              size="small"
+              type="number"
+              value={totalAmountCollected}
+              disabled
+              fullWidth
+              InputProps={{ readOnly: true }}
+            />
+
+            <TextField
+              label="Reference Notes"
+              size="small"
+              multiline
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              fullWidth
+            />
           </Box>
+          
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
             <Button onClick={() => setOpenModal(false)} variant="outlined">
               Cancel
