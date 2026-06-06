@@ -31,14 +31,19 @@ class MasterServices:
     @staticmethod
     async def create_customer(db: AsyncSession, customer_data: CustomerCreate) -> Customer:
         """Create a customer master record."""
-        import random
         if not customer_data.code:
+            from sqlalchemy import func
+            count_query = await db.execute(select(func.count()).select_from(Customer))
+            count = count_query.scalar() or 0
+            next_num = count + 1
+            
             while True:
-                candidate = f"CUST-{random.randint(100000, 999999)}"
+                candidate = str(next_num)
                 query_check = await db.execute(select(Customer).filter(Customer.code == candidate))
                 if not query_check.scalar_one_or_none():
                     customer_data.code = candidate
                     break
+                next_num += 1
         else:
             # Verify unique code
             query_check = await db.execute(select(Customer).filter(Customer.code == customer_data.code))
@@ -87,14 +92,19 @@ class MasterServices:
     @staticmethod
     async def create_supplier(db: AsyncSession, supplier_data: SupplierCreate) -> Supplier:
         """Create a supplier record."""
-        import random
         if not supplier_data.code:
+            from sqlalchemy import func
+            count_query = await db.execute(select(func.count()).select_from(Supplier))
+            count = count_query.scalar() or 0
+            next_num = count + 1
+            
             while True:
-                candidate = f"SUPP-{random.randint(100000, 999999)}"
+                candidate = str(next_num)
                 query_check = await db.execute(select(Supplier).filter(Supplier.code == candidate))
                 if not query_check.scalar_one_or_none():
                     supplier_data.code = candidate
                     break
+                next_num += 1
         else:
             query_check = await db.execute(select(Supplier).filter(Supplier.code == supplier_data.code))
             if query_check.scalar_one_or_none():
