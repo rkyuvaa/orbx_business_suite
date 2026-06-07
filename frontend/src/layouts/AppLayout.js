@@ -106,6 +106,30 @@ const AppLayout = () => {
     if (p.startsWith('/accounts/sales-register')) {
       return { title: 'Sales Register', breadcrumbs: 'Dashboard > Accounts > Sales Register' };
     }
+    if (p.startsWith('/accounts/balance-sheet')) {
+      return { title: 'Balance Sheet', breadcrumbs: 'Dashboard > Accounts > Balance Sheet' };
+    }
+    if (p.startsWith('/accounts/profit-loss')) {
+      return { title: 'Profit & Loss', breadcrumbs: 'Dashboard > Accounts > Profit & Loss' };
+    }
+    if (p.startsWith('/accounts/cash-flow')) {
+      return { title: 'Cash Flow Statement', breadcrumbs: 'Dashboard > Accounts > Cash Flow' };
+    }
+    if (p.startsWith('/accounts/gst-returns')) {
+      return { title: 'GST Returns', breadcrumbs: 'Dashboard > Accounts > GST Returns' };
+    }
+    if (p.startsWith('/accounts/tds-payable')) {
+      return { title: 'TDS Payable', breadcrumbs: 'Dashboard > Accounts > TDS Payable' };
+    }
+    if (p.startsWith('/accounts/audit-trail')) {
+      return { title: 'Audit Trail', breadcrumbs: 'Dashboard > Accounts > Audit Trail' };
+    }
+    if (p.startsWith('/accounts/cash-bank-books')) {
+      return { title: 'Cash & Bank Books', breadcrumbs: 'Dashboard > Accounts > Cash & Bank Books' };
+    }
+    if (p.startsWith('/accounts/journal-register')) {
+      return { title: 'Journal Register', breadcrumbs: 'Dashboard > Accounts > Journal Register' };
+    }
     if (p.startsWith('/masters/customers')) {
       return { title: 'Customer Master', breadcrumbs: 'Dashboard > Customer Master' };
     }
@@ -183,6 +207,14 @@ const AppLayout = () => {
         { label: 'Day Book', icon: <ReportIcon />, to: '/accounts/day-book' },
         { label: 'Purchase Register', icon: <ReportIcon />, to: '/accounts/purchase-register' },
         { label: 'Sales Register', icon: <ReportIcon />, to: '/accounts/sales-register' },
+        { label: 'Balance Sheet', icon: <ReportIcon />, to: '/accounts/balance-sheet' },
+        { label: 'Profit & Loss', icon: <ReportIcon />, to: '/accounts/profit-loss' },
+        { label: 'Cash Flow', icon: <ReportIcon />, to: '/accounts/cash-flow' },
+        { label: 'GST Returns', icon: <ReportIcon />, to: '/accounts/gst-returns' },
+        { label: 'TDS Summary', icon: <ReportIcon />, to: '/accounts/tds-payable' },
+        { label: 'Audit Trail', icon: <ReportIcon />, to: '/accounts/audit-trail' },
+        { label: 'Cash & Bank Books', icon: <ReportIcon />, to: '/accounts/cash-bank-books' },
+        { label: 'Journal Register', icon: <ReportIcon />, to: '/accounts/journal-register' },
       ];
     }
     if (path.startsWith('/transactions/purchase') || path.startsWith('/masters/suppliers')) {

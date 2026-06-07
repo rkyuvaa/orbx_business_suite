@@ -15,6 +15,8 @@ async def lifespan(app: FastAPI):
     yield
 
 # Create core FastAPI application instance
+from app.db import audit_listener  # noqa
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Corporate Enterprise Resource Planning API Gateway",
@@ -33,6 +35,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi import Request
+from app.core.audit_context import current_ip
+
+@app.middleware("http")
+async def audit_context_middleware(request: Request, call_next):
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip = forwarded_for.split(",")[0].strip()
+    else:
+        ip = request.client.host if request.client else None
+    
+    current_ip.set(ip)
+    response = await call_next(request)
+    return response
+
 
 # Aggregate modular routers
 app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -100,6 +100,9 @@ class PurchaseEntry(Base):
     sgst_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     igst_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    tds_section: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    tds_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"))
+    tds_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     status: Mapped[str] = mapped_column(String(30), default="Unpaid") # Paid, Unpaid, PartiallyPaid, Draft
 
     # Account ledger FKs

@@ -46,6 +46,14 @@ import GeneralLedger from '../pages/Accounts/GeneralLedger';
 import DayBook from '../pages/Accounts/DayBook';
 import PurchaseRegister from '../pages/Accounts/PurchaseRegister';
 import SalesRegister from '../pages/Accounts/SalesRegister';
+import BalanceSheet from '../pages/Accounts/BalanceSheet';
+import ProfitLoss from '../pages/Accounts/ProfitLoss';
+import CashFlow from '../pages/Accounts/CashFlow';
+import GstReturns from '../pages/Accounts/GstReturns';
+import TdsPayable from '../pages/Accounts/TdsPayable';
+import AuditTrail from '../pages/Accounts/AuditTrail';
+import CashBankBooks from '../pages/Accounts/CashBankBooks';
+import JournalRegister from '../pages/Accounts/JournalRegister';
 
 const AppRoutes = () => {
   return (
@@ -106,6 +114,14 @@ const AppRoutes = () => {
           <Route path="day-book" element={<DayBook />} />
           <Route path="purchase-register" element={<PurchaseRegister />} />
           <Route path="sales-register" element={<SalesRegister />} />
+          <Route path="balance-sheet" element={<BalanceSheet />} />
+          <Route path="profit-loss" element={<ProfitLoss />} />
+          <Route path="cash-flow" element={<CashFlow />} />
+          <Route path="gst-returns" element={<GstReturns />} />
+          <Route path="tds-payable" element={<TdsPayable />} />
+          <Route path="audit-trail" element={<AuditTrail />} />
+          <Route path="cash-bank-books" element={<CashBankBooks />} />
+          <Route path="journal-register" element={<JournalRegister />} />
           <Route path="*" element={<Navigate to="chart-of-accounts" replace />} />
         </Route>
 

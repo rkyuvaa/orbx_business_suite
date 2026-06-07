@@ -59,6 +59,11 @@ async def get_current_user(
     user = query.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+    
+    # Set audit context variable
+    from app.core.audit_context import current_user_id as context_user_id
+    context_user_id.set(user.id)
+    
     return user
 
 

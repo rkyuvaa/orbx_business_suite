@@ -1439,3 +1439,378 @@ class ReportService:
         )
 
         return SalesRegisterResponse(rows=register_rows, totals=totals)
+
+    @staticmethod
+    async def get_cash_book(
+        db: AsyncSession,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Retrieves a Cash Book showing transaction lines for Cash ledgers.
+        """
+        from app.core.account_constants import current_fy_dates
+        from decimal import Decimal
+        from sqlalchemy import text
+
+        if start_date is None or end_date is None:
+            start_date, end_date = current_fy_dates()
+
+        prev_day = start_date - timedelta(days=1)
+
+        # 1. Get all Cash Group Ledger IDs
+        ledgers_sql = text("""
+            SELECT id FROM ledger_accounts la
+            WHERE la.is_active = true 
+              AND (la.group_id = '12300000-0000-0000-0000-000000000001' 
+                OR la.group_id IN (SELECT id FROM account_groups WHERE parent_id = '12300000-0000-0000-0000-000000000001')
+                OR la.name ILIKE '%cash%')
+        """)
+        ledger_res = await db.execute(ledgers_sql)
+        ledger_ids = [row.id for row in ledger_res.all()]
+
+        if not ledger_ids:
+            return {
+                "opening_balance": 0.0,
+                "closing_balance": 0.0,
+                "total_debit": 0.0,
+                "total_credit": 0.0,
+                "records": []
+            }
+
+        # 2. Compute opening balance
+        op_sql = text("""
+            SELECT
+              SUM(
+                (CASE WHEN la.opening_bal_type = 'Dr' THEN la.opening_bal ELSE -la.opening_bal END) +
+                COALESCE(ja.total_dr, 0) - COALESCE(ja.total_cr, 0)
+              ) AS opening_bal
+            FROM ledger_accounts la
+            LEFT JOIN (
+              SELECT
+                jl.ledger_id,
+                SUM(CASE WHEN jl.dr_cr = 'Dr' THEN jl.amount ELSE 0 END) AS total_dr,
+                SUM(CASE WHEN jl.dr_cr = 'Cr' THEN jl.amount ELSE 0 END) AS total_cr
+              FROM journal_entry_lines jl
+              JOIN journal_entries je ON je.id = jl.journal_entry_id
+              WHERE je.is_active = true AND je.is_reversed = false AND je.date <= :prev_day
+              GROUP BY jl.ledger_id
+            ) ja ON ja.ledger_id = la.id
+            WHERE la.id = ANY(:ledger_ids)
+        """)
+        op_res = await db.execute(op_sql, {"prev_day": prev_day, "ledger_ids": ledger_ids})
+        opening_balance = Decimal(str(op_res.scalar() or 0.00))
+
+        # 3. Fetch transaction lines within date range
+        tx_sql = text("""
+            SELECT
+              je.date AS date,
+              je.voucher_number AS voucher_number,
+              jl.dr_cr AS dr_cr,
+              jl.amount AS amount,
+              jl.narration AS narration,
+              la.name AS ledger_name,
+              (
+                SELECT STRING_AGG(comp_la.name, ', ')
+                FROM journal_entry_lines comp_jl
+                JOIN ledger_accounts comp_la ON comp_la.id = comp_jl.ledger_id
+                WHERE comp_jl.journal_entry_id = je.id AND comp_jl.ledger_id != jl.ledger_id
+              ) AS particulars
+            FROM journal_entry_lines jl
+            JOIN journal_entries je ON je.id = jl.journal_entry_id
+            JOIN ledger_accounts la ON la.id = jl.ledger_id
+            WHERE je.is_active = true AND je.is_reversed = false 
+              AND je.date BETWEEN :start_date AND :end_date
+              AND jl.ledger_id = ANY(:ledger_ids)
+            ORDER BY je.date ASC, je.voucher_number ASC
+        """)
+        tx_res = await db.execute(tx_sql, {
+            "start_date": start_date,
+            "end_date": end_date,
+            "ledger_ids": ledger_ids
+        })
+        tx_rows = tx_res.all()
+
+        records = []
+        running_balance = opening_balance
+        total_debit = Decimal("0.00")
+        total_credit = Decimal("0.00")
+
+        for r in tx_rows:
+            amt = Decimal(str(r.amount))
+            is_dr = r.dr_cr == 'Dr'
+            if is_dr:
+                debit = amt
+                credit = Decimal("0.00")
+                running_balance += amt
+                total_debit += amt
+            else:
+                debit = Decimal("0.00")
+                credit = amt
+                running_balance -= amt
+                total_credit += amt
+
+            records.append({
+                "date": r.date.isoformat() if isinstance(r.date, (date, datetime)) else str(r.date),
+                "voucher_number": r.voucher_number or "JV-N/A",
+                "particulars": r.particulars or "Multiple Ledgers",
+                "ledger_name": r.ledger_name,
+                "narration": r.narration,
+                "debit": float(debit),
+                "credit": float(credit),
+                "running_balance": float(running_balance)
+            })
+
+        paginated_records = records[skip: skip + limit]
+
+        return {
+            "opening_balance": float(opening_balance),
+            "closing_balance": float(running_balance),
+            "total_debit": float(total_debit),
+            "total_credit": float(total_credit),
+            "total_count": len(records),
+            "records": paginated_records
+        }
+
+    @staticmethod
+    async def get_bank_book(
+        db: AsyncSession,
+        bank_ledger_id: Optional[UUID] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Retrieves a Bank Book for a specific bank ledger or all bank ledgers.
+        """
+        from app.core.account_constants import current_fy_dates
+        from decimal import Decimal
+        from sqlalchemy import text
+
+        if start_date is None or end_date is None:
+            start_date, end_date = current_fy_dates()
+
+        prev_day = start_date - timedelta(days=1)
+
+        # 1. Identify bank ledger IDs
+        if bank_ledger_id:
+            ledger_ids = [bank_ledger_id]
+        else:
+            ledgers_sql = text("""
+                SELECT id FROM ledger_accounts la
+                WHERE la.is_active = true 
+                  AND (la.name ILIKE '%bank%' OR la.name ILIKE '%saving%' OR la.name ILIKE '%current a/c%')
+            """)
+            ledger_res = await db.execute(ledgers_sql)
+            ledger_ids = [row.id for row in ledger_res.all()]
+
+        if not ledger_ids:
+            return {
+                "opening_balance": 0.0,
+                "closing_balance": 0.0,
+                "total_debit": 0.0,
+                "total_credit": 0.0,
+                "records": []
+            }
+
+        # 2. Compute opening balance
+        op_sql = text("""
+            SELECT
+              SUM(
+                (CASE WHEN la.opening_bal_type = 'Dr' THEN la.opening_bal ELSE -la.opening_bal END) +
+                COALESCE(ja.total_dr, 0) - COALESCE(ja.total_cr, 0)
+              ) AS opening_bal
+            FROM ledger_accounts la
+            LEFT JOIN (
+              SELECT
+                jl.ledger_id,
+                SUM(CASE WHEN jl.dr_cr = 'Dr' THEN jl.amount ELSE 0 END) AS total_dr,
+                SUM(CASE WHEN jl.dr_cr = 'Cr' THEN jl.amount ELSE 0 END) AS total_cr
+              FROM journal_entry_lines jl
+              JOIN journal_entries je ON je.id = jl.journal_entry_id
+              WHERE je.is_active = true AND je.is_reversed = false AND je.date <= :prev_day
+              GROUP BY jl.ledger_id
+            ) ja ON ja.ledger_id = la.id
+            WHERE la.id = ANY(:ledger_ids)
+        """)
+        op_res = await db.execute(op_sql, {"prev_day": prev_day, "ledger_ids": ledger_ids})
+        opening_balance = Decimal(str(op_res.scalar() or 0.00))
+
+        # 3. Fetch transaction lines within date range
+        tx_sql = text("""
+            SELECT
+              je.date AS date,
+              je.voucher_number AS voucher_number,
+              jl.dr_cr AS dr_cr,
+              jl.amount AS amount,
+              jl.narration AS narration,
+              la.name AS ledger_name,
+              (
+                SELECT STRING_AGG(comp_la.name, ', ')
+                FROM journal_entry_lines comp_jl
+                JOIN ledger_accounts comp_la ON comp_la.id = comp_jl.ledger_id
+                WHERE comp_jl.journal_entry_id = je.id AND comp_jl.ledger_id != jl.ledger_id
+              ) AS particulars
+            FROM journal_entry_lines jl
+            JOIN journal_entries je ON je.id = jl.journal_entry_id
+            JOIN ledger_accounts la ON la.id = jl.ledger_id
+            WHERE je.is_active = true AND je.is_reversed = false 
+              AND je.date BETWEEN :start_date AND :end_date
+              AND jl.ledger_id = ANY(:ledger_ids)
+            ORDER BY je.date ASC, je.voucher_number ASC
+        """)
+        tx_res = await db.execute(tx_sql, {
+            "start_date": start_date,
+            "end_date": end_date,
+            "ledger_ids": ledger_ids
+        })
+        tx_rows = tx_res.all()
+
+        records = []
+        running_balance = opening_balance
+        total_debit = Decimal("0.00")
+        total_credit = Decimal("0.00")
+
+        for r in tx_rows:
+            amt = Decimal(str(r.amount))
+            is_dr = r.dr_cr == 'Dr'
+            if is_dr:
+                debit = amt
+                credit = Decimal("0.00")
+                running_balance += amt
+                total_debit += amt
+            else:
+                debit = Decimal("0.00")
+                credit = amt
+                running_balance -= amt
+                total_credit += amt
+
+            records.append({
+                "date": r.date.isoformat() if isinstance(r.date, (date, datetime)) else str(r.date),
+                "voucher_number": r.voucher_number or "JV-N/A",
+                "particulars": r.particulars or "Multiple Ledgers",
+                "ledger_name": r.ledger_name,
+                "narration": r.narration,
+                "debit": float(debit),
+                "credit": float(credit),
+                "running_balance": float(running_balance)
+            })
+
+        paginated_records = records[skip: skip + limit]
+
+        return {
+            "opening_balance": float(opening_balance),
+            "closing_balance": float(running_balance),
+            "total_debit": float(total_debit),
+            "total_credit": float(total_credit),
+            "total_count": len(records),
+            "records": paginated_records
+        }
+
+    @staticmethod
+    async def get_journal_register(
+        db: AsyncSession,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Retrieves a Journal Register listing all posted journal entries with their lines.
+        """
+        from app.core.account_constants import current_fy_dates
+        from sqlalchemy import text
+
+        if start_date is None or end_date is None:
+            start_date, end_date = current_fy_dates()
+
+        # Count total
+        count_sql = text("""
+            SELECT COUNT(je.id) FROM journal_entries je
+            WHERE je.is_active = true AND je.is_reversed = false
+              AND je.date BETWEEN :start_date AND :end_date
+        """)
+        count_res = await db.execute(count_sql, {"start_date": start_date, "end_date": end_date})
+        total = count_res.scalar() or 0
+
+        # Fetch journal entries with limit
+        je_sql = text("""
+            SELECT 
+              je.id AS entry_id,
+              je.date AS date,
+              je.voucher_number AS voucher_number,
+              je.narration AS narration,
+              vt.name AS voucher_type
+            FROM journal_entries je
+            JOIN voucher_types vt ON vt.id = je.voucher_type_id
+            WHERE je.is_active = true AND je.is_reversed = false
+              AND je.date BETWEEN :start_date AND :end_date
+            ORDER BY je.date DESC, je.voucher_number DESC
+            OFFSET :skip LIMIT :limit
+        """)
+        je_res = await db.execute(je_sql, {
+            "start_date": start_date,
+            "end_date": end_date,
+            "skip": skip,
+            "limit": limit
+        })
+        entries = je_res.all()
+
+        if not entries:
+            return {
+                "total": total,
+                "skip": skip,
+                "limit": limit,
+                "records": []
+            }
+
+        entry_ids = [str(e.entry_id) for e in entries]
+
+        # Fetch lines for these entries
+        lines_sql = text("""
+            SELECT
+              jl.journal_entry_id AS entry_id,
+              jl.dr_cr AS dr_cr,
+              jl.amount AS amount,
+              jl.narration AS line_narration,
+              la.name AS ledger_name,
+              la.code AS ledger_code
+            FROM journal_entry_lines jl
+            JOIN ledger_accounts la ON la.id = jl.ledger_id
+            WHERE jl.journal_entry_id = ANY(:entry_ids)
+            ORDER BY jl.dr_cr DESC, la.name ASC
+        """)
+        lines_res = await db.execute(lines_sql, {"entry_ids": entry_ids})
+        lines = lines_res.all()
+
+        lines_by_entry = {}
+        for l in lines:
+            lines_by_entry.setdefault(str(l.entry_id), []).append({
+                "ledger_code": l.ledger_code,
+                "ledger_name": l.ledger_name,
+                "dr_cr": l.dr_cr,
+                "amount": float(l.amount),
+                "narration": l.line_narration
+            })
+
+        records = []
+        for e in entries:
+            records.append({
+                "id": str(e.entry_id),
+                "date": e.date.isoformat() if isinstance(e.date, (date, datetime)) else str(e.date),
+                "voucher_number": e.voucher_number or "N/A",
+                "voucher_type": e.voucher_type,
+                "narration": e.narration,
+                "lines": lines_by_entry.get(str(e.entry_id), [])
+            })
+
+        return {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "records": records
+        }
+

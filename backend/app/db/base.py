@@ -10,3 +10,4 @@ from app.models.inventory import StockTransaction, CurrentStock, StockTransfer, 
 from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem  # noqa
 from app.models.finance import Payment, PaymentReceipt, VendorPayment  # noqa
 from app.models.accounts import AccountGroup, LedgerAccount, VoucherType, JournalEntry, JournalLine  # noqa
+from app.models.audit import AuditLog  # noqa
