@@ -91,7 +91,7 @@ def upgrade() -> None:
     # 2. Seed Default Accounts & Groups (stable UUIDs)
     # Wrap in transaction block cleanly via connection execution
     conn = op.get_bind()
-    now_str = datetime.utcnow().isoformat()
+    now_dt = datetime.utcnow()
 
     # Seed Account Groups (parent before child)
     groups = [
@@ -155,8 +155,8 @@ def upgrade() -> None:
                 "name": g["name"],
                 "parent_id": g["parent_id"],
                 "nature": g["nature"],
-                "created_at": now_str,
-                "updated_at": now_str,
+                "created_at": now_dt,
+                "updated_at": now_dt,
             }
         )
 
@@ -181,8 +181,8 @@ def upgrade() -> None:
                 "name": v["name"],
                 "prefix": v["prefix"],
                 "numbering_method": v["numbering_method"],
-                "created_at": now_str,
-                "updated_at": now_str,
+                "created_at": now_dt,
+                "updated_at": now_dt,
             }
         )
 
