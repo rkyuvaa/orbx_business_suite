@@ -1070,7 +1070,7 @@ class ReportService:
             LEFT JOIN invoices inv ON inv.id = je.reference_id AND je.reference_type = 'Invoice'
             LEFT JOIN purchase_returns pr ON pr.id = je.reference_id AND je.reference_type = 'PurchaseReturn'
             WHERE je.is_active = true AND je.date BETWEEN :start_date AND :end_date
-              AND (:branch_id IS NULL OR pe.branch_id = :branch_id OR inv.branch_id = :branch_id OR pr.branch_id = :branch_id OR je.reference_type IS NULL)
+              AND (CAST(:branch_id AS UUID) IS NULL OR pe.branch_id = :branch_id OR inv.branch_id = :branch_id OR pr.branch_id = :branch_id OR je.reference_type IS NULL)
             ORDER BY je.date ASC, je.created_at ASC, je.id ASC
             OFFSET :skip LIMIT :limit
         """)
@@ -1180,8 +1180,8 @@ class ReportService:
             JOIN branches b ON b.id = pe.branch_id
             JOIN companies c ON c.id = b.company_id
             WHERE pe.status != 'Cancelled' AND pe.billing_date BETWEEN :start_date AND :end_date
-              AND (:supplier_id IS NULL OR pe.supplier_id = :supplier_id)
-              AND (:branch_id IS NULL OR pe.branch_id = :branch_id)
+              AND (CAST(:supplier_id AS UUID) IS NULL OR pe.supplier_id = :supplier_id)
+              AND (CAST(:branch_id AS UUID) IS NULL OR pe.branch_id = :branch_id)
             ORDER BY pe.billing_date ASC, pe.invoice_number ASC, pe.id ASC
             OFFSET :skip LIMIT :limit
         """)
@@ -1248,8 +1248,8 @@ class ReportService:
                 SUM(pe.total_amount) as grand_total
             FROM purchase_entries pe
             WHERE pe.status != 'Cancelled' AND pe.billing_date BETWEEN :start_date AND :end_date
-              AND (:supplier_id IS NULL OR pe.supplier_id = :supplier_id)
-              AND (:branch_id IS NULL OR pe.branch_id = :branch_id)
+              AND (CAST(:supplier_id AS UUID) IS NULL OR pe.supplier_id = :supplier_id)
+              AND (CAST(:branch_id AS UUID) IS NULL OR pe.branch_id = :branch_id)
         """)
         res_totals = await db.execute(
             sql_totals,
@@ -1313,8 +1313,8 @@ class ReportService:
             JOIN branches b ON b.id = inv.branch_id
             JOIN companies comp ON comp.id = b.company_id
             WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (:customer_id IS NULL OR so.customer_id = :customer_id)
-              AND (:branch_id IS NULL OR inv.branch_id = :branch_id)
+              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
+              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
             ORDER BY inv.date ASC, inv.invoice_number ASC, inv.id ASC
             OFFSET :skip LIMIT :limit
         """)
@@ -1393,8 +1393,8 @@ class ReportService:
             FROM invoices inv
             JOIN sales_orders so ON so.id = inv.sales_order_id
             WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (:customer_id IS NULL OR so.customer_id = :customer_id)
-              AND (:branch_id IS NULL OR inv.branch_id = :branch_id)
+              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
+              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
         """)
         res_totals = await db.execute(
             sql_totals,
@@ -1415,8 +1415,8 @@ class ReportService:
             FROM invoices inv
             JOIN sales_orders so ON so.id = inv.sales_order_id
             WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (:customer_id IS NULL OR so.customer_id = :customer_id)
-              AND (:branch_id IS NULL OR inv.branch_id = :branch_id)
+              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
+              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
         """)
         res_tax = await db.execute(
             sql_tax_totals,
