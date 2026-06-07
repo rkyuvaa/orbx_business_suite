@@ -17,6 +17,13 @@ from app.schemas.transaction import (
     MonthlySalesTrendOut, TopProductSalesOut, RecentTransactionOut,
     LedgerEntry, CustomerLedgerResponse, SupplierLedgerResponse
 )
+from app.schemas.accounts import (
+    TrialBalanceResponse,
+    GeneralLedgerResponse,
+    DayBookResponse,
+    PurchaseRegisterResponse,
+    SalesRegisterResponse
+)
 
 
 class ReportService:
