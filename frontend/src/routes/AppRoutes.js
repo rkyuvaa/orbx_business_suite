@@ -38,6 +38,10 @@ import Branches from '../pages/Admin/Branches';
 import UsersAndRoles from '../pages/Admin/UsersAndRoles';
 import BackupRestore from '../pages/Admin/BackupRestore';
 
+// Accounts Module Pages
+import ChartOfAccounts from '../pages/Accounts/ChartOfAccounts';
+import VoucherTypes from '../pages/Accounts/VoucherTypes';
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -86,6 +90,13 @@ const AppRoutes = () => {
           <Route path="purchase" element={<PurchaseReport />} />
           <Route path="sales-summary" element={<ExcelSalesSummary />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
+        </Route>
+
+        {/* Accounts Namespace */}
+        <Route path="/accounts">
+          <Route path="chart-of-accounts" element={<ChartOfAccounts />} />
+          <Route path="voucher-types" element={<VoucherTypes />} />
+          <Route path="*" element={<Navigate to="chart-of-accounts" replace />} />
         </Route>
 
         {/* Admin Namespace */}

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     auth, admin, customers, suppliers, products,
-    purchase, inventory, sales, payments, reports
+    purchase, inventory, sales, payments, reports, accounts
 )
 
 api_router = APIRouter()
@@ -18,3 +18,4 @@ api_router.include_router(inventory.router, prefix="/inventory", tags=["Warehous
 api_router.include_router(sales.router, prefix="/sales", tags=["Sales Orders & Tax Invoices"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Customer Outstanding & Receipting"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Analytics & BI Reports"])
+api_router.include_router(accounts.router, prefix="/accounts", tags=["Chart of Accounts & Ledgers"])

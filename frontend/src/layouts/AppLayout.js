@@ -21,7 +21,8 @@ import {
   Assessment as ReportIcon,
   Settings as AdminIcon,
   Business as BranchIcon,
-  Backup as BackupIcon
+  Backup as BackupIcon,
+  AccountTree as AccountTreeIcon
 } from '@mui/icons-material';
 
 import { logoutUser, fetchUserProfile } from '../app/slices/authSlice';
@@ -84,6 +85,12 @@ const AppLayout = () => {
 
   const getPageInfo = () => {
     const p = path.toLowerCase();
+    if (p.startsWith('/accounts/chart-of-accounts')) {
+      return { title: 'Chart of Accounts', breadcrumbs: 'Dashboard > Accounts > Chart of Accounts' };
+    }
+    if (p.startsWith('/accounts/voucher-types')) {
+      return { title: 'Voucher Configurations', breadcrumbs: 'Dashboard > Accounts > Voucher Configurations' };
+    }
     if (p.startsWith('/masters/customers')) {
       return { title: 'Customer Master', breadcrumbs: 'Dashboard > Customer Master' };
     }
@@ -152,6 +159,12 @@ const AppLayout = () => {
 
   // Sub-navigation menus based on active module prefix
   const getSidebarMenu = () => {
+    if (path.startsWith('/accounts')) {
+      return [
+        { label: 'Chart of Accounts', icon: <AccountTreeIcon />, to: '/accounts/chart-of-accounts' },
+        { label: 'Voucher Types', icon: <ReceiptIcon />, to: '/accounts/voucher-types' },
+      ];
+    }
     if (path.startsWith('/transactions/purchase') || path.startsWith('/masters/suppliers')) {
       return [
         { label: 'Purchase Module', icon: <SupplierIcon />, to: '/transactions/purchase' },

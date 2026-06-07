@@ -16,7 +16,8 @@ import {
   BarChart as PurchaseReportIcon,
   Business as CompanyIcon,
   Store as BranchIcon,
-  Group as UserIcon
+  Group as UserIcon,
+  AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 
 const Dashboard = () => {
@@ -29,6 +30,7 @@ const Dashboard = () => {
     { label: 'Inventory', icon: <InventoryIcon />, color: '#9B5DE5', to: '/transactions/inventory' },
     { label: 'Sales', icon: <SalesIcon />, color: '#F15BB5', to: '/transactions/sales' },
     { label: 'Receipts & Payments', icon: <PaymentReceiptIcon />, color: '#43AA8B', to: '/transactions/receipts' },
+    { label: 'Accounts', icon: <AccountBalanceIcon />, color: '#2A9D8F', to: '/accounts/chart-of-accounts' },
     { label: 'Reports', icon: <ReportDashboardIcon />, color: '#FFB703', to: '/reports/dashboard' },
     { label: 'Settings', icon: <CompanyIcon />, color: '#4A5759', to: '/admin/company' },
   ];
