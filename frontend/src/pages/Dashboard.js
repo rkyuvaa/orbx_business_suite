@@ -28,7 +28,7 @@ const Dashboard = () => {
     { label: 'Purchase', icon: <PurchaseIcon />, color: '#E76F51', to: '/transactions/purchase' },
     { label: 'Inventory', icon: <InventoryIcon />, color: '#9B5DE5', to: '/transactions/inventory' },
     { label: 'Sales', icon: <SalesIcon />, color: '#F15BB5', to: '/transactions/sales' },
-    { label: 'Accounting', icon: <PaymentReceiptIcon />, color: '#43AA8B', to: '/transactions/receipts' },
+    { label: 'Receipts & Payments', icon: <PaymentReceiptIcon />, color: '#43AA8B', to: '/transactions/receipts' },
     { label: 'Reports', icon: <ReportDashboardIcon />, color: '#FFB703', to: '/reports/dashboard' },
     { label: 'Settings', icon: <CompanyIcon />, color: '#4A5759', to: '/admin/company' },
   ];
