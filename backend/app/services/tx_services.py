@@ -318,29 +318,136 @@ class TxServices:
         return list(query.scalars().all())
 
     @staticmethod
-    async def create_purchase_entry(db: AsyncSession, entry_data: PurchaseEntryCreate) -> PurchaseEntry:
-        """Create a supplier invoice record."""
-        # Check if a purchase bill already exists for this GRN
-        if entry_data.grn_id:
-            q_existing = await db.execute(
-                select(PurchaseEntry).filter(
-                    PurchaseEntry.grn_id == entry_data.grn_id,
-                    PurchaseEntry.status != "Cancelled"
-                )
-            )
-            existing = q_existing.scalars().first()
-            if existing:
-                raise HTTPException(status_code=400, detail="A purchase bill already exists for this GRN.")
+    async def create_purchase_entry(db: AsyncSession, entry_data: PurchaseEntryCreate, user_id: UUID) -> PurchaseEntry:
+        """Create a supplier invoice record and post a double-entry journal entry."""
+        import logging
+        from decimal import Decimal
+        from app.core.account_constants import (
+            DEFAULT_SUNDRY_CREDITORS_LEDGER_ID,
+            DEFAULT_PURCHASE_LEDGER_ID,
+            DEFAULT_GST_INPUT_LEDGER_ID
+        )
+        from app.services.account_services import AccountServices
+        from app.schemas.accounts import JournalEntryLine
 
-        entry = PurchaseEntry(**entry_data.model_dump(), status="Unpaid")
-        db.add(entry)
-        await db.commit()
-        
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Check if a purchase bill already exists for this GRN
+            if entry_data.grn_id:
+                q_existing = await db.execute(
+                    select(PurchaseEntry).filter(
+                        PurchaseEntry.grn_id == entry_data.grn_id,
+                        PurchaseEntry.status != "Cancelled"
+                    )
+                )
+                existing = q_existing.scalars().first()
+                if existing:
+                    raise HTTPException(status_code=400, detail="A purchase bill already exists for this GRN.")
+
+            # Fetch supplier to determine default payable ledger
+            q_supplier = await db.execute(select(Supplier).filter(Supplier.id == entry_data.supplier_id))
+            supplier = q_supplier.scalar_one_or_none()
+            if not supplier:
+                raise HTTPException(status_code=400, detail="Supplier not found.")
+
+            # Determine payable_ledger_id
+            payable_ledger_id = entry_data.payable_ledger_id
+            if not payable_ledger_id:
+                if supplier.default_payable_ledger_id:
+                    payable_ledger_id = supplier.default_payable_ledger_id
+                else:
+                    logger.warning(
+                        f"Supplier '{supplier.name}' ({supplier.id}) has no default payable ledger. Using global fallback."
+                    )
+                    payable_ledger_id = DEFAULT_SUNDRY_CREDITORS_LEDGER_ID
+
+            # Determine purchase_account_id and tax_ledger_id
+            purchase_account_id = entry_data.purchase_account_id or DEFAULT_PURCHASE_LEDGER_ID
+            tax_ledger_id = entry_data.tax_ledger_id or DEFAULT_GST_INPUT_LEDGER_ID
+
+            # Create PurchaseEntry instance
+            entry_dict = entry_data.model_dump()
+            entry_dict["payable_ledger_id"] = payable_ledger_id
+            entry_dict["purchase_account_id"] = purchase_account_id
+            entry_dict["tax_ledger_id"] = tax_ledger_id
+            entry_dict["status"] = "Unpaid"
+
+            entry = PurchaseEntry(**entry_dict)
+            db.add(entry)
+            await db.flush()  # Obtain entry.id and fill billing_date default if not supplied
+
+            # Prepare journal entry lines
+            journal_lines = []
+            
+            # Purchase Expense Debit
+            if entry.subtotal > 0:
+                journal_lines.append(
+                    JournalEntryLine(
+                        ledger_id=purchase_account_id,
+                        dr_cr="Dr",
+                        amount=Decimal(str(entry.subtotal)),
+                        narration=f"Purchase expense for bill {entry.invoice_number}"
+                    )
+                )
+
+            # GST Input Tax Debit
+            if entry.tax_amount > 0:
+                journal_lines.append(
+                    JournalEntryLine(
+                        ledger_id=tax_ledger_id,
+                        dr_cr="Dr",
+                        amount=Decimal(str(entry.tax_amount)),
+                        narration=f"GST input tax on purchase {entry.invoice_number}"
+                    )
+                )
+
+            # Supplier Payable Credit
+            if entry.total_amount > 0:
+                journal_lines.append(
+                    JournalEntryLine(
+                        ledger_id=payable_ledger_id,
+                        dr_cr="Cr",
+                        amount=Decimal(str(entry.total_amount)),
+                        narration=f"Accounts payable to supplier for bill {entry.invoice_number}"
+                    )
+                )
+
+            # Post the journal entry
+            billing_date = entry.billing_date.date() if isinstance(entry.billing_date, datetime) else entry.billing_date
+            
+            journal = await AccountServices.post_journal_entry(
+                db=db,
+                voucher_type_name="Purchase",
+                reference_id=entry.id,
+                reference_type="PurchaseEntry",
+                entry_date=billing_date,
+                lines=journal_lines,
+                user_id=user_id,
+                narration=f"Journal entry for purchase invoice {entry.invoice_number}"
+            )
+            
+            # Link journal entry to PurchaseEntry
+            entry.journal_entry_id = journal.id
+
+            await db.commit()
+
+        except Exception as e:
+            await db.rollback()
+            raise e
+
         # Re-fetch with relationship
         q = await db.execute(
             select(PurchaseEntry)
             .filter(PurchaseEntry.id == entry.id)
-            .options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments))
+            .options(
+                selectinload(PurchaseEntry.supplier),
+                selectinload(PurchaseEntry.payments),
+                selectinload(PurchaseEntry.payable_ledger),
+                selectinload(PurchaseEntry.purchase_account),
+                selectinload(PurchaseEntry.tax_ledger),
+                selectinload(PurchaseEntry.journal_entry)
+            )
         )
         o = q.scalar_one()
         o.outstanding_amount = o.total_amount

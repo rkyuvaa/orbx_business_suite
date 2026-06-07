@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
@@ -113,3 +114,51 @@ class OpeningBalanceTallyOut(BaseModel):
     cr_total: float
     difference: float
     tallies: bool
+
+
+# ==========================================
+# JOURNAL ENTRY SCHEMAS
+# ==========================================
+class JournalEntryLine(BaseModel):
+    ledger_id: UUID
+    dr_cr: str  # "Dr" or "Cr"
+    amount: Decimal
+    narration: Optional[str] = None
+
+
+class JournalEntryCreate(BaseModel):
+    voucher_type_name: str
+    date: date
+    reference_id: Optional[UUID] = None
+    reference_type: Optional[str] = None
+    narration: Optional[str] = None
+    lines: List[JournalEntryLine]
+
+
+class JournalEntryLineOut(BaseModel):
+    id: UUID
+    journal_entry_id: UUID
+    ledger_id: UUID
+    dr_cr: str
+    amount: Decimal
+    narration: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class JournalEntryOut(BaseModel):
+    id: UUID
+    voucher_type_id: UUID
+    reference_id: Optional[UUID] = None
+    reference_type: Optional[str] = None
+    date: date
+    narration: Optional[str] = None
+    is_reversed: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    lines: List[JournalEntryLineOut]
+
+    class Config:
+        from_attributes = True

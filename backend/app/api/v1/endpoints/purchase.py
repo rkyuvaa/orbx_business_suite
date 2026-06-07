@@ -81,7 +81,7 @@ async def create_bill(
     current_user = Depends(deps.PermissionChecker("purchase", "create"))
 ):
     """Log a supplier invoice bill."""
-    return await TxServices.create_purchase_entry(db, entry_data)
+    return await TxServices.create_purchase_entry(db, entry_data, user_id=current_user.id)
 
 
 @router.put("/po/{po_id}", response_model=PurchaseOrderOut)

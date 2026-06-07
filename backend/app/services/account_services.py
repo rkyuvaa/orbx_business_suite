@@ -1,16 +1,17 @@
-from uuid import UUID, uuid4
+from datetime import datetime, date
 from typing import List, Optional, Dict
+from uuid import UUID, uuid4
 from sqlalchemy.future import select
 from sqlalchemy import text, func, cast, Numeric
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.accounts import AccountGroup, LedgerAccount, VoucherType
+from app.models.accounts import AccountGroup, LedgerAccount, VoucherType, JournalEntry, JournalLine
 from app.models.auth import User
 from app.schemas.accounts import (
     AccountGroupCreate, LedgerAccountCreate, VoucherTypeCreate,
-    OpeningBalanceTallyOut, BalanceValidationRequest
+    OpeningBalanceTallyOut, BalanceValidationRequest, JournalEntryLine
 )
 
 
@@ -260,11 +261,192 @@ class AccountServices:
         return ledger
 
     @staticmethod
-    async def has_transactions(db: AsyncSession, account_id: UUID) -> bool:
+    async def post_journal_entry(
+        db: AsyncSession,
+        voucher_type_name: str,
+        reference_id: Optional[UUID],
+        reference_type: Optional[str],
+        entry_date: date,
+        lines: List[JournalEntryLine],
+        user_id: UUID,
+        narration: Optional[str] = None
+    ) -> JournalEntry:
         """
-        Central extensible validation check to see if ledger account is referenced in transaction tables.
-        # TODO: extend when GL journal entries, GST ledger entries, TDS ledger entries, AP, AR, and Bank Reconciliation modules are added.
+        Posts a balanced double-entry journal entry to the ledger systems.
+        Validates that Dr == Cr and all line amounts are positive.
         """
+        # 1. Fetch VoucherType by name
+        q_vt = await db.execute(select(VoucherType).filter(VoucherType.name == voucher_type_name))
+        voucher_type = q_vt.scalar_one_or_none()
+        if not voucher_type:
+            raise ValueError(f"Voucher type '{voucher_type_name}' not found.")
+
+        # 2. Validate Dr == Cr and amounts > 0 using Decimal
+        from decimal import Decimal
+        dr_total = Decimal("0.00")
+        cr_total = Decimal("0.00")
+        for line in lines:
+            amt = Decimal(str(line.amount))
+            if amt <= Decimal("0.00"):
+                raise ValueError("Journal line amount must be greater than zero.")
+            if line.dr_cr == "Dr":
+                dr_total += amt
+            elif line.dr_cr == "Cr":
+                cr_total += amt
+            else:
+                raise ValueError(f"Invalid debit/credit flag: '{line.dr_cr}'. Must be 'Dr' or 'Cr'.")
+
+        if dr_total != cr_total:
+            raise ValueError(f"Journal entry imbalanced: Dr {dr_total} != Cr {cr_total}")
+
+        # 3. Create JournalEntry
+        entry = JournalEntry(
+            id=uuid4(),
+            voucher_type_id=voucher_type.id,
+            reference_id=reference_id,
+            reference_type=reference_type,
+            date=entry_date,
+            narration=narration,
+            is_reversed=False,
+            created_by_id=user_id,
+            updated_by_id=user_id
+        )
+        db.add(entry)
+
+        # 4. Create JournalLines
+        for line in lines:
+            jl = JournalLine(
+                id=uuid4(),
+                journal_entry_id=entry.id,
+                ledger_id=line.ledger_id,
+                dr_cr=line.dr_cr,
+                amount=float(line.amount),
+                narration=line.narration
+            )
+            db.add(jl)
+
+        return entry
+
+    @staticmethod
+    async def reverse_journal_entry(db: AsyncSession, journal_entry_id: UUID, user_id: UUID) -> JournalEntry:
+        """
+        Reverses a journal entry by posting a balanced mirror entry with flipped Dr/Cr lines.
+        Marks the original entry as reversed.
+        """
+        stmt = (
+            select(JournalEntry)
+            .filter(JournalEntry.id == journal_entry_id)
+            .options(selectinload(JournalEntry.lines))
+        )
+        q_entry = await db.execute(stmt)
+        entry = q_entry.scalar_one_or_none()
+        if not entry:
+            raise HTTPException(status_code=404, detail="Journal entry not found.")
+
+        # Guard: raise 409 if already reversed
+        if entry.is_reversed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Journal entry is already reversed."
+            )
+
+        # Guard: raise 422 if no lines exist
+        if not entry.lines:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Cannot reverse journal entry with no lines."
+            )
+
+        # Set original is_reversed = True
+        entry.is_reversed = True
+
+        # Compile mirror lines (flip Dr/Cr)
+        from decimal import Decimal
+        mirror_lines = []
+        for line in entry.lines:
+            flipped_dr_cr = "Cr" if line.dr_cr == "Dr" else "Dr"
+            mirror_lines.append(
+                JournalEntryLine(
+                    ledger_id=line.ledger_id,
+                    dr_cr=flipped_dr_cr,
+                    amount=Decimal(str(line.amount)),
+                    narration=line.narration
+                )
+            )
+
+        # Fetch voucher type
+        q_vt = await db.execute(select(VoucherType).filter(VoucherType.id == entry.voucher_type_id))
+        voucher_type = q_vt.scalar_one_or_none()
+        if not voucher_type:
+            raise HTTPException(status_code=404, detail="Voucher type for journal entry not found.")
+
+        mirror_narration = f"Reversal of journal entry {entry.id}"
+        
+        # Post mirror entry
+        mirror_entry = await AccountServices.post_journal_entry(
+            db=db,
+            voucher_type_name=voucher_type.name,
+            reference_id=entry.id,
+            reference_type="JournalEntry",
+            entry_date=date.today(),
+            lines=mirror_lines,
+            user_id=user_id,
+            narration=mirror_narration
+        )
+        
+        await db.flush()
+        return mirror_entry
+
+    @staticmethod
+    async def has_transactions(db: AsyncSession, account_id: UUID, _ledger: Optional[LedgerAccount] = None) -> bool:
+        """
+        Checks whether the specified ledger account has any associated transactions,
+        or if it is designated as a system ledger. If so, deletion is prohibited
+        to maintain data integrity and consistency of the double-entry bookkeeping system.
+        """
+        from app.core.account_constants import SYSTEM_LEDGER_IDS
+        from app.models.purchase import PurchaseEntry, PurchaseReturn
+        from app.models.accounts import JournalLine
+        from sqlalchemy import or_
+        from sqlalchemy.sql import exists
+
+        # 1. Short-circuit if account_id is in system ledger list
+        if account_id in SYSTEM_LEDGER_IDS:
+            return True
+
+        # 2. Fetch ledger if not provided, check is_system
+        if _ledger is None:
+            q_ledger = await db.execute(select(LedgerAccount).filter(LedgerAccount.id == account_id))
+            _ledger = q_ledger.scalar_one_or_none()
+
+        if _ledger and _ledger.is_system:
+            return True
+
+        # 3. Check if referenced in PurchaseEntry (payable, purchase, or tax ledger)
+        pe_exists = select(PurchaseEntry).where(
+            or_(
+                PurchaseEntry.payable_ledger_id == account_id,
+                PurchaseEntry.purchase_account_id == account_id,
+                PurchaseEntry.tax_ledger_id == account_id
+            )
+        )
+        if await db.scalar(select(pe_exists.exists())):
+            return True
+
+        # 4. Check if referenced in PurchaseReturn
+        pr_exists = select(PurchaseReturn).where(
+            PurchaseReturn.debit_note_ledger_id == account_id
+        )
+        if await db.scalar(select(pr_exists.exists())):
+            return True
+
+        # 5. Check if referenced in JournalLine
+        jl_exists = select(JournalLine).where(
+            JournalLine.ledger_id == account_id
+        )
+        if await db.scalar(select(jl_exists.exists())):
+            return True
+
         return False
 
     @staticmethod
@@ -275,8 +457,8 @@ class AccountServices:
         if not ledger:
             raise HTTPException(status_code=404, detail="Ledger account not found.")
 
-        if await AccountServices.has_transactions(db, account_id):
-            raise HTTPException(status_code=409, detail="Cannot delete ledger account with active transaction history.")
+        if await AccountServices.has_transactions(db, account_id, ledger):
+            raise HTTPException(status_code=409, detail="Cannot delete ledger account with active transaction history or system status.")
 
         await db.delete(ledger)
         await db.commit()

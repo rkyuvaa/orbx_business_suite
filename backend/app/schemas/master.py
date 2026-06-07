@@ -94,6 +94,7 @@ class SupplierCreate(BaseModel):
     payment_terms: Optional[str] = None
     bank_details: Optional[Dict[str, Any]] = None  # JSON format (bank_name, account_no, ifsc)
     branch_id: Optional[UUID] = None
+    default_payable_ledger_id: Optional[UUID] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -121,6 +122,7 @@ class SupplierUpdate(BaseModel):
     payment_terms: Optional[str] = None
     bank_details: Optional[Dict[str, Any]] = None
     branch_id: Optional[UUID] = None
+    default_payable_ledger_id: Optional[UUID] = None
     is_active: Optional[bool] = None
 
     @field_validator("gstin", mode="before")
@@ -150,6 +152,7 @@ class SupplierOut(BaseModel):
     payment_terms: Optional[str] = None
     bank_details: Optional[Dict[str, Any]] = None
     branch_id: Optional[UUID] = None
+    default_payable_ledger_id: Optional[UUID] = None
     is_active: bool
     created_at: datetime
 

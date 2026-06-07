@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKey, String, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+from app.models.accounts import LedgerAccount
 
 
 class Company(Base):
@@ -102,6 +103,8 @@ class Supplier(Base):
     bank_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     
     branch_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True, index=True)
+    default_payable_ledger_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("ledger_accounts.id", ondelete="RESTRICT"), nullable=True, index=True)
 
     # Relationships
     branch: Mapped[Optional["Branch"]] = relationship()
+    default_payable_ledger: Mapped[Optional[LedgerAccount]] = relationship(foreign_keys=[default_payable_ledger_id])

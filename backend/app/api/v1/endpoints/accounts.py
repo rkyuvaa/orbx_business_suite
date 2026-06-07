@@ -8,7 +8,7 @@ from app.schemas.accounts import (
     AccountGroupCreate, AccountGroupOut, AccountGroupHierarchyOut,
     LedgerAccountCreate, LedgerAccountOut,
     VoucherTypeCreate, VoucherTypeOut,
-    BalanceValidationRequest, OpeningBalanceTallyOut
+    BalanceValidationRequest, OpeningBalanceTallyOut, JournalEntryOut
 )
 from app.services.account_services import AccountServices
 
@@ -161,3 +161,29 @@ async def validate_opening_balances(
 ):
     """Verify if total Debit opening balances matches Credit opening balances."""
     return await AccountServices.validate_opening_balances_tally(db, request_data)
+
+
+# ==========================================
+# JOURNAL ENTRY ROUTERS
+# ==========================================
+@router.post("/journal-entries/{entry_id}/reverse", response_model=JournalEntryOut)
+async def reverse_journal_entry(
+    entry_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("accounts", "reverse"))
+):
+    """Reverses a journal entry by posting a balanced mirror entry."""
+    from sqlalchemy.future import select
+    from sqlalchemy.orm import selectinload
+    from app.models.accounts import JournalEntry
+
+    mirror = await AccountServices.reverse_journal_entry(db, entry_id, current_user.id)
+    await db.commit()
+
+    # Fetch mirror entry with pre-loaded lines for proper API serialization
+    q = await db.execute(
+        select(JournalEntry)
+        .filter(JournalEntry.id == mirror.id)
+        .options(selectinload(JournalEntry.lines))
+    )
+    return q.scalar_one()

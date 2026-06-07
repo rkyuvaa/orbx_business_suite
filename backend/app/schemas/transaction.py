@@ -106,6 +106,9 @@ class PurchaseEntryCreate(BaseModel):
     subtotal: float
     tax_amount: float
     total_amount: float
+    payable_ledger_id: Optional[UUID] = None
+    purchase_account_id: Optional[UUID] = None
+    tax_ledger_id: Optional[UUID] = None
 
 
 class PurchaseEntryOut(BaseModel):
@@ -123,6 +126,10 @@ class PurchaseEntryOut(BaseModel):
     total_amount: float
     outstanding_amount: Optional[float] = None
     status: str
+    payable_ledger_id: Optional[UUID] = None
+    purchase_account_id: Optional[UUID] = None
+    tax_ledger_id: Optional[UUID] = None
+    journal_entry_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True

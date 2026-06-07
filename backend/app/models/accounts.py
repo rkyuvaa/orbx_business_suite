@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import ForeignKey, String, Numeric, Boolean, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Numeric, Boolean, UniqueConstraint, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -46,6 +46,7 @@ class LedgerAccount(Base):
     is_closing_stock: Mapped[bool] = mapped_column(Boolean, default=False)
     sundry_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Debtor / Creditor
     partnership_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Capital / Current
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -68,3 +69,35 @@ class VoucherType(Base):
 
     created_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    voucher_type_id: Mapped[UUID] = mapped_column(ForeignKey("voucher_types.id", ondelete="RESTRICT"), index=True)
+    reference_id: Mapped[Optional[UUID]] = mapped_column(nullable=True, index=True)
+    reference_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    date: Mapped[date] = mapped_column(Date)
+    narration: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_reversed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    voucher_type: Mapped["VoucherType"] = relationship()
+    lines: Mapped[List["JournalLine"]] = relationship("JournalLine", back_populates="journal_entry", cascade="all, delete-orphan")
+
+
+class JournalLine(Base):
+    __tablename__ = "journal_entry_lines"
+
+    journal_entry_id: Mapped[UUID] = mapped_column(ForeignKey("journal_entries.id", ondelete="CASCADE"), index=True)
+    ledger_id: Mapped[UUID] = mapped_column(ForeignKey("ledger_accounts.id", ondelete="RESTRICT"), index=True)
+    dr_cr: Mapped[str] = mapped_column(String(10))  # Dr / Cr
+    amount: Mapped[float] = mapped_column(Numeric(15, 2))
+    narration: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Relationships
+    journal_entry: Mapped["JournalEntry"] = relationship(back_populates="lines")
+    ledger: Mapped["LedgerAccount"] = relationship()
