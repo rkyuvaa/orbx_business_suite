@@ -8,11 +8,11 @@ from sqlalchemy import text, select, func
 
 from app.models.accounts import AccountGroup, LedgerAccount, JournalEntry, JournalLine
 from app.models.purchase import PurchaseEntry
-from app.models.sales import Invoice, InvoiceItem
+from app.models.sales import Invoice, InvoiceItem, SalesOrder
 from app.models.auth import User
 from app.models.audit import AuditLog
 from app.models.product import Product
-from app.models.business import Company, Branch
+from app.models.business import Company, Branch, Customer
 from app.core.account_constants import current_fy_dates
 
 
@@ -391,7 +391,7 @@ class ComplianceService:
               WHERE je.is_active = true AND je.is_reversed = false AND je.date <= :end_date
               GROUP BY jl.ledger_id
             ) ja ON ja.ledger_id = la.id
-            WHERE la.is_active = true AND gp.ancestor_id = :group_id
+            WHERE la.is_active = true AND gp.ancestor_id = CAST(:group_id AS UUID)
         """)
         res = await db.execute(sql, {"group_id": group_id, "end_date": end_date})
         return Decimal(str(res.scalar() or 0.00))
@@ -699,11 +699,11 @@ class ComplianceService:
         if start_date is None or end_date is None:
             start_date, end_date = current_fy_dates()
 
-        # Fetch active invoices with customer details
+        # Fetch active invoices with customer details using eager loading
+        from sqlalchemy.orm import selectinload
         stmt = (
             select(Invoice)
-            .join(SalesOrder, Invoice.sales_order_id == SalesOrder.id)
-            .join(Customer, Customer.id == SalesOrder.customer_id)
+            .options(selectinload(Invoice.sales_order).selectinload(SalesOrder.customer))
             .filter(Invoice.status != "Cancelled", Invoice.date BETWEEN start_date and end_date)
         )
         res = await db.execute(stmt)

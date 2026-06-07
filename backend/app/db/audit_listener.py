@@ -71,6 +71,10 @@ def receive_before_flush(session, flush_context, instances):
     for obj in session.new:
         if isinstance(obj, TRACKED_CLASSES):
             old_v, new_v = get_model_changes(obj, "create")
+            rec_id = obj.id
+            if rec_id is None:
+                rec_id = uuid4()
+                obj.id = rec_id
             log = AuditLog(
                 id=uuid4(),
                 user_id=current_user_id.get(),
@@ -78,7 +82,7 @@ def receive_before_flush(session, flush_context, instances):
                 ip_address=current_ip.get(),
                 action="create",
                 table_name=obj.__tablename__,
-                record_id=obj.id,
+                record_id=rec_id,
                 old_values=old_v or None,
                 new_values=new_v or None
             )
