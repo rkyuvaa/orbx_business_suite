@@ -901,7 +901,7 @@ class ReportService:
                 SELECT
                     journal_entry_id,
                     COUNT(id) as line_count,
-                    MAX(CASE WHEN ledger_id != :ledger_id THEN ledger_id ELSE NULL END) as other_ledger_id
+                    CAST(MAX(CASE WHEN ledger_id != :ledger_id THEN CAST(ledger_id AS TEXT) ELSE NULL END) AS UUID) as other_ledger_id
                 FROM journal_entry_lines
                 GROUP BY journal_entry_id
             )
