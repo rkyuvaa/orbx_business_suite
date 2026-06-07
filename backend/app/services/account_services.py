@@ -299,10 +299,28 @@ class AccountServices:
         if dr_total != cr_total:
             raise ValueError(f"Journal entry imbalanced: Dr {dr_total} != Cr {cr_total}")
 
-        # 3. Create JournalEntry
+        # 3. Create Voucher Number
+        from app.core.account_constants import current_fy_dates
+        from sqlalchemy import text
+        fy_start, _ = current_fy_dates()
+        fy_tag = f"{str(fy_start.year)[2:]}{str(fy_start.year + 1)[2:]}"  # e.g. "2627"
+        seq_name = f"voucher_seq_{voucher_type.prefix.lower()}_{fy_tag}"
+        
+        try:
+            result = await db.execute(text(f"SELECT nextval('{seq_name}')"))
+            seq_val = result.scalar()
+            voucher_number = f"{voucher_type.prefix}-{str(seq_val).zfill(5)}"
+        except Exception as e:
+            raise ValueError(
+                f"Voucher number sequence '{seq_name}' does not exist for the current financial year. "
+                "Ensure that ensure_fy_sequences has been run."
+            ) from e
+
+        # 4. Create JournalEntry
         entry = JournalEntry(
             id=uuid4(),
             voucher_type_id=voucher_type.id,
+            voucher_number=voucher_number,
             reference_id=reference_id,
             reference_type=reference_type,
             date=entry_date,
@@ -559,4 +577,19 @@ class AccountServices:
             raise HTTPException(status_code=403, detail="System default voucher configurations cannot be deleted.")
 
         await db.delete(vt)
+        await db.commit()
+
+    @staticmethod
+    async def ensure_fy_sequences(db: AsyncSession) -> None:
+        """Ensure PostgreSQL sequences for seeded voucher types exist for the current financial year."""
+        from app.core.account_constants import current_fy_dates
+        from sqlalchemy import text
+        
+        fy_start, _ = current_fy_dates()
+        fy_tag = f"{str(fy_start.year)[2:]}{str(fy_start.year + 1)[2:]}"  # e.g. "2627"
+        
+        for prefix in ["pmt", "rct", "jv", "ctr", "sls", "pur"]:
+            seq_name = f"voucher_seq_{prefix}_{fy_tag}"
+            await db.execute(text(f"CREATE SEQUENCE IF NOT EXISTS {seq_name} START 1 INCREMENT 1"))
+        
         await db.commit()

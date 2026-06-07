@@ -1,8 +1,18 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.v1.router import api_router
+from app.db.session import SessionLocal
+from app.services.account_services import AccountServices
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure all financial year sequences exist on startup
+    async with SessionLocal() as db:
+        await AccountServices.ensure_fy_sequences(db)
+    yield
 
 # Create core FastAPI application instance
 app = FastAPI(
@@ -10,7 +20,8 @@ app = FastAPI(
     description="Corporate Enterprise Resource Planning API Gateway",
     version="1.0.0",
     docs_url="/docs",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure Cross-Origin Resource Sharing (CORS)

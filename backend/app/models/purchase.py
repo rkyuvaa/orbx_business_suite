@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import ForeignKey, String, Float, DateTime, Date, Numeric
@@ -95,6 +96,9 @@ class PurchaseEntry(Base):
     
     subtotal: Mapped[float] = mapped_column(Float, default=0.0)
     tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    cgst_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    sgst_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
+    igst_amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     total_amount: Mapped[float] = mapped_column(Float, default=0.0)
     status: Mapped[str] = mapped_column(String(30), default="Unpaid") # Paid, Unpaid, PartiallyPaid, Draft
 

@@ -75,6 +75,7 @@ class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
     voucher_type_id: Mapped[UUID] = mapped_column(ForeignKey("voucher_types.id", ondelete="RESTRICT"), index=True)
+    voucher_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     reference_id: Mapped[Optional[UUID]] = mapped_column(nullable=True, index=True)
     reference_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     date: Mapped[date] = mapped_column(Date)

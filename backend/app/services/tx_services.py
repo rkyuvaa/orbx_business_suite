@@ -366,11 +366,48 @@ class TxServices:
             purchase_account_id = entry_data.purchase_account_id or DEFAULT_PURCHASE_LEDGER_ID
             tax_ledger_id = entry_data.tax_ledger_id or DEFAULT_GST_INPUT_LEDGER_ID
 
+            # Resolve interstate status and GST split
+            q_branch = await db.execute(select(Branch).filter(Branch.id == entry_data.branch_id))
+            branch = q_branch.scalar_one_or_none()
+            if not branch:
+                raise HTTPException(status_code=400, detail="Branch not found.")
+            
+            q_company = await db.execute(select(Company).filter(Company.id == branch.company_id))
+            company = q_company.scalar_one_or_none()
+            
+            branch_state_code = None
+            if company:
+                branch_state_code = company.state_code or (company.gstin[:2] if company.gstin else None)
+            
+            supplier_state_code = supplier.gstin[:2] if (supplier.gstin and len(supplier.gstin) >= 2) else None
+            
+            if not supplier_state_code or not branch_state_code:
+                logger.warning(
+                    "State code missing for supplier '%s' (%s) or branch '%s' (%s). Defaulting to intrastate.",
+                    supplier.name, supplier.id, branch.branch_name, branch.id
+                )
+                is_interstate = False
+            else:
+                is_interstate = supplier_state_code != branch_state_code
+
+            tax_val = Decimal(str(entry_data.tax_amount))
+            if is_interstate:
+                igst_amount = tax_val
+                cgst_amount = Decimal("0.00")
+                sgst_amount = Decimal("0.00")
+            else:
+                igst_amount = Decimal("0.00")
+                cgst_amount = tax_val / Decimal("2.00")
+                sgst_amount = tax_val / Decimal("2.00")
+
             # Create PurchaseEntry instance
             entry_dict = entry_data.model_dump()
             entry_dict["payable_ledger_id"] = payable_ledger_id
             entry_dict["purchase_account_id"] = purchase_account_id
             entry_dict["tax_ledger_id"] = tax_ledger_id
+            entry_dict["cgst_amount"] = cgst_amount
+            entry_dict["sgst_amount"] = sgst_amount
+            entry_dict["igst_amount"] = igst_amount
             entry_dict["status"] = "Unpaid"
 
             entry = PurchaseEntry(**entry_dict)
