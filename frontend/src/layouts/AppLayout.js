@@ -91,6 +91,21 @@ const AppLayout = () => {
     if (p.startsWith('/accounts/voucher-types')) {
       return { title: 'Voucher Configurations', breadcrumbs: 'Dashboard > Accounts > Voucher Configurations' };
     }
+    if (p.startsWith('/accounts/trial-balance')) {
+      return { title: 'Trial Balance', breadcrumbs: 'Dashboard > Accounts > Trial Balance' };
+    }
+    if (p.startsWith('/accounts/general-ledger')) {
+      return { title: 'General Ledger', breadcrumbs: 'Dashboard > Accounts > General Ledger' };
+    }
+    if (p.startsWith('/accounts/day-book')) {
+      return { title: 'Day Book', breadcrumbs: 'Dashboard > Accounts > Day Book' };
+    }
+    if (p.startsWith('/accounts/purchase-register')) {
+      return { title: 'Purchase Register', breadcrumbs: 'Dashboard > Accounts > Purchase Register' };
+    }
+    if (p.startsWith('/accounts/sales-register')) {
+      return { title: 'Sales Register', breadcrumbs: 'Dashboard > Accounts > Sales Register' };
+    }
     if (p.startsWith('/masters/customers')) {
       return { title: 'Customer Master', breadcrumbs: 'Dashboard > Customer Master' };
     }
@@ -163,6 +178,11 @@ const AppLayout = () => {
       return [
         { label: 'Chart of Accounts', icon: <AccountTreeIcon />, to: '/accounts/chart-of-accounts' },
         { label: 'Voucher Types', icon: <ReceiptIcon />, to: '/accounts/voucher-types' },
+        { label: 'Trial Balance', icon: <ReportIcon />, to: '/accounts/trial-balance' },
+        { label: 'General Ledger', icon: <ReportIcon />, to: '/accounts/general-ledger' },
+        { label: 'Day Book', icon: <ReportIcon />, to: '/accounts/day-book' },
+        { label: 'Purchase Register', icon: <ReportIcon />, to: '/accounts/purchase-register' },
+        { label: 'Sales Register', icon: <ReportIcon />, to: '/accounts/sales-register' },
       ];
     }
     if (path.startsWith('/transactions/purchase') || path.startsWith('/masters/suppliers')) {

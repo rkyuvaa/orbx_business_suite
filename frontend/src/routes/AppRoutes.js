@@ -41,6 +41,11 @@ import BackupRestore from '../pages/Admin/BackupRestore';
 // Accounts Module Pages
 import ChartOfAccounts from '../pages/Accounts/ChartOfAccounts';
 import VoucherTypes from '../pages/Accounts/VoucherTypes';
+import TrialBalance from '../pages/Accounts/TrialBalance';
+import GeneralLedger from '../pages/Accounts/GeneralLedger';
+import DayBook from '../pages/Accounts/DayBook';
+import PurchaseRegister from '../pages/Accounts/PurchaseRegister';
+import SalesRegister from '../pages/Accounts/SalesRegister';
 
 const AppRoutes = () => {
   return (
@@ -96,6 +101,11 @@ const AppRoutes = () => {
         <Route path="/accounts">
           <Route path="chart-of-accounts" element={<ChartOfAccounts />} />
           <Route path="voucher-types" element={<VoucherTypes />} />
+          <Route path="trial-balance" element={<TrialBalance />} />
+          <Route path="general-ledger" element={<GeneralLedger />} />
+          <Route path="day-book" element={<DayBook />} />
+          <Route path="purchase-register" element={<PurchaseRegister />} />
+          <Route path="sales-register" element={<SalesRegister />} />
           <Route path="*" element={<Navigate to="chart-of-accounts" replace />} />
         </Route>
 
