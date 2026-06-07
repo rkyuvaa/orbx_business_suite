@@ -704,7 +704,7 @@ class ComplianceService:
         stmt = (
             select(Invoice)
             .options(selectinload(Invoice.sales_order).selectinload(SalesOrder.customer))
-            .filter(Invoice.status != "Cancelled", Invoice.date BETWEEN start_date and end_date)
+            .filter(Invoice.status != "Cancelled", Invoice.date.between(start_date, end_date))
         )
         res = await db.execute(stmt)
         invoices = res.scalars().all()
