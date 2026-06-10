@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Box, Alert, Typography, Tabs, Tab, Paper } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -37,6 +38,9 @@ const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [error, setError] = useState(null);
+
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const { control: pControl, handleSubmit: pSubmit, reset: pReset } = useForm({
     resolver: yupResolver(productSchema),
@@ -110,6 +114,17 @@ const Products = () => {
     }
   };
 
+  const handleDeleteProduct = async (product) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete product '${product.name}'? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/products/${product.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete product.');
+      }
+    }
+  };
+
   const onProductSubmit = async (data) => {
     try {
       if (selectedProduct) {
@@ -137,6 +152,17 @@ const Products = () => {
     setSelectedCategory(category);
     cReset(category);
     setOpenCategoryModal(true);
+  };
+
+  const handleDeleteCategory = async (category) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete category '${category.name}'? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/products/categories/${category.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete category.');
+      }
+    }
   };
 
   const onCategorySubmit = async (data) => {
@@ -212,6 +238,13 @@ const Products = () => {
       onClick: handleActivateProduct,
       color: 'success',
     },
+    ...(isSuperAdmin ? [{
+      type: 'delete',
+      label: 'Delete Product',
+      icon: <DeleteIcon />,
+      onClick: handleDeleteProduct,
+      color: 'error',
+    }] : [])
   ];
 
   const categoryColumns = [
@@ -240,6 +273,13 @@ const Products = () => {
 
   const categoryActions = [
     { type: 'edit', label: 'Edit Category', onClick: handleOpenEditCategory },
+    ...(isSuperAdmin ? [{
+      type: 'delete',
+      label: 'Delete Category',
+      icon: <DeleteIcon />,
+      onClick: handleDeleteCategory,
+      color: 'error',
+    }] : [])
   ];
 
   const uomOptions = [

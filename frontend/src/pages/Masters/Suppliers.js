@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Box, Alert, Typography, Divider } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -23,6 +24,8 @@ const schema = yup.object().shape({
   bank_name: yup.string().nullable(),
   bank_account_no: yup.string().nullable(),
   bank_ifsc: yup.string().nullable(),
+  opening_bal: yup.number().typeError('Must be a number').default(0.0),
+  opening_bal_type: yup.string().default('Cr'),
 });
 
 const Suppliers = () => {
@@ -30,6 +33,9 @@ const Suppliers = () => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [error, setError] = useState(null);
+
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
@@ -62,13 +68,14 @@ const Suppliers = () => {
       bank_name: '',
       bank_account_no: '',
       bank_ifsc: '',
+      opening_bal: 0,
+      opening_bal_type: 'Cr',
     });
     setOpenModal(true);
   };
 
   const handleOpenEdit = (supplier) => {
     setSelectedSupplier(supplier);
-    // Unpack bank details for form prefilling
     const bank = supplier.bank_details || {};
     reset({
       ...supplier,
@@ -99,9 +106,19 @@ const Suppliers = () => {
     }
   };
 
+  const handleDeleteSupplier = async (supplier) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete supplier '${supplier.name}'? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/suppliers/${supplier.id}`);
+        loadSuppliers();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete supplier.');
+      }
+    }
+  };
+
   const onSubmit = async (data) => {
     try {
-      // Repack bank details
       const payload = {
         code: data.code || null,
         name: data.name,
@@ -111,6 +128,8 @@ const Suppliers = () => {
         email: data.email || null,
         address: data.address || null,
         payment_terms: data.payment_terms || null,
+        opening_bal: data.opening_bal || 0.0,
+        opening_bal_type: data.opening_bal_type || 'Cr',
         bank_details: {
           bank_name: data.bank_name || null,
           bank_account_no: data.bank_account_no || null,
@@ -180,6 +199,13 @@ const Suppliers = () => {
       onClick: handleActivate,
       color: 'success',
     },
+    ...(isSuperAdmin ? [{
+      type: 'delete',
+      label: 'Delete Supplier',
+      icon: <DeleteIcon />,
+      onClick: handleDeleteSupplier,
+      color: 'error',
+    }] : [])
   ];
 
   return (
@@ -216,6 +242,17 @@ const Suppliers = () => {
             <FormInput name="alternative_phone" control={control} label="Alternative Phone" />
             <FormInput name="email" control={control} label="Email Address" type="email" />
             <FormInput name="payment_terms" control={control} label="Payment Terms" />
+            <FormInput name="opening_bal" control={control} label="Opening Balance (₹)" type="number" />
+            <FormInput
+              name="opening_bal_type"
+              control={control}
+              label="Opening Balance Type"
+              type="select"
+              options={[
+                { value: 'Dr', label: 'Debit (Dr) - Receivable' },
+                { value: 'Cr', label: 'Credit (Cr) - Payable' }
+              ]}
+            />
             <Box sx={{ gridColumn: 'span 2' }}>
               <FormInput name="address" control={control} label="Office Address" type="textarea" rows={2} />
             </Box>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -37,6 +38,9 @@ const Purchase = () => {
 
   const [error, setError] = useState(null);
 
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
+
   const loadData = async () => {
     try {
       const poRes = await apiClient.get('/purchase/po');
@@ -68,6 +72,17 @@ const Purchase = () => {
     }
   };
 
+  const handleDeletePO = async (po) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Purchase Order ${po.po_number || `PO-${po.id.substring(0, 6).toUpperCase()}`}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/purchase/po/${po.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Purchase Order.');
+      }
+    }
+  };
+
   const handleCancelGRN = async (grn) => {
     if (window.confirm(`Are you sure you want to cancel GRN ${grn.grn_number || `GRN-${grn.id.substring(0, 6).toUpperCase()}`}?`)) {
       try {
@@ -79,6 +94,17 @@ const Purchase = () => {
     }
   };
 
+  const handleDeleteGRN = async (grn) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete GRN ${grn.grn_number || `GRN-${grn.id.substring(0, 6).toUpperCase()}`}? This action cannot be undone and will reverse stock levels.`)) {
+      try {
+        await apiClient.delete(`/purchase/grn/${grn.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete GRN.');
+      }
+    }
+  };
+
   const handleCancelBill = async (bill) => {
     if (window.confirm(`Are you sure you want to cancel Purchase Bill ${bill.invoice_number}?`)) {
       try {
@@ -86,6 +112,17 @@ const Purchase = () => {
         loadData();
       } catch (err) {
         setError(err.response?.data?.detail || 'Failed to cancel Purchase Entry Bill.');
+      }
+    }
+  };
+
+  const handleDeleteBill = async (bill) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Purchase Bill ${bill.invoice_number}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/purchase/bills/${bill.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Purchase Bill.');
       }
     }
   };
@@ -391,7 +428,13 @@ const Purchase = () => {
               condition: (row) => row.status !== 'Cancelled',
               onClick: handleCancelPO,
               color: 'error'
-            }
+            },
+            ...(isSuperAdmin ? [{
+              icon: <DeleteIcon />,
+              label: 'Delete Purchase Order',
+              onClick: handleDeletePO,
+              color: 'error'
+            }] : [])
           ]}
           searchKey="status"
           tableActions={
@@ -420,7 +463,13 @@ const Purchase = () => {
               condition: (row) => row.status !== 'Cancelled',
               onClick: handleCancelGRN,
               color: 'error'
-            }
+            },
+            ...(isSuperAdmin ? [{
+              icon: <DeleteIcon />,
+              label: 'Delete GRN',
+              onClick: handleDeleteGRN,
+              color: 'error'
+            }] : [])
           ]}
           searchKey="status"
         />
@@ -437,7 +486,13 @@ const Purchase = () => {
               condition: (row) => row.status !== 'Cancelled',
               onClick: handleCancelBill,
               color: 'error'
-            }
+            },
+            ...(isSuperAdmin ? [{
+              icon: <DeleteIcon />,
+              label: 'Delete Purchase Bill',
+              onClick: handleDeleteBill,
+              color: 'error'
+            }] : [])
           ]}
           searchKey="invoice_number"
         />

@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Button, Box, Alert, Typography } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -22,6 +23,8 @@ const schema = yup.object().shape({
   shipping_address: yup.string().nullable(),
   credit_limit: yup.number().typeError('Must be a number').default(0.0),
   payment_terms: yup.string().nullable(),
+  opening_bal: yup.number().typeError('Must be a number').default(0.0),
+  opening_bal_type: yup.string().default('Dr'),
 });
 
 const Customers = () => {
@@ -29,6 +32,9 @@ const Customers = () => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [error, setError] = useState(null);
+
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
@@ -60,6 +66,8 @@ const Customers = () => {
       shipping_address: '',
       credit_limit: 0,
       payment_terms: '',
+      opening_bal: 0,
+      opening_bal_type: 'Dr',
     });
     setOpenModal(true);
   };
@@ -87,6 +95,17 @@ const Customers = () => {
       loadCustomers();
     } catch (err) {
       setError('Failed to activate customer.');
+    }
+  };
+
+  const handleDeleteCustomer = async (customer) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete customer '${customer.name}'? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/customers/${customer.id}`);
+        loadCustomers();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete customer.');
+      }
     }
   };
 
@@ -147,6 +166,13 @@ const Customers = () => {
       onClick: handleActivate,
       color: 'success',
     },
+    ...(isSuperAdmin ? [{
+      type: 'delete',
+      label: 'Delete Customer',
+      icon: <DeleteIcon />,
+      onClick: handleDeleteCustomer,
+      color: 'error',
+    }] : [])
   ];
 
   return (
@@ -184,6 +210,17 @@ const Customers = () => {
             <FormInput name="email" control={control} label="Email Address" type="email" />
             <FormInput name="payment_terms" control={control} label="Payment Terms" />
             <FormInput name="credit_limit" control={control} label="Credit Limit" type="number" />
+            <FormInput name="opening_bal" control={control} label="Opening Balance (₹)" type="number" />
+            <FormInput
+              name="opening_bal_type"
+              control={control}
+              label="Opening Balance Type"
+              type="select"
+              options={[
+                { value: 'Dr', label: 'Debit (Dr) - Receivable' },
+                { value: 'Cr', label: 'Credit (Cr) - Payable' }
+              ]}
+            />
             <Box sx={{ gridColumn: 'span 2' }}>
               <FormInput name="billing_address" control={control} label="Billing Address" type="textarea" rows={2} />
               <FormInput name="shipping_address" control={control} label="Shipping Address" type="textarea" rows={2} />

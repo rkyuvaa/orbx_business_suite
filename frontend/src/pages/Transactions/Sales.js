@@ -9,6 +9,7 @@ import {
   Receipt as InvoiceIcon, Print as PrintIcon,
   Edit as EditIcon, Block as CancelIcon
 } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -42,6 +43,9 @@ const Sales = () => {
   const [error, setError] = useState(null);
   const printRef = useRef();
 
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
+
   const loadData = async () => {
     try {
       const soRes = await apiClient.get('/sales/so');
@@ -73,6 +77,17 @@ const Sales = () => {
     }
   };
 
+  const handleDeleteSO = async (so) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Sales Order ${so.so_number || `SO-${so.id.substring(0, 6).toUpperCase()}`}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/sales/so/${so.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Sales Order.');
+      }
+    }
+  };
+
   const handleCancelInvoice = async (inv) => {
     if (window.confirm(`Are you sure you want to cancel Tax Invoice ${inv.invoice_number}?`)) {
       try {
@@ -80,6 +95,17 @@ const Sales = () => {
         loadData();
       } catch (err) {
         setError(err.response?.data?.detail || 'Failed to cancel Tax Invoice.');
+      }
+    }
+  };
+
+  const handleDeleteInvoice = async (inv) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Tax Invoice ${inv.invoice_number}? This action cannot be undone and will reverse stock levels.`)) {
+      try {
+        await apiClient.delete(`/sales/invoices/${inv.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Tax Invoice.');
       }
     }
   };
@@ -535,7 +561,13 @@ const Sales = () => {
               condition: (row) => row.status !== 'Cancelled',
               onClick: handleCancelSO,
               color: 'error'
-            }
+            },
+            ...(isSuperAdmin ? [{
+              icon: <DeleteIcon />,
+              label: 'Delete Sales Order',
+              onClick: handleDeleteSO,
+              color: 'error'
+            }] : [])
           ]}
           searchKey="status"
           tableActions={
@@ -563,7 +595,13 @@ const Sales = () => {
               condition: (row) => row.status !== 'Cancelled',
               onClick: handleCancelInvoice,
               color: 'error'
-            }
+            },
+            ...(isSuperAdmin ? [{
+              icon: <DeleteIcon />,
+              label: 'Delete Tax Invoice',
+              onClick: handleDeleteInvoice,
+              color: 'error'
+            }] : [])
           ]}
           searchKey="invoice_number"
         />

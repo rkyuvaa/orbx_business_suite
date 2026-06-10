@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Button, Box, Alert, Paper, Typography, Grid, Divider } from '@mui/material';
-import { Print as PrintIcon, Block as CancelIcon } from '@mui/icons-material';
+import { Print as PrintIcon, Block as CancelIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import CommonTable from '../../components/CommonTable';
@@ -16,6 +17,9 @@ const Receipts = () => {
 
   const [error, setError] = useState(null);
   const printRef = useRef();
+
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
     try {
@@ -40,6 +44,17 @@ const Receipts = () => {
         loadData();
       } catch (err) {
         setError(err.response?.data?.detail || 'Failed to cancel Payment Receipt.');
+      }
+    }
+  };
+
+  const handleDeletePayment = async (payment) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Payment Receipt ${payment.receipt_number || 'N/A'}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/payments/${payment.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete payment receipt.');
       }
     }
   };
@@ -128,7 +143,13 @@ const Receipts = () => {
             label: 'Cancel Payment Receipt',
             onClick: handleCancelPayment,
             color: 'error'
-          }
+          },
+          ...(isSuperAdmin ? [{
+            icon: <DeleteIcon />,
+            label: 'Delete Payment Receipt',
+            onClick: handleDeletePayment,
+            color: 'error'
+          }] : [])
         ]}
         searchKey="receipt_number"
         searchPlaceholder="Search by receipt number..."

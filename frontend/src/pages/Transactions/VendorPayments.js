@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Box, Alert, MenuItem, TextField, Typography, Autocomplete } from '@mui/material';
-import { Add as AddIcon, Block as CancelIcon } from '@mui/icons-material';
+import { Add as AddIcon, Block as CancelIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
 import CommonTable from '../../components/CommonTable';
@@ -23,6 +24,9 @@ const VendorPayments = () => {
 
   const [openModal, setOpenModal] = useState(false);
   const [error, setError] = useState(null);
+
+  const { user } = useSelector((state) => state.auth);
+  const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
     try {
@@ -81,6 +85,17 @@ const VendorPayments = () => {
         loadData();
       } catch (err) {
         setError(err.response?.data?.detail || 'Failed to cancel Vendor Payment.');
+      }
+    }
+  };
+
+  const handleDeletePayment = async (payment) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Vendor Payment of ₹${payment.amount_paid.toFixed(2)}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/purchase/payments/${payment.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Vendor Payment.');
       }
     }
   };
@@ -207,7 +222,13 @@ const VendorPayments = () => {
             label: 'Cancel & Reverse Payment',
             onClick: handleCancelPayment,
             color: 'error'
-          }
+          },
+          ...(isSuperAdmin ? [{
+            icon: <DeleteIcon />,
+            label: 'Delete Vendor Payment',
+            onClick: handleDeletePayment,
+            color: 'error'
+          }] : [])
         ]}
       />
 
