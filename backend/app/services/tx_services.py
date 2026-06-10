@@ -1032,14 +1032,22 @@ class TxServices:
             branch = q_br.scalar_one_or_none()
 
         if branch:
-            receipt_seq = branch.receipt_next_number
-            branch.receipt_next_number += 1
-            db.add(branch)
-            rcpt_no = f"{branch.receipt_prefix}{receipt_seq:05d}{branch.receipt_suffix}"
+            while True:
+                receipt_seq = branch.receipt_next_number
+                branch.receipt_next_number += 1
+                db.add(branch)
+                rcpt_no = f"{branch.receipt_prefix}{receipt_seq:05d}{branch.receipt_suffix}"
+                q_exist = await db.execute(select(PaymentReceipt).filter(PaymentReceipt.receipt_number == rcpt_no))
+                if not q_exist.scalars().first():
+                    break
         else:
-            q_count = await db.execute(select(PaymentReceipt))
-            receipt_seq = len(q_count.scalars().all()) + 1
-            rcpt_no = f"RCPT-{receipt_seq:05d}"
+            receipt_seq = 1
+            while True:
+                rcpt_no = f"RCPT-{receipt_seq:05d}"
+                q_exist = await db.execute(select(PaymentReceipt).filter(PaymentReceipt.receipt_number == rcpt_no))
+                if not q_exist.scalars().first():
+                    break
+                receipt_seq += 1
 
         # Create Receipt record
         receipt = PaymentReceipt(
