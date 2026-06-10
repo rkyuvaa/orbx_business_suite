@@ -131,7 +131,7 @@ const CommonTable = ({
                 </TableCell>
               ))}
               {actions.length > 0 && (
-                <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 600 }}>
+                <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   Actions
                 </TableCell>
               )}
@@ -156,7 +156,7 @@ const CommonTable = ({
                     );
                   })}
                   {actions.length > 0 && (
-                    <TableCell align="right">
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       {actions.map((act, actIdx) => {
                         const show = act.condition ? act.condition(row) : true;
                         if (!show) return null;
