@@ -38,6 +38,8 @@ const Sales = () => {
   const [soCustomerId, setSoCustomerId] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [soBranchId, setSoBranchId] = useState('');
+  const [soDate, setSoDate] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState('');
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
   const [error, setError] = useState(null);
@@ -115,6 +117,7 @@ const Sales = () => {
     setSoCustomerId('');
     setSelectedCustomer(null);
     setSoBranchId(branches.length > 0 ? branches[0].id : '');
+    setSoDate(new Date().toISOString().split('T')[0]);
     setSoItems([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
     setOpenSOModal(true);
   };
@@ -130,6 +133,7 @@ const Sales = () => {
       shipping_address: so.customer_shipping_address
     });
     setSoBranchId(so.branch_id);
+    setSoDate(so.date ? new Date(so.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
     setSoItems(
       so.items.map((item) => ({
         product_id: item.product_id,
@@ -168,6 +172,7 @@ const Sales = () => {
       const payload = {
         customer_id: soCustomerId,
         branch_id: soBranchId,
+        date: soDate ? new Date(soDate).toISOString() : null,
         items: soItems.map(item => ({
           product_id: item.product_id,
           qty: item.qty,
@@ -197,6 +202,7 @@ const Sales = () => {
     setSelectedSO(so);
     setSelectedDCId('');
     setAvailableDCs([]);
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
     
     // Fetch transferred DCs for this customer
     apiClient.get(`/inventory/transfers?customer_id=${so.customer_id}`)
@@ -214,6 +220,7 @@ const Sales = () => {
       const payload = {
         sales_order_id: selectedSO.id,
         delivery_challan_id: selectedDCId || null,
+        date: invoiceDate ? new Date(invoiceDate).toISOString() : null,
         due_date: new Date(Date.now() + 15 * 86400000).toISOString()
       };
       await apiClient.post('/sales/invoices', payload);
@@ -647,6 +654,17 @@ const Sales = () => {
               ))}
             </TextField>
           </Box>
+          <Box sx={{ flex: '1 1 200px' }}>
+            <TextField
+              type="date"
+              label="Order Date"
+              fullWidth
+              size="small"
+              value={soDate}
+              onChange={(e) => setSoDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
           <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
             <Button onClick={() => setOpenSOModal(false)} variant="outlined" size="small">Cancel</Button>
             <Button onClick={submitSO} variant="contained" size="small">Submit SO</Button>
@@ -801,6 +819,16 @@ const Sales = () => {
             No pending Delivery Challans found for this customer. Stock will be deducted from inventory.
           </Typography>
         )}
+
+        <TextField
+          type="date"
+          fullWidth
+          label="Invoice Date"
+          value={invoiceDate}
+          onChange={(e) => setInvoiceDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ mb: 3 }}
+        />
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button onClick={() => setOpenInvoiceModal(false)} variant="outlined">Cancel</Button>

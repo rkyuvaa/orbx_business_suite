@@ -102,6 +102,8 @@ class TxServices:
             tax_amount=0.0,
             grand_total=0.0
         )
+        if po_data.date:
+            po.date = po_data.date
         db.add(po)
         await db.flush() # Yield PO ID
 
@@ -270,6 +272,8 @@ class TxServices:
             received_by_id=received_by_id,
             status="Received"
         )
+        if grn_data.date:
+            grn.date = grn_data.date
         db.add(grn)
         await db.flush()
 
@@ -604,6 +608,8 @@ class TxServices:
             discount_amount=0.0,
             grand_total=0.0
         )
+        if so_data.date:
+            so.date = so_data.date
         db.add(so)
         await db.flush()
 
@@ -833,7 +839,7 @@ class TxServices:
             delivery_challan_id=inv_data.delivery_challan_id,
             branch_id=so.branch_id,
             invoice_number=invoice_no,
-            date=datetime.utcnow(),
+            date=inv_data.date or datetime.utcnow(),
             due_date=inv_data.due_date,
             gst_breakup=gst_breakup,
             subtotal=so.total_amount,
@@ -1356,6 +1362,8 @@ class TxServices:
             amount_paid=payment_data.amount_paid,
             notes=payment_data.notes
         )
+        if payment_data.payment_date:
+            payment.payment_date = payment_data.payment_date
         db.add(payment)
         await db.flush()
 
@@ -1468,6 +1476,8 @@ class TxServices:
             grand_total=0.0,
             gst_breakup={}
         )
+        if transfer_data.date:
+            transfer.date = transfer_data.date
         db.add(transfer)
         await db.flush()
         

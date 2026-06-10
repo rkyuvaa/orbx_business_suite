@@ -27,13 +27,16 @@ const Purchase = () => {
   const [poSupplierId, setPoSupplierId] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [poBranchId, setPoBranchId] = useState('');
+  const [poDate, setPoDate] = useState('');
   const [poItems, setPoItems] = useState([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
   
   // GRN received quantities local state
   const [grnItems, setGrnItems] = useState([]);
+  const [grnDate, setGrnDate] = useState('');
   
   // Bill local states
   const [billInvoiceNo, setBillInvoiceNo] = useState('');
+  const [billDate, setBillDate] = useState('');
   const [billDueDate, setBillDueDate] = useState('');
 
   const [error, setError] = useState(null);
@@ -132,6 +135,7 @@ const Purchase = () => {
     setPoSupplierId('');
     setSelectedSupplier(null);
     setPoBranchId(branches.length > 0 ? branches[0].id : '');
+    setPoDate(new Date().toISOString().split('T')[0]);
     setPoItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
     setOpenPOModal(true);
   };
@@ -144,6 +148,7 @@ const Purchase = () => {
       name: po.supplier_name
     });
     setPoBranchId(po.branch_id);
+    setPoDate(po.date ? new Date(po.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
     setPoItems(
       po.items.map((item) => ({
         product_id: item.product_id,
@@ -181,6 +186,7 @@ const Purchase = () => {
       const payload = {
         supplier_id: poSupplierId,
         branch_id: poBranchId,
+        date: poDate ? new Date(poDate).toISOString() : null,
         items: poItems.map(item => ({
           product_id: item.product_id,
           qty: item.qty,
@@ -214,6 +220,7 @@ const Purchase = () => {
       warehouse_location: 'Main Rack A'
     }));
     setGrnItems(items);
+    setGrnDate(new Date().toISOString().split('T')[0]);
     setOpenGRNModal(true);
   };
 
@@ -230,6 +237,7 @@ const Purchase = () => {
       const payload = {
         purchase_order_id: selectedPO.id,
         branch_id: selectedPO.branch_id,
+        date: grnDate ? new Date(grnDate).toISOString() : null,
         items: grnItems
       };
       await apiClient.post('/purchase/grn', payload);
@@ -246,6 +254,7 @@ const Purchase = () => {
   const handleOpenBill = (grn) => {
     setSelectedGRN(grn);
     setBillInvoiceNo(`INV-${grn.grn_number || grn.id.substring(0, 6).toUpperCase()}`);
+    setBillDate(new Date().toISOString().split('T')[0]);
     setBillDueDate(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
     setOpenBillModal(true);
   };
@@ -259,6 +268,7 @@ const Purchase = () => {
         supplier_id: selectedGRN.purchase_order_id ? po.supplier_id : '',
         branch_id: selectedGRN.branch_id,
         invoice_number: billInvoiceNo,
+        billing_date: billDate ? new Date(billDate).toISOString() : null,
         due_date: new Date(billDueDate).toISOString(),
         payment_terms: "15 Days Net",
         subtotal: po ? po.total_amount : 0,
@@ -530,6 +540,17 @@ const Purchase = () => {
               ))}
             </TextField>
           </Box>
+          <Box sx={{ flex: '1 1 200px' }}>
+            <TextField
+              type="date"
+              label="Order Date"
+              fullWidth
+              size="small"
+              value={poDate}
+              onChange={(e) => setPoDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
           <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
             <Button onClick={() => setOpenPOModal(false)} variant="outlined" size="small">Cancel</Button>
             <Button onClick={submitPO} variant="contained" size="small">Submit PO</Button>
@@ -644,9 +665,20 @@ const Purchase = () => {
         title="Record Goods Receipt Note"
         maxWidth="md"
       >
-        <Typography variant="body1" sx={{ mb: 3 }}>
-          Order reference: <strong>{selectedPO?.po_number || `PO-${selectedPO?.id.substring(0, 6).toUpperCase()}`}</strong>
-        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>
+          <Typography variant="body1">
+            Order reference: <strong>{selectedPO?.po_number || `PO-${selectedPO?.id.substring(0, 6).toUpperCase()}`}</strong>
+          </Typography>
+          <TextField
+            type="date"
+            label="GRN Date"
+            size="small"
+            value={grnDate}
+            onChange={(e) => setGrnDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 200, ml: 'auto' }}
+          />
+        </Box>
 
         <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
           <Table>
@@ -705,6 +737,14 @@ const Purchase = () => {
             fullWidth
             value={billInvoiceNo}
             onChange={(e) => setBillInvoiceNo(e.target.value)}
+          />
+          <TextField
+            label="Bill Date"
+            type="date"
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            value={billDate}
+            onChange={(e) => setBillDate(e.target.value)}
           />
           <TextField
             label="Payment Due Date"

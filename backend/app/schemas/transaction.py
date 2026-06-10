@@ -33,6 +33,7 @@ class PurchaseOrderItemOut(BaseModel):
 class PurchaseOrderCreate(BaseModel):
     supplier_id: UUID
     branch_id: UUID
+    date: Optional[datetime] = None
     expected_delivery: Optional[datetime] = None
     items: List[PurchaseOrderItemCreate]
 
@@ -79,6 +80,7 @@ class GRNItemOut(BaseModel):
 class GRNCreate(BaseModel):
     purchase_order_id: UUID
     branch_id: UUID
+    date: Optional[datetime] = None
     items: List[GRNItemCreate]
 
 
@@ -101,6 +103,7 @@ class PurchaseEntryCreate(BaseModel):
     supplier_id: UUID
     branch_id: UUID
     invoice_number: str
+    billing_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     payment_terms: Optional[str] = None
     subtotal: float
@@ -203,6 +206,7 @@ class SalesOrderItemOut(BaseModel):
 class SalesOrderCreate(BaseModel):
     customer_id: UUID
     branch_id: UUID
+    date: Optional[datetime] = None
     items: List[SalesOrderItemCreate]
 
 
@@ -248,6 +252,7 @@ class InvoiceItemOut(BaseModel):
 class InvoiceCreate(BaseModel):
     sales_order_id: Optional[UUID] = None
     delivery_challan_id: Optional[UUID] = None
+    date: Optional[datetime] = None
     due_date: Optional[datetime] = None
 
 
@@ -286,6 +291,7 @@ class InvoiceOut(BaseModel):
 class PaymentCreate(BaseModel):
     customer_id: UUID
     invoice_id: Optional[UUID] = None
+    payment_date: Optional[datetime] = None
     payment_mode: str  # cash, cheque, UPI, bank
     reference_number: Optional[str] = None
     amount_paid: float
@@ -320,6 +326,7 @@ class PaymentReceiptOut(BaseModel):
 class VendorPaymentCreate(BaseModel):
     supplier_id: UUID
     purchase_entry_id: Optional[UUID] = None
+    payment_date: Optional[datetime] = None
     payment_mode: str
     reference_number: Optional[str] = None
     amount_paid: float
@@ -442,6 +449,7 @@ class StockTransferCreate(BaseModel):
     source_branch_id: UUID
     destination_branch_id: Optional[UUID] = None
     customer_id: Optional[UUID] = None
+    date: Optional[datetime] = None
     notes: Optional[str] = None
     items: List[StockTransferItemCreate]
 

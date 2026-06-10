@@ -83,6 +83,7 @@ const Inventory = () => {
   const [transferType, setTransferType] = useState('branch'); // branch or customer
   const [transferDestBranch, setTransferDestBranch] = useState('');
   const [transferCustomerId, setTransferCustomerId] = useState('');
+  const [transferDate, setTransferDate] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
   const [transferItems, setTransferItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
@@ -160,6 +161,7 @@ const Inventory = () => {
     setTransferType('branch');
     setTransferDestBranch(branches.length > 1 ? branches[1].id : '');
     setTransferCustomerId('');
+    setTransferDate(new Date().toISOString().split('T')[0]);
     setTransferNotes('');
     setTransferItems([{ product_id: products.length > 0 ? products[0].id : '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
     setOpenTransferModal(true);
@@ -199,6 +201,7 @@ const Inventory = () => {
         source_branch_id: transferSourceBranch,
         destination_branch_id: transferType === 'branch' ? transferDestBranch : null,
         customer_id: transferType === 'customer' ? transferCustomerId : null,
+        date: transferDate ? new Date(transferDate).toISOString() : null,
         notes: transferNotes,
         items: transferItems.map(i => ({
           product_id: i.product_id,
@@ -655,6 +658,15 @@ const Inventory = () => {
               ))}
             </TextField>
           )}
+
+          <TextField
+            type="date"
+            fullWidth
+            label="Challan Date"
+            value={transferDate}
+            onChange={(e) => setTransferDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
 
           <TextField
             fullWidth

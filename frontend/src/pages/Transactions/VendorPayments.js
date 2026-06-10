@@ -19,6 +19,7 @@ const VendorPayments = () => {
   // Payment metadata states
   const [paymentMode, setPaymentMode] = useState('UPI');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [notes, setNotes] = useState('Vendor outward payment entry.');
 
@@ -73,6 +74,7 @@ const VendorPayments = () => {
     setCheckedBills({});
     setPaymentMode('UPI');
     setReferenceNumber('');
+    setPaymentDate(new Date().toISOString().split('T')[0]);
     setAdvanceAmount(0);
     setNotes('Vendor outward payment entry.');
     setOpenModal(true);
@@ -120,6 +122,7 @@ const VendorPayments = () => {
         const payload = {
           supplier_id: selectedSupplier.id,
           purchase_entry_id: billId,
+          payment_date: paymentDate ? new Date(paymentDate).toISOString() : null,
           payment_mode: paymentMode,
           reference_number: referenceNumber,
           amount_paid: parseFloat(bill.amount),
@@ -133,6 +136,7 @@ const VendorPayments = () => {
         const payload = {
           supplier_id: selectedSupplier.id,
           purchase_entry_id: null,
+          payment_date: paymentDate ? new Date(paymentDate).toISOString() : null,
           payment_mode: paymentMode,
           reference_number: referenceNumber,
           amount_paid: parseFloat(advanceAmount),
@@ -346,6 +350,16 @@ const VendorPayments = () => {
                 </MenuItem>
               ))}
             </TextField>
+
+            <TextField
+              type="date"
+              label="Payment Date"
+              size="small"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
 
             <TextField
               label="Transaction ID / Cheque Ref #"
