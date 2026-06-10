@@ -311,10 +311,17 @@ class AccountServices:
             seq_val = result.scalar()
             voucher_number = f"{voucher_type.prefix}-{str(seq_val).zfill(5)}"
         except Exception as e:
-            raise ValueError(
-                f"Voucher number sequence '{seq_name}' does not exist for the current financial year. "
-                "Ensure that ensure_fy_sequences has been run."
-            ) from e
+            try:
+                # Try to create missing sequences on-the-fly (e.g. on financial year rollover)
+                await AccountServices.ensure_fy_sequences(db)
+                result = await db.execute(text(f"SELECT nextval('{seq_name}')"))
+                seq_val = result.scalar()
+                voucher_number = f"{voucher_type.prefix}-{str(seq_val).zfill(5)}"
+            except Exception as retry_e:
+                raise ValueError(
+                    f"Voucher number sequence '{seq_name}' does not exist for the current financial year. "
+                    "Ensure that ensure_fy_sequences has been run."
+                ) from retry_e
 
         # 4. Create JournalEntry
         entry = JournalEntry(
