@@ -20,7 +20,7 @@ class MasterServices:
     @staticmethod
     async def list_customers(db: AsyncSession, branch_id: Optional[UUID] = None, search: Optional[str] = None) -> List[Customer]:
         """List all customer accounts, optionally filtering by active branch and search query."""
-        stmt = select(Customer)
+        stmt = select(Customer).order_by(Customer.created_at.desc())
         if branch_id:
             stmt = stmt.filter(Customer.branch_id == branch_id)
         if search:
@@ -81,7 +81,7 @@ class MasterServices:
     @staticmethod
     async def list_suppliers(db: AsyncSession, branch_id: Optional[UUID] = None, search: Optional[str] = None) -> List[Supplier]:
         """List all suppliers, optionally filtering by branch and search query."""
-        stmt = select(Supplier)
+        stmt = select(Supplier).order_by(Supplier.created_at.desc())
         if branch_id:
             stmt = stmt.filter(Supplier.branch_id == branch_id)
         if search:
@@ -141,7 +141,7 @@ class MasterServices:
     @staticmethod
     async def list_categories(db: AsyncSession) -> List[ProductCategory]:
         """List all product categories."""
-        query = await db.execute(select(ProductCategory))
+        query = await db.execute(select(ProductCategory).order_by(ProductCategory.created_at.desc()))
         return list(query.scalars().all())
 
     @staticmethod
@@ -175,7 +175,7 @@ class MasterServices:
     @staticmethod
     async def list_products(db: AsyncSession, search: Optional[str] = None) -> List[Product]:
         """List all product records including branch pricing overrides and search filter."""
-        stmt = select(Product).options(selectinload(Product.pricing_overrides))
+        stmt = select(Product).options(selectinload(Product.pricing_overrides)).order_by(Product.created_at.desc())
         if search:
             stmt = stmt.filter(Product.name.ilike(f"%{search}%") | Product.sku.ilike(f"%{search}%"))
         query = await db.execute(stmt)

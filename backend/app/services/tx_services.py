@@ -164,6 +164,7 @@ class TxServices:
                 selectinload(PurchaseOrder.supplier),
                 selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
             )
+            .order_by(PurchaseOrder.created_at.desc())
         )
         if branch_id:
             stmt = stmt.filter(PurchaseOrder.branch_id == branch_id)
@@ -311,7 +312,7 @@ class TxServices:
     @staticmethod
     async def list_grns(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[GRN]:
         """List GRNs."""
-        stmt = select(GRN).options(selectinload(GRN.items), selectinload(GRN.purchase_order))
+        stmt = select(GRN).options(selectinload(GRN.items), selectinload(GRN.purchase_order)).order_by(GRN.created_at.desc())
         if branch_id:
             stmt = stmt.filter(GRN.branch_id == branch_id)
         query = await db.execute(stmt)
@@ -494,7 +495,7 @@ class TxServices:
     @staticmethod
     async def list_purchase_entries(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[PurchaseEntry]:
         """List purchase entries."""
-        stmt = select(PurchaseEntry).options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments))
+        stmt = select(PurchaseEntry).options(selectinload(PurchaseEntry.supplier), selectinload(PurchaseEntry.payments)).order_by(PurchaseEntry.created_at.desc())
         if branch_id:
             stmt = stmt.filter(PurchaseEntry.branch_id == branch_id)
         query = await db.execute(stmt)
@@ -672,6 +673,7 @@ class TxServices:
                 selectinload(SalesOrder.customer),
                 selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
             )
+            .order_by(SalesOrder.created_at.desc())
         )
         if branch_id:
             stmt = stmt.filter(SalesOrder.branch_id == branch_id)
@@ -914,6 +916,7 @@ class TxServices:
                 selectinload(Invoice.payments),
                 selectinload(Invoice.delivery_challan)
             )
+            .order_by(Invoice.created_at.desc())
         )
         if branch_id:
             stmt = stmt.filter(Invoice.branch_id == branch_id)
@@ -956,6 +959,7 @@ class TxServices:
                 selectinload(Invoice.payments),
                 selectinload(Invoice.delivery_challan)
             )
+            .order_by(Invoice.created_at.desc())
         )
         if customer_id:
             stmt = stmt.join(SalesOrder).filter(SalesOrder.customer_id == customer_id)
@@ -1385,7 +1389,7 @@ class TxServices:
     @staticmethod
     async def list_vendor_payments(db: AsyncSession, supplier_id: Optional[UUID] = None) -> List[VendorPayment]:
         """List recorded vendor payments."""
-        stmt = select(VendorPayment).options(selectinload(VendorPayment.supplier), selectinload(VendorPayment.purchase_entry))
+        stmt = select(VendorPayment).options(selectinload(VendorPayment.supplier), selectinload(VendorPayment.purchase_entry)).order_by(VendorPayment.created_at.desc())
         if supplier_id:
             stmt = stmt.filter(VendorPayment.supplier_id == supplier_id)
         query = await db.execute(stmt)
@@ -1578,7 +1582,7 @@ class TxServices:
                 selectinload(StockTransfer.customer),
                 selectinload(StockTransfer.items).selectinload(StockTransferItem.product)
             )
-            .order_by(StockTransfer.date.desc())
+            .order_by(StockTransfer.created_at.desc())
         )
         if branch_id:
             stmt = stmt.filter(

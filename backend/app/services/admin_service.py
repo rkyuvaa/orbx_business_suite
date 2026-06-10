@@ -56,7 +56,7 @@ class AdminService:
     @staticmethod
     async def list_branches(db: AsyncSession) -> List[Branch]:
         """Fetch all branches."""
-        query = await db.execute(select(Branch))
+        query = await db.execute(select(Branch).order_by(Branch.created_at.desc()))
         return list(query.scalars().all())
 
     @staticmethod
@@ -106,7 +106,7 @@ class AdminService:
     @staticmethod
     async def list_roles(db: AsyncSession) -> List[Role]:
         """Fetch all roles including their permission checklists."""
-        query = await db.execute(select(Role).options(selectinload(Role.permissions)))
+        query = await db.execute(select(Role).options(selectinload(Role.permissions)).order_by(Role.created_at.desc()))
         return list(query.scalars().all())
 
     @staticmethod
@@ -196,7 +196,7 @@ class AdminService:
     @staticmethod
     async def list_users(db: AsyncSession) -> List[User]:
         """List all users."""
-        query = await db.execute(select(User))
+        query = await db.execute(select(User).order_by(User.created_at.desc()))
         return list(query.scalars().all())
 
     @staticmethod
