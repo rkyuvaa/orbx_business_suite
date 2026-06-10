@@ -1686,3 +1686,189 @@ class TxServices:
         await db.commit()
         return await TxServices.get_stock_transfer(db, t.id)
 
+    @staticmethod
+    async def delete_purchase_order(db: AsyncSession, po_id: UUID) -> None:
+        """Delete purchase order and items."""
+        from app.models.purchase import PurchaseOrderItem
+        from sqlalchemy import delete
+        q_po = await db.execute(select(PurchaseOrder).filter(PurchaseOrder.id == po_id))
+        po = q_po.scalar_one_or_none()
+        if not po:
+            raise HTTPException(status_code=404, detail="Purchase Order not found.")
+        try:
+            await db.execute(delete(PurchaseOrderItem).filter(PurchaseOrderItem.purchase_order_id == po_id))
+            await db.delete(po)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete Purchase Order. It may be referenced by active GRNs."
+            )
+
+    @staticmethod
+    async def delete_grn(db: AsyncSession, grn_id: UUID) -> None:
+        """Delete GRN, reverse stock transactions, and reset PO status."""
+        from app.models.purchase import GRNItem
+        from sqlalchemy import delete
+        q_grn = await db.execute(
+            select(GRN)
+            .filter(GRN.id == grn_id)
+            .options(selectinload(GRN.purchase_entries), selectinload(GRN.purchase_order), selectinload(GRN.items))
+        )
+        grn = q_grn.scalar_one_or_none()
+        if not grn:
+            raise HTTPException(status_code=404, detail="GRN not found.")
+            
+        active_entries = [pe for pe in grn.purchase_entries if pe.status != "Cancelled"]
+        if active_entries:
+            raise HTTPException(status_code=400, detail="Cannot delete GRN with linked active purchase bills. Delete the bills first.")
+            
+        # Reset linked PO status back to Draft
+        if grn.purchase_order:
+            grn.purchase_order.status = "Draft"
+            db.add(grn.purchase_order)
+            
+        # Reverse stock changes
+        q_stock = await db.execute(
+            select(StockTransaction).filter(
+                StockTransaction.reference_type == "GRN",
+                StockTransaction.reference_id == grn_id
+            )
+        )
+        stock_txs = q_stock.scalars().all()
+        for st in stock_txs:
+            # Update live stock positions
+            await TxServices.update_stock(
+                db=db,
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty_change=-st.qty,
+                tx_type="Out",
+                ref_type="GRN Delete",
+                ref_id=grn_id,
+                reason="GRN deleted"
+            )
+            await db.delete(st)
+            
+        try:
+            await db.execute(delete(GRNItem).filter(GRNItem.grn_id == grn_id))
+            await db.delete(grn)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Failed to delete GRN due to database constraints.")
+
+    @staticmethod
+    async def delete_purchase_entry(db: AsyncSession, bill_id: UUID) -> None:
+        """Delete purchase entry and linked journal entry."""
+        q_pe = await db.execute(
+            select(PurchaseEntry)
+            .filter(PurchaseEntry.id == bill_id)
+            .options(selectinload(PurchaseEntry.payments))
+        )
+        pe = q_pe.scalar_one_or_none()
+        if not pe:
+            raise HTTPException(status_code=404, detail="Purchase Bill not found.")
+            
+        active_payments = [p for p in pe.payments if p.status != "Cancelled"]
+        if active_payments:
+            raise HTTPException(status_code=400, detail="Cannot delete Purchase Bill with linked active payments. Delete the payments first.")
+            
+        # Delete linked Journal Entry
+        if pe.journal_entry_id:
+            from app.models.accounts import JournalEntry, JournalLine
+            q_je = await db.execute(
+                select(JournalEntry)
+                .filter(JournalEntry.id == pe.journal_entry_id)
+                .options(selectinload(JournalEntry.lines))
+            )
+            je = q_je.scalar_one_or_none()
+            if je:
+                for line in je.lines:
+                    await db.delete(line)
+                await db.delete(je)
+                
+        await db.delete(pe)
+        await db.commit()
+
+    @staticmethod
+    async def delete_sales_order(db: AsyncSession, so_id: UUID) -> None:
+        """Delete sales order and its items."""
+        from app.models.sales import SalesOrderItem
+        from sqlalchemy import delete
+        q_so = await db.execute(
+            select(SalesOrder)
+            .filter(SalesOrder.id == so_id)
+            .options(selectinload(SalesOrder.invoices))
+        )
+        so = q_so.scalar_one_or_none()
+        if not so:
+            raise HTTPException(status_code=404, detail="Sales Order not found.")
+            
+        active_invoices = [inv for inv in so.invoices if inv.status != "Cancelled"]
+        if active_invoices:
+            raise HTTPException(status_code=400, detail="Cannot delete Sales Order with linked active invoices. Delete the invoices first.")
+            
+        try:
+            await db.execute(delete(SalesOrderItem).filter(SalesOrderItem.sales_order_id == so_id))
+            await db.delete(so)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Cannot delete Sales Order due to database constraints.")
+
+    @staticmethod
+    async def delete_invoice(db: AsyncSession, invoice_id: UUID) -> None:
+        """Delete invoice, reverse stock, and reset sales order status."""
+        from app.models.sales import InvoiceItem
+        from sqlalchemy import delete
+        q_inv = await db.execute(
+            select(Invoice)
+            .filter(Invoice.id == invoice_id)
+            .options(selectinload(Invoice.payments), selectinload(Invoice.items))
+        )
+        inv = q_inv.scalar_one_or_none()
+        if not inv:
+            raise HTTPException(status_code=404, detail="Invoice not found.")
+            
+        if inv.payments:
+            raise HTTPException(status_code=400, detail="Cannot delete Invoice with recorded payments. Delete the payments first.")
+            
+        # Reset linked sales order status to Draft so it can be re-invoiced
+        if inv.sales_order_id:
+            q_so = await db.execute(select(SalesOrder).filter(SalesOrder.id == inv.sales_order_id))
+            so = q_so.scalar_one_or_none()
+            if so:
+                so.status = "Draft"
+                db.add(so)
+                
+        # Reverse stock changes
+        q_stock = await db.execute(
+            select(StockTransaction).filter(
+                StockTransaction.reference_type == "Invoice",
+                StockTransaction.reference_id == invoice_id
+            )
+        )
+        stock_txs = q_stock.scalars().all()
+        for st in stock_txs:
+            await TxServices.update_stock(
+                db=db,
+                product_id=st.product_id,
+                branch_id=st.branch_id,
+                qty_change=-st.qty,
+                tx_type="In",
+                ref_type="Invoice Delete",
+                ref_id=invoice_id,
+                reason="Invoice deleted"
+            )
+            await db.delete(st)
+            
+        try:
+            await db.execute(delete(InvoiceItem).filter(InvoiceItem.invoice_id == invoice_id))
+            await db.delete(inv)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Failed to delete Invoice due to database constraints.")
+

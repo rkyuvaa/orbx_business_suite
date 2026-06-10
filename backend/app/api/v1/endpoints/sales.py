@@ -91,3 +91,25 @@ async def cancel_invoice(
 ):
     """Mark a Tax Invoice as Cancelled and reverse stock updates."""
     return await TxServices.cancel_invoice(db, invoice_id)
+
+
+@router.delete("/so/{so_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sales_order(
+    so_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "delete"))
+):
+    """Delete a sales order."""
+    await TxServices.delete_sales_order(db, so_id)
+    return None
+
+
+@router.delete("/invoices/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_invoice(
+    invoice_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "delete"))
+):
+    """Delete an invoice."""
+    await TxServices.delete_invoice(db, invoice_id)
+    return None

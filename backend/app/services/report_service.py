@@ -256,11 +256,28 @@ class ReportService:
         # Sort entries by date
         entries.sort(key=lambda x: x["date"])
 
+        # Fetch customer opening balance details
+        q_cust = await db.execute(select(Customer).filter(Customer.id == customer_id))
+        customer = q_cust.scalar_one_or_none()
+        opening_bal = customer.opening_bal if customer else 0.0
+        opening_bal_type = customer.opening_bal_type if customer else "Dr"
+
         # Calculate running balance and totals
         total_billed = 0.0
         total_paid = 0.0
-        running_balance = 0.0
+        running_balance = opening_bal if opening_bal_type == "Dr" else -opening_bal
+        
         ledger_entries = []
+        ledger_entries.append(
+            LedgerEntry(
+                date=start_dt or (customer.created_at if customer else datetime(2000, 1, 1)),
+                tx_type="Opening Balance",
+                reference_no="OB",
+                debit=opening_bal if opening_bal_type == "Dr" else 0.0,
+                credit=opening_bal if opening_bal_type == "Cr" else 0.0,
+                running_balance=running_balance
+            )
+        )
 
         for e in entries:
             debit = e["debit"]
@@ -341,10 +358,27 @@ class ReportService:
         # Sort entries by date
         entries.sort(key=lambda x: x["date"])
 
+        # Fetch supplier opening balance details
+        q_supp = await db.execute(select(Supplier).filter(Supplier.id == supplier_id))
+        supplier = q_supp.scalar_one_or_none()
+        opening_bal = supplier.opening_bal if supplier else 0.0
+        opening_bal_type = supplier.opening_bal_type if supplier else "Cr"
+
         total_purchased = 0.0
         total_paid = 0.0
-        running_balance = 0.0
+        running_balance = opening_bal if opening_bal_type == "Cr" else -opening_bal
+        
         ledger_entries = []
+        ledger_entries.append(
+            LedgerEntry(
+                date=start_dt or (supplier.created_at if supplier else datetime(2000, 1, 1)),
+                tx_type="Opening Balance",
+                reference_no="OB",
+                debit=opening_bal if opening_bal_type == "Dr" else 0.0,
+                credit=opening_bal if opening_bal_type == "Cr" else 0.0,
+                running_balance=running_balance
+            )
+        )
 
         for e in entries:
             debit = e["debit"]

@@ -264,3 +264,54 @@ class MasterServices:
             .options(selectinload(Product.pricing_overrides))
         )
         return query_final.scalar_one()
+
+    @staticmethod
+    async def delete_customer(db: AsyncSession, customer_id: UUID) -> None:
+        """Delete customer record."""
+        query = await db.execute(select(Customer).filter(Customer.id == customer_id))
+        customer = query.scalar_one_or_none()
+        if not customer:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+        try:
+            await db.delete(customer)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete customer. It may be referenced by active transactions."
+            )
+
+    @staticmethod
+    async def delete_supplier(db: AsyncSession, supplier_id: UUID) -> None:
+        """Delete supplier record."""
+        query = await db.execute(select(Supplier).filter(Supplier.id == supplier_id))
+        supplier = query.scalar_one_or_none()
+        if not supplier:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found.")
+        try:
+            await db.delete(supplier)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete supplier. It may be referenced by active transactions."
+            )
+
+    @staticmethod
+    async def delete_product(db: AsyncSession, product_id: UUID) -> None:
+        """Delete product record."""
+        query = await db.execute(select(Product).filter(Product.id == product_id))
+        product = query.scalar_one_or_none()
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+        try:
+            await db.delete(product)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete product. It may be referenced by active transactions."
+            )

@@ -40,3 +40,14 @@ async def update_customer(
 ):
     """Update customer master record details."""
     return await MasterServices.update_customer(db, customer_id, customer_data)
+
+
+@router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_customer(
+    customer_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("masters", "delete"))
+):
+    """Delete customer master record."""
+    await MasterServices.delete_customer(db, customer_id)
+    return None

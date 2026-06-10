@@ -166,3 +166,47 @@ async def cancel_vendor_payment(
     """Cancel a vendor payment collection."""
     await TxServices.cancel_vendor_payment(db, payment_id)
     return {"detail": "Vendor payment cancelled successfully."}
+
+
+@router.delete("/po/{po_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_purchase_order(
+    po_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "delete"))
+):
+    """Delete a purchase order."""
+    await TxServices.delete_purchase_order(db, po_id)
+    return None
+
+
+@router.delete("/grn/{grn_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_grn(
+    grn_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "delete"))
+):
+    """Delete a GRN."""
+    await TxServices.delete_grn(db, grn_id)
+    return None
+
+
+@router.delete("/bills/{bill_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_purchase_entry(
+    bill_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "delete"))
+):
+    """Delete a purchase entry bill."""
+    await TxServices.delete_purchase_entry(db, bill_id)
+    return None
+
+
+@router.delete("/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_vendor_payment(
+    payment_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "delete"))
+):
+    """Delete a vendor payment."""
+    await TxServices.cancel_vendor_payment(db, payment_id)
+    return None

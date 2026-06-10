@@ -80,6 +80,8 @@ class Customer(Base):
     shipping_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0)
     payment_terms: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    opening_bal: Mapped[float] = mapped_column(Float, default=0.0)
+    opening_bal_type: Mapped[str] = mapped_column(String(10), default="Dr")
     
     branch_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True, index=True)
 
@@ -98,6 +100,8 @@ class Supplier(Base):
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     payment_terms: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    opening_bal: Mapped[float] = mapped_column(Float, default=0.0)
+    opening_bal_type: Mapped[str] = mapped_column(String(10), default="Cr")
     
     # Store dynamic structure like bank name, routing/IFSC code, account number
     bank_details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

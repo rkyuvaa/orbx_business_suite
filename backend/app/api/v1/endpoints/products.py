@@ -78,3 +78,14 @@ async def update_product(
 ):
     """Update product SKU parameters or pricing overrides."""
     return await MasterServices.update_product(db, product_id, product_data)
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
+    product_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("masters", "delete"))
+):
+    """Delete product master record."""
+    await MasterServices.delete_product(db, product_id)
+    return None

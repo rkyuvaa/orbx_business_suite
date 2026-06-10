@@ -42,3 +42,7 @@ class User(Base):
     # Relationships
     role: Mapped["Role"] = relationship(back_populates="users")
     branch: Mapped[Optional["Branch"]] = relationship(back_populates="users", foreign_keys=[branch_id])
+
+    @property
+    def role_name(self) -> Optional[str]:
+        return self.role.name if self.role else None

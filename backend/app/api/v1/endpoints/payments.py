@@ -59,3 +59,14 @@ async def cancel_payment(
     """Cancel and reverse a Customer Payment collection."""
     await TxServices.cancel_payment(db, payment_id)
     return {"status": "success", "message": "Payment cancelled successfully"}
+
+
+@router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_customer_payment(
+    payment_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("payments", "delete"))
+):
+    """Delete a customer payment record."""
+    await TxServices.cancel_payment(db, payment_id)
+    return None

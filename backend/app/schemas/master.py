@@ -17,6 +17,8 @@ class CustomerCreate(BaseModel):
     credit_limit: float = 0.0
     payment_terms: Optional[str] = None
     branch_id: Optional[UUID] = None
+    opening_bal: float = 0.0
+    opening_bal_type: str = "Dr"
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -46,6 +48,8 @@ class CustomerUpdate(BaseModel):
     payment_terms: Optional[str] = None
     branch_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+    opening_bal: Optional[float] = None
+    opening_bal_type: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -77,6 +81,8 @@ class CustomerOut(BaseModel):
     branch_id: Optional[UUID] = None
     is_active: bool
     created_at: datetime
+    opening_bal: float
+    opening_bal_type: str
 
     class Config:
         from_attributes = True
@@ -95,6 +101,8 @@ class SupplierCreate(BaseModel):
     bank_details: Optional[Dict[str, Any]] = None  # JSON format (bank_name, account_no, ifsc)
     branch_id: Optional[UUID] = None
     default_payable_ledger_id: Optional[UUID] = None
+    opening_bal: float = 0.0
+    opening_bal_type: str = "Cr"
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -124,6 +132,8 @@ class SupplierUpdate(BaseModel):
     branch_id: Optional[UUID] = None
     default_payable_ledger_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+    opening_bal: Optional[float] = None
+    opening_bal_type: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -155,6 +165,8 @@ class SupplierOut(BaseModel):
     default_payable_ledger_id: Optional[UUID] = None
     is_active: bool
     created_at: datetime
+    opening_bal: float
+    opening_bal_type: str
 
     class Config:
         from_attributes = True

@@ -55,7 +55,12 @@ async def get_current_user(
         raise credentials_exception
 
     # Query the user
-    query = await db.execute(select(User).filter(User.id == user_id, User.is_active == True))
+    from sqlalchemy.orm import selectinload
+    query = await db.execute(
+        select(User)
+        .filter(User.id == user_id, User.is_active == True)
+        .options(selectinload(User.role))
+    )
     user = query.scalar_one_or_none()
     if user is None:
         raise credentials_exception

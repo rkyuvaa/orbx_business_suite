@@ -40,3 +40,14 @@ async def update_supplier(
 ):
     """Update supplier profile details."""
     return await MasterServices.update_supplier(db, supplier_id, supplier_data)
+
+
+@router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_supplier(
+    supplier_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("masters", "delete"))
+):
+    """Delete supplier master record."""
+    await MasterServices.delete_supplier(db, supplier_id)
+    return None

@@ -42,6 +42,7 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: str
     role_id: UUID
+    role_name: Optional[str] = None
     branch_id: Optional[UUID] = None
     is_active: bool
     created_at: datetime
