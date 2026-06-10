@@ -211,7 +211,7 @@ class ProductPricingOut(BaseModel):
 # Product Schemas
 class ProductCreate(BaseModel):
     name: str
-    sku: str
+    sku: Optional[str] = None
     category_id: UUID
     uom: str = "PCS"
     hsn_code: Optional[str] = None
@@ -239,7 +239,7 @@ class ProductUpdate(BaseModel):
 class ProductOut(BaseModel):
     id: UUID
     name: str
-    sku: str
+    sku: Optional[str] = None
     category_id: UUID
     uom: str
     hsn_code: Optional[str] = None

@@ -14,7 +14,7 @@ import FormInput from '../../components/FormInput';
 
 const productSchema = yup.object().shape({
   name: yup.string().required('Product name is required'),
-  sku: yup.string().required('SKU code is required'),
+  sku: yup.string().nullable(),
   category_id: yup.string().required('Category is required'),
   uom: yup.string().default('PCS'),
   hsn_code: yup.string().nullable(),

@@ -184,12 +184,26 @@ class MasterServices:
     @staticmethod
     async def create_product(db: AsyncSession, product_data: ProductCreate) -> Product:
         """Create a product master record and generate optional price overrides."""
-        query_check = await db.execute(select(Product).filter(Product.sku == product_data.sku))
-        if query_check.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Product with SKU '{product_data.sku}' already exists."
-            )
+        if not product_data.sku:
+            from sqlalchemy import func
+            count_query = await db.execute(select(func.count()).select_from(Product))
+            count = count_query.scalar() or 0
+            next_num = count + 1
+            
+            while True:
+                candidate = f"SKU-{next_num:05d}"
+                query_check = await db.execute(select(Product).filter(Product.sku == candidate))
+                if not query_check.scalar_one_or_none():
+                    product_data.sku = candidate
+                    break
+                next_num += 1
+        else:
+            query_check = await db.execute(select(Product).filter(Product.sku == product_data.sku))
+            if query_check.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Product with SKU '{product_data.sku}' already exists."
+                )
 
         # Extract pricing overrides
         overrides_data = product_data.pricing_overrides or []

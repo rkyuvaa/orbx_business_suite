@@ -33,7 +33,7 @@ class Product(Base):
     __tablename__ = "products"
 
     name: Mapped[str] = mapped_column(String(100), index=True)
-    sku: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    sku: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True, nullable=True)
     category_id: Mapped[UUID] = mapped_column(ForeignKey("product_categories.id", ondelete="RESTRICT"), index=True)
     uom: Mapped[str] = mapped_column(String(20), default="PCS") # Unit of Measure, e.g. PCS, KG, LTR
     hsn_code: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
