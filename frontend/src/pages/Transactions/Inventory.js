@@ -43,23 +43,67 @@ const loadScript = (src) => {
 };
 
 const numberToWords = (num) => {
-  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
-  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  if (num === undefined || num === null || isNaN(num)) return 'Zero Rupees Only';
+  let n = parseFloat(num);
+  if (n === 0) return 'Zero Rupees Only';
 
-  if ((num = num.toString()).length > 9) return 'overflow';
-  let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-  if (!n) return ''; 
-  let str = '';
-  str += n[1] != 0 ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
-  str += n[2] != 0 ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
-  str += n[3] != 0 ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
-  str += n[4] != 0 ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
-  str += n[5] != 0 ? (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) + 'Rupees ' : '';
+  const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const convertLessThanOneThousand = (val) => {
+    if (val < 20) return units[val];
+    if (val < 100) return tens[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + units[val % 10] : '');
+    return units[Math.floor(val / 100)] + ' Hundred' + (val % 100 !== 0 ? ' and ' + convertLessThanOneThousand(val % 100) : '');
+  };
+
+  const convert = (val) => {
+    if (val === 0) return '';
+    let parts = [];
+    
+    // Crores
+    if (val >= 10000000) {
+      const crores = Math.floor(val / 10000000);
+      parts.push(convertLessThanOneThousand(crores) + ' Crore');
+      val %= 10000000;
+    }
+    
+    // Lakhs
+    if (val >= 100000) {
+      const lakhs = Math.floor(val / 100000);
+      parts.push(convertLessThanOneThousand(lakhs) + ' Lakh');
+      val %= 100000;
+    }
+    
+    // Thousands
+    if (val >= 1000) {
+      const thousands = Math.floor(val / 1000);
+      parts.push(convertLessThanOneThousand(thousands) + ' Thousand');
+      val %= 1000;
+    }
+    
+    // Remainder under 1000
+    if (val > 0) {
+      parts.push(convertLessThanOneThousand(val));
+    }
+    
+    return parts.join(' ').trim();
+  };
+
+  const rupees = Math.floor(n);
+  const paise = Math.round((n - rupees) * 100);
   
-  if (str === '') {
-    str = 'Zero Rupees ';
+  let word = '';
+  if (rupees > 0) {
+    word += convert(rupees) + ' Rupees';
+  } else {
+    word += 'Zero Rupees';
   }
-  return str + 'Only';
+  
+  if (paise > 0) {
+    word += ' and ' + convertLessThanOneThousand(paise) + ' Paise';
+  }
+  
+  return word + ' Only';
 };
 
 const Inventory = () => {
