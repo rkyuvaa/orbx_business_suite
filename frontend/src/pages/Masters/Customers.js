@@ -98,13 +98,22 @@ const Customers = () => {
     }
   };
 
+  const formatError = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map(e => `${e.loc[e.loc.length - 1]}: ${e.msg}`).join(', ');
+    }
+    return fallback;
+  };
+
   const handleDeleteCustomer = async (customer) => {
     if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete customer '${customer.name}'? This action cannot be undone.`)) {
       try {
         await apiClient.delete(`/customers/${customer.id}`);
         loadCustomers();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete customer.');
+        setError(formatError(err, 'Failed to delete customer.'));
       }
     }
   };
@@ -119,7 +128,7 @@ const Customers = () => {
       setOpenModal(false);
       loadCustomers();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save customer details.');
+      setError(formatError(err, 'Failed to save customer details.'));
     }
   };
 

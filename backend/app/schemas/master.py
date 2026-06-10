@@ -31,7 +31,8 @@ class CustomerCreate(BaseModel):
     @classmethod
     def lowercase_email(cls, v):
         if isinstance(v, str):
-            return v.strip().lower()
+            val = v.strip().lower()
+            return val if val != "" else None
         return v
 
 
@@ -62,7 +63,8 @@ class CustomerUpdate(BaseModel):
     @classmethod
     def lowercase_email(cls, v):
         if isinstance(v, str):
-            return v.strip().lower()
+            val = v.strip().lower()
+            return val if val != "" else None
         return v
 
 
@@ -115,7 +117,8 @@ class SupplierCreate(BaseModel):
     @classmethod
     def lowercase_email(cls, v):
         if isinstance(v, str):
-            return v.strip().lower()
+            val = v.strip().lower()
+            return val if val != "" else None
         return v
 
 
@@ -146,7 +149,8 @@ class SupplierUpdate(BaseModel):
     @classmethod
     def lowercase_email(cls, v):
         if isinstance(v, str):
-            return v.strip().lower()
+            val = v.strip().lower()
+            return val if val != "" else None
         return v
 
 
