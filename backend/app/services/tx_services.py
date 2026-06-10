@@ -382,7 +382,7 @@ class TxServices:
             
             branch_state_code = None
             if company:
-                branch_state_code = company.state_code or (company.gstin[:2] if company.gstin else None)
+                branch_state_code = (company.gstin[:2] if company.gstin else company.state_code)
             
             supplier_state_code = supplier.gstin[:2] if (supplier.gstin and len(supplier.gstin) >= 2) else None
             
@@ -820,7 +820,7 @@ class TxServices:
         sgst = 0.0
         igst = 0.0
 
-        company_state = company.state_code if (company and company.state_code) else (company.gstin[:2] if company and company.gstin else "22")
+        company_state = company.gstin[:2] if (company and company.gstin) else (company.state_code if company and company.state_code else "22")
         customer_state = customer.gstin[:2] if customer and customer.gstin else "22"
 
         if company_state == customer_state:
@@ -1524,7 +1524,7 @@ class TxServices:
             q_comp = await db.execute(select(Company).filter(Company.id == src_branch.company_id))
             company = q_comp.scalar_one_or_none()
             if company:
-                company_state = company.state_code if company.state_code else (company.gstin[:2] if company.gstin else "22")
+                company_state = company.gstin[:2] if company.gstin else (company.state_code if company.state_code else "22")
                 
         recipient_state = company_state
         if transfer_data.customer_id:
@@ -1539,7 +1539,7 @@ class TxServices:
                 q_dest_comp = await db.execute(select(Company).filter(Company.id == dest_branch.company_id))
                 dest_company = q_dest_comp.scalar_one_or_none()
                 if dest_company:
-                    recipient_state = dest_company.state_code if dest_company.state_code else (dest_company.gstin[:2] if dest_company.gstin else company_state)
+                    recipient_state = dest_company.gstin[:2] if dest_company.gstin else (dest_company.state_code if dest_company.state_code else company_state)
 
         if company_state == recipient_state:
             cgst = tax_amount / 2

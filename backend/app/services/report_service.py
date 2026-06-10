@@ -464,7 +464,7 @@ class ReportService:
                 q_comp = await db.execute(select(Company).filter(Company.id == branch.company_id))
                 company = q_comp.scalar_one_or_none()
                 if company:
-                    company_state = company.state_code if company.state_code else (company.gstin[:2] if company.gstin else "22")
+                    company_state = company.gstin[:2] if company.gstin else (company.state_code if company.state_code else "22")
             
             # Aggregate payment details
             total_paid = sum([p.amount_paid for p in inv.payments])
