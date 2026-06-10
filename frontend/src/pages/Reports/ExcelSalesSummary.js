@@ -60,17 +60,30 @@ const ExcelSalesSummary = () => {
     }
   }, [startDate, endDate]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!startDate || !endDate) return;
-    const url = `${apiClient.defaults.baseURL}/reports/sales-summary/excel?start_date=${startDate}&end_date=${endDate}`;
-    
-    // Download file
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Sales_Summary_${startDate}_to_${endDate}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await apiClient.get('/reports/sales-summary/excel', {
+        params: {
+          start_date: startDate,
+          end_date: endDate
+        },
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Sales_Summary_${startDate}_to_${endDate}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to export Excel report.');
+    }
   };
 
   // Compute column totals
