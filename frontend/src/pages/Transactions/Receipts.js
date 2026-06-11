@@ -234,15 +234,17 @@ const Receipts = () => {
           }}
         >
           {/* Header */}
-          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
+          <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, minHeight: 90 }}>
             {company?.logo && (
               <Box
                 component="img"
                 src={company.logo}
                 alt="Company Logo"
                 sx={{
-                  maxHeight: 100,
-                  maxWidth: 100,
+                  position: 'absolute',
+                  left: 0,
+                  maxHeight: 90,
+                  maxWidth: 90,
                   objectFit: 'contain',
                   '@media print': {
                     printColorAdjust: 'exact',
@@ -250,7 +252,7 @@ const Receipts = () => {
                 }}
               />
             )}
-            <Box>
+            <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
                 {company?.name || 'ORBX CORPORATION'}
               </Typography>
@@ -266,7 +268,7 @@ const Receipts = () => {
           <Divider sx={{ my: 2 }} />
 
           {/* Document Details (Title, Number & Date) */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
                 PAYMENT RECEIPT{' '}
@@ -279,6 +281,8 @@ const Receipts = () => {
               </Typography>
             </Box>
           </Box>
+
+          <Divider sx={{ my: 2 }} />
 
           <Box sx={{ backgroundColor: '#f8fafc', p: 3, borderRadius: '8px', mb: 3 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 1.5 }}>

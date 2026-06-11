@@ -920,15 +920,17 @@ const Sales = () => {
             }}
           >
           {/* Header */}
-          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
+          <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, minHeight: 90 }}>
             {company?.logo && (
               <Box
                 component="img"
                 src={company.logo}
                 alt="Company Logo"
                 sx={{
-                  maxHeight: 100,
-                  maxWidth: 100,
+                  position: 'absolute',
+                  left: 0,
+                  maxHeight: 90,
+                  maxWidth: 90,
                   objectFit: 'contain',
                   '@media print': {
                     printColorAdjust: 'exact',
@@ -936,7 +938,7 @@ const Sales = () => {
                 }}
               />
             )}
-            <Box>
+            <Box sx={{ textAlign: 'center' }}>
               <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
                 {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
               </Typography>
@@ -951,7 +953,7 @@ const Sales = () => {
           <Divider sx={{ mb: 2 }} />
 
           {/* Document Details (Title, Number & Date) */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
                 {printDocType === 'Invoice' ? 'TAX INVOICE' : 'SALES ORDER'}{' '}
@@ -969,6 +971,8 @@ const Sales = () => {
               </Typography>
             </Box>
           </Box>
+
+          <Divider sx={{ mb: 2 }} />
 
           {/* Addresses */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>

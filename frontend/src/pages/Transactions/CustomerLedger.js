@@ -332,15 +332,17 @@ const CustomerLedger = () => {
           }}
         >
           {/* Statement Header */}
-          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
+          <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, minHeight: 90 }}>
             {company?.logo && (
               <Box
                 component="img"
                 src={company.logo}
                 alt="Company Logo"
                 sx={{
-                  maxHeight: 100,
-                  maxWidth: 100,
+                  position: 'absolute',
+                  left: 0,
+                  maxHeight: 90,
+                  maxWidth: 90,
                   objectFit: 'contain',
                   '@media print': {
                     printColorAdjust: 'exact',
@@ -348,7 +350,7 @@ const CustomerLedger = () => {
                 }}
               />
             )}
-            <Box>
+            <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332' }}>
                 {company?.name || 'ORBX Corporation'}
               </Typography>
@@ -363,7 +365,7 @@ const CustomerLedger = () => {
           <Divider sx={{ mb: 3, borderBottomWidth: 2 }} />
 
           {/* Document Details (Title & Date/Period) */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#334155', lineHeight: 1.2 }}>
                 CUSTOMER STATEMENT
@@ -373,6 +375,8 @@ const CustomerLedger = () => {
               </Typography>
             </Box>
           </Box>
+
+          <Divider sx={{ mb: 3, borderBottomWidth: 2 }} />
 
           {/* Parties Block */}
           <Grid container spacing={2} sx={{ mb: 4 }}>
