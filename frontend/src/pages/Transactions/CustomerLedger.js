@@ -332,46 +332,47 @@ const CustomerLedger = () => {
           }}
         >
           {/* Statement Header */}
-          <Grid container justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-            <Grid item sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
-              {company?.logo && (
-                <Box
-                  component="img"
-                  src={company.logo}
-                  alt="Company Logo"
-                  sx={{
-                    maxHeight: 80,
-                    maxWidth: 160,
-                    objectFit: 'contain',
-                    marginTop: '4px',
-                    '@media print': {
-                      printColorAdjust: 'exact',
-                    }
-                  }}
-                />
-              )}
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332' }}>
-                  {company?.name || 'ORBX Corporation'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#475569', whiteSpace: 'pre-line' }}>
-                  {company?.address || 'ORBX Head Office'}
-                  {company?.phone && `\nPhone: ${company.phone}`}
-                  {company?.gstin && `\nGSTIN: ${company.gstin}`}
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item sx={{ textAlign: 'right' }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#334155', mb: 0.5 }}>
-                CUSTOMER STATEMENT
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
+            {company?.logo && (
+              <Box
+                component="img"
+                src={company.logo}
+                alt="Company Logo"
+                sx={{
+                  maxHeight: 100,
+                  maxWidth: 100,
+                  objectFit: 'contain',
+                  '@media print': {
+                    printColorAdjust: 'exact',
+                  }
+                }}
+              />
+            )}
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332' }}>
+                {company?.name || 'ORBX Corporation'}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b' }}>
-                Period: {startMonth || 'Beginning'} to {endMonth || 'Present'}
+              <Typography variant="body2" sx={{ color: '#475569', whiteSpace: 'pre-line' }}>
+                {company?.address || 'ORBX Head Office'}
+                {company?.phone && `\nPhone: ${company.phone}`}
+                {company?.gstin && `\nGSTIN: ${company.gstin}`}
               </Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Divider sx={{ mb: 3, borderBottomWidth: 2 }} />
+
+          {/* Document Details (Title & Date/Period) */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#334155', lineHeight: 1.2 }}>
+                CUSTOMER STATEMENT
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#64748b', mt: 0.5 }}>
+                Period: <strong>{startMonth || 'Beginning'} to {endMonth || 'Present'}</strong>
+              </Typography>
+            </Box>
+          </Box>
 
           {/* Parties Block */}
           <Grid container spacing={2} sx={{ mb: 4 }}>

@@ -920,56 +920,55 @@ const Sales = () => {
             }}
           >
           {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
-              {company?.logo && (
-                <Box
-                  component="img"
-                  src={company.logo}
-                  alt="Company Logo"
-                  sx={{
-                    maxHeight: 80,
-                    maxWidth: 160,
-                    objectFit: 'contain',
-                    marginTop: '4px',
-                    '@media print': {
-                      printColorAdjust: 'exact',
-                    }
-                  }}
-                />
-              )}
-              <Box>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
-                  {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
-                </Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address ? company.address.trim() : ''}</Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin ? company.gstin.trim() : ''}</strong></Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                  Email: {company?.email ? company.email.trim() : ''} | Phone: {company?.phone ? company.phone.trim() : ''}
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
-                {printDocType === 'Invoice' ? 'TAX INVOICE' : 'SALES ORDER'}
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
+            {company?.logo && (
+              <Box
+                component="img"
+                src={company.logo}
+                alt="Company Logo"
+                sx={{
+                  maxHeight: 100,
+                  maxWidth: 100,
+                  objectFit: 'contain',
+                  '@media print': {
+                    printColorAdjust: 'exact',
+                  }
+                }}
+              />
+            )}
+            <Box>
+              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
+                {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
               </Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>{company?.address ? company.address.trim() : ''}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>GSTIN: <strong>{company?.gstin ? company.gstin.trim() : ''}</strong></Typography>
               <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                {printDocType === 'Invoice' ? 'Invoice No: ' : 'Order No: '}
-                <strong>{printData?.invoice_number}</strong>
-              </Typography>
-              {printDocType === 'Invoice' && printData?.delivery_challan_number && (
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                  Challan No: <strong>{printData.delivery_challan_number}</strong>
-                </Typography>
-              )}
-              <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                {printDocType === 'Invoice' ? 'Billing Date: ' : 'Order Date: '}
-                <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
+                Email: {company?.email ? company.email.trim() : ''} | Phone: {company?.phone ? company.phone.trim() : ''}
               </Typography>
             </Box>
           </Box>
 
           <Divider sx={{ mb: 2 }} />
+
+          {/* Document Details (Title, Number & Date) */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                {printDocType === 'Invoice' ? 'TAX INVOICE' : 'SALES ORDER'}{' '}
+                <span style={{ fontWeight: 600, color: '#334155', fontSize: '1.15rem', marginLeft: '6px' }}>
+                  {printData?.invoice_number}
+                </span>
+              </Typography>
+              {printDocType === 'Invoice' && printData?.delivery_challan_number && (
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                  Challan No: <strong>{printData.delivery_challan_number}</strong>
+                </Typography>
+              )}
+              <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                Date: <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
+              </Typography>
+            </Box>
+          </Box>
 
           {/* Addresses */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>

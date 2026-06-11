@@ -872,18 +872,16 @@ const Inventory = () => {
             }}
           >
             {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
+            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
               {company?.logo && (
                 <Box
                   component="img"
                   src={company.logo}
                   alt="Company Logo"
                   sx={{
-                    maxHeight: 80,
-                    maxWidth: 160,
+                    maxHeight: 100,
+                    maxWidth: 100,
                     objectFit: 'contain',
-                    marginTop: '4px',
                     '@media print': {
                       printColorAdjust: 'exact',
                     }
@@ -901,23 +899,26 @@ const Inventory = () => {
                 </Typography>
               </Box>
             </Box>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Document Details (Title, Number & Date) */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
-                  DELIVERY CHALLAN
+                <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                  DELIVERY CHALLAN{' '}
+                  <span style={{ fontWeight: 600, color: '#334155', fontSize: '1.15rem', marginLeft: '6px' }}>
+                    {selectedTransfer?.challan_number}
+                  </span>
                 </Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                  Challan No: <strong>{selectedTransfer?.challan_number}</strong>
-                </Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                   Date: <strong>{selectedTransfer ? new Date(selectedTransfer.date).toLocaleDateString() : ''}</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                   Status: <strong>{selectedTransfer?.status}</strong>
                 </Typography>
               </Box>
             </Box>
-
-            <Divider sx={{ mb: 2 }} />
 
             {/* Addresses */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>

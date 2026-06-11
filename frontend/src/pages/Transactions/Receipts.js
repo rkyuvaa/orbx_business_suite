@@ -234,17 +234,16 @@ const Receipts = () => {
           }}
         >
           {/* Header */}
-          <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start', mb: 3 }}>
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mb: 2 }}>
             {company?.logo && (
               <Box
                 component="img"
                 src={company.logo}
                 alt="Company Logo"
                 sx={{
-                  maxHeight: 80,
-                  maxWidth: 160,
+                  maxHeight: 100,
+                  maxWidth: 100,
                   objectFit: 'contain',
-                  marginTop: '4px',
                   '@media print': {
                     printColorAdjust: 'exact',
                   }
@@ -266,24 +265,20 @@ const Receipts = () => {
 
           <Divider sx={{ my: 2 }} />
 
-          <Typography variant="h6" align="center" sx={{ fontWeight: 700, letterSpacing: '1px', mb: 3 }}>
-            PAYMENT RECEIPT
-          </Typography>
-
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6}>
-              <Typography variant="body2" color="text.secondary">Receipt Number:</Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                {selectedPayment?.receipt_number || 'N/A'}
+          {/* Document Details (Title, Number & Date) */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                PAYMENT RECEIPT{' '}
+                <span style={{ fontWeight: 600, color: '#334155', fontSize: '1.15rem', marginLeft: '6px' }}>
+                  {selectedPayment?.receipt_number || 'N/A'}
+                </span>
               </Typography>
-            </Grid>
-            <Grid item xs={6} sx={{ textAlign: 'right' }}>
-              <Typography variant="body2" color="text.secondary">Date Received:</Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                {selectedPayment ? new Date(selectedPayment.payment_date).toLocaleDateString('en-IN') : ''}
+              <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                Date: <strong>{selectedPayment ? new Date(selectedPayment.payment_date).toLocaleDateString('en-IN') : ''}</strong>
               </Typography>
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
 
           <Box sx={{ backgroundColor: '#f8fafc', p: 3, borderRadius: '8px', mb: 3 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 1.5 }}>
