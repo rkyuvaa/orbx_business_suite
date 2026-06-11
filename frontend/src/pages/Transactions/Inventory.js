@@ -873,16 +873,17 @@ const Inventory = () => {
           >
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
               {company?.logo && (
                 <Box
                   component="img"
                   src={company.logo}
                   alt="Company Logo"
                   sx={{
-                    maxHeight: 60,
-                    maxWidth: 120,
+                    maxHeight: 80,
+                    maxWidth: 160,
                     objectFit: 'contain',
+                    marginTop: '4px',
                     '@media print': {
                       printColorAdjust: 'exact',
                     }

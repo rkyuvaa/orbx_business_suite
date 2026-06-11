@@ -333,16 +333,17 @@ const CustomerLedger = () => {
         >
           {/* Statement Header */}
           <Grid container justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-            <Grid item sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Grid item sx={{ display: 'flex', gap: 2.5, alignItems: 'flex-start' }}>
               {company?.logo && (
                 <Box
                   component="img"
                   src={company.logo}
                   alt="Company Logo"
                   sx={{
-                    maxHeight: 60,
-                    maxWidth: 120,
+                    maxHeight: 80,
+                    maxWidth: 160,
                     objectFit: 'contain',
+                    marginTop: '4px',
                     '@media print': {
                       printColorAdjust: 'exact',
                     }
