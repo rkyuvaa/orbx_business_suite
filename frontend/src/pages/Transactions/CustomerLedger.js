@@ -333,15 +333,32 @@ const CustomerLedger = () => {
         >
           {/* Statement Header */}
           <Grid container justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-            <Grid item>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332' }}>
-                {company?.name || 'ORBX Corporation'}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#475569', whiteSpace: 'pre-line' }}>
-                {company?.billing_address || 'ORBX Head Office'}
-                {company?.phone && `\nPhone: ${company.phone}`}
-                {company?.gstin && `\nGSTIN: ${company.gstin}`}
-              </Typography>
+            <Grid item sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              {company?.logo && (
+                <Box
+                  component="img"
+                  src={company.logo}
+                  alt="Company Logo"
+                  sx={{
+                    maxHeight: 60,
+                    maxWidth: 120,
+                    objectFit: 'contain',
+                    '@media print': {
+                      printColorAdjust: 'exact',
+                    }
+                  }}
+                />
+              )}
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332' }}>
+                  {company?.name || 'ORBX Corporation'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#475569', whiteSpace: 'pre-line' }}>
+                  {company?.address || 'ORBX Head Office'}
+                  {company?.phone && `\nPhone: ${company.phone}`}
+                  {company?.gstin && `\nGSTIN: ${company.gstin}`}
+                </Typography>
+              </Box>
             </Grid>
             <Grid item sx={{ textAlign: 'right' }}>
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#334155', mb: 0.5 }}>

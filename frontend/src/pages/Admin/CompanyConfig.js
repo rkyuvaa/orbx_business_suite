@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Box, Button, Alert, Paper, Typography, CircularProgress } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
+import { Save as SaveIcon, CloudUpload as UploadIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -24,6 +24,8 @@ const CompanyConfig = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
@@ -34,6 +36,7 @@ const CompanyConfig = () => {
       setLoading(true);
       const res = await apiClient.get('/admin/company');
       reset(res.data);
+      setLogoUrl(res.data.logo || '');
     } catch (err) {
       setError('Failed to load company configurations.');
     } finally {
@@ -45,12 +48,46 @@ const CompanyConfig = () => {
     loadCompany();
   }, []);
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Selected file must be an image.');
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      setError(null);
+      setSuccess(false);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiClient.post('/admin/company/logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setLogoUrl(res.data.logo || '');
+      setSuccess(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const onSubmit = async (data) => {
     try {
       setSaving(true);
       setSuccess(false);
       setError(null);
-      await apiClient.put('/admin/company', data);
+      // Exclude logo from regular update payload to avoid overwriting with path string
+      const { logo, ...updateData } = data;
+      await apiClient.put('/admin/company', updateData);
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save configurations.');
@@ -93,6 +130,40 @@ const CompanyConfig = () => {
         <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 3 }}>
           Corporate Entity Details
         </Typography>
+
+        {/* Company Logo Upload & Preview Section */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 4, p: 2.5, border: '1px dashed #cbd5e1', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+          <Box sx={{ position: 'relative', width: 120, height: 120, border: '1px solid #cbd5e1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', overflow: 'hidden', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Company Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', padding: '4px' }} />
+            ) : (
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>No Logo Set</Typography>
+            )}
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#334155' }}>Company Logo</Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5, lineHeight: 1.3 }}>
+              Recommended: Horizontal layout, transparent PNG background.<br />
+              This logo will automatically appear on all printouts (Invoices, Challans, Receipts, Statements).
+            </Typography>
+            <Button
+              variant="outlined"
+              component="label"
+              size="small"
+              startIcon={<UploadIcon />}
+              disabled={uploadingLogo}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+              <input
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={handleLogoUpload}
+              />
+            </Button>
+          </Box>
+        </Box>
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>

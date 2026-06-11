@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, Depends, status, BackgroundTasks, UploadFile, File, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import deps
@@ -34,6 +34,39 @@ async def update_company(
 ):
     """Update company details."""
     return await AdminService.update_company(db, company_data)
+
+
+@router.post("/company/logo", response_model=CompanyOut)
+async def upload_company_logo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("admin", "edit"))
+):
+    """Upload a logo image file for the company."""
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
+    
+    import shutil
+    import os
+    
+    extension = os.path.splitext(file.filename)[1]
+    filename = f"company_logo{extension}"
+    save_dir = "static/logos"
+    os.makedirs(save_dir, exist_ok=True)
+    file_path = os.path.join(save_dir, filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    logo_url = f"/api/v1/static/logos/{filename}"
+    
+    company = await AdminService.get_company(db)
+    company.logo = logo_url
+    db.add(company)
+    await db.commit()
+    await db.refresh(company)
+    return company
+
 
 
 # ==========================================

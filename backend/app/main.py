@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -25,6 +27,11 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Ensure static directories exist and mount static files router
+os.makedirs("static/logos", exist_ok=True)
+app.mount("/api/v1/static", StaticFiles(directory="static"), name="static")
+
 
 # Configure Cross-Origin Resource Sharing (CORS)
 # Allows our React frontend on different ports or environments to communicate smoothly

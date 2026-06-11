@@ -234,16 +234,33 @@ const Receipts = () => {
           }}
         >
           {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
-              {company?.name || 'ORBX CORPORATION'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {company?.address || '123 Corporate Blvd, Silicon Valley'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              GSTIN: {company?.gstin} | Phone: {company?.phone}
-            </Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>
+            {company?.logo && (
+              <Box
+                component="img"
+                src={company.logo}
+                alt="Company Logo"
+                sx={{
+                  maxHeight: 60,
+                  maxWidth: 120,
+                  objectFit: 'contain',
+                  '@media print': {
+                    printColorAdjust: 'exact',
+                  }
+                }}
+              />
+            )}
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', mb: 0.5 }}>
+                {company?.name || 'ORBX CORPORATION'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {company?.address || '123 Corporate Blvd, Silicon Valley'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                GSTIN: {company?.gstin} | Phone: {company?.phone}
+              </Typography>
+            </Box>
           </Box>
 
           <Divider sx={{ my: 2 }} />

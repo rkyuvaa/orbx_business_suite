@@ -873,6 +873,22 @@ const Inventory = () => {
           >
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              {company?.logo && (
+                <Box
+                  component="img"
+                  src={company.logo}
+                  alt="Company Logo"
+                  sx={{
+                    maxHeight: 60,
+                    maxWidth: 120,
+                    objectFit: 'contain',
+                    '@media print': {
+                      printColorAdjust: 'exact',
+                    }
+                  }}
+                />
+              )}
               <Box>
                 <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'primary.main', mb: 0.5, lineHeight: 1.2 }}>
                   {company?.name ? company.name.trim() : 'ORBX CORPORATION'}
@@ -883,6 +899,7 @@ const Inventory = () => {
                   Email: {company?.email || ''} | Phone: {company?.phone || ''}
                 </Typography>
               </Box>
+            </Box>
               <Box sx={{ textAlign: 'right' }}>
                 <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 0.5, lineHeight: 1.2 }}>
                   DELIVERY CHALLAN
