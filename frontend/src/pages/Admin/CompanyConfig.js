@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Box, Button, Alert, Paper, Typography, CircularProgress } from '@mui/material';
+import { Box, Button, Alert, Paper, Typography, CircularProgress, Divider } from '@mui/material';
 import { Save as SaveIcon, CloudUpload as UploadIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import FormInput from '../../components/FormInput';
+
+
 
 const schema = yup.object().shape({
   name: yup.string().required('Company name is required'),
@@ -17,6 +19,11 @@ const schema = yup.object().shape({
   phone: yup.string().required('Phone number is required'),
   address: yup.string().required('Company address is required'),
   financial_year_start: yup.string().required('FY Start date is required'),
+  smtp_host: yup.string().nullable(),
+  smtp_port: yup.number().nullable().transform((value) => (isNaN(value) ? null : value)).typeError('SMTP Port must be a number'),
+  smtp_user: yup.string().nullable(),
+  smtp_password: yup.string().nullable(),
+  email_from: yup.string().email('Please enter a valid sender email').nullable(),
 });
 
 const CompanyConfig = () => {
@@ -176,6 +183,22 @@ const CompanyConfig = () => {
             
             <Box sx={{ gridColumn: 'span 2' }}>
               <FormInput name="address" control={control} label="Registered Head Office Address" type="textarea" rows={3} />
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 4 }} />
+
+          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 3 }}>
+            SMTP Email Configuration (Optional)
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>
+            <FormInput name="smtp_host" control={control} label="SMTP Host (e.g. smtp.gmail.com)" />
+            <FormInput name="smtp_port" control={control} label="SMTP Port (e.g. 587)" type="number" />
+            <FormInput name="smtp_user" control={control} label="SMTP Username / Email" />
+            <FormInput name="smtp_password" control={control} label="SMTP Password" type="password" />
+            <Box sx={{ gridColumn: { xs: 'span 1', sm: 'span 2' } }}>
+              <FormInput name="email_from" control={control} label="Sender Email Address (From Address)" type="email" />
             </Box>
           </Box>
 

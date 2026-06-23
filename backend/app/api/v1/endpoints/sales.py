@@ -248,6 +248,17 @@ async def email_invoice(
     )
     filename = f"Invoice_{invoice.invoice_number}.pdf"
 
+    # Assemble dynamic SMTP settings from database if configured
+    smtp_settings = None
+    if company:
+        smtp_settings = {
+            "smtp_host": company.smtp_host,
+            "smtp_port": company.smtp_port,
+            "smtp_user": company.smtp_user,
+            "smtp_password": company.smtp_password,
+            "email_from": company.email_from,
+        }
+
     # ── 8. Send email ──────────────────────────────────────────────────────────
     try:
         await send_invoice_email(
@@ -256,6 +267,7 @@ async def email_invoice(
             body=body,
             pdf_bytes=pdf_bytes,
             filename=filename,
+            smtp_settings=smtp_settings,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))

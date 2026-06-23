@@ -19,6 +19,13 @@ class Company(Base):
     financial_year_start: Mapped[Optional[str]] = mapped_column(String(10), nullable=True) # e.g. "2026-04-01"
     state_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
+    # SMTP Configuration Settings
+    smtp_host: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_port: Mapped[Optional[int]] = mapped_column(nullable=True)
+    smtp_user: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    smtp_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_from: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     # Relationships
     branches: Mapped[List["Branch"]] = relationship(back_populates="company", cascade="all, delete-orphan")
 

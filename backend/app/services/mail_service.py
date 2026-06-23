@@ -384,6 +384,7 @@ async def send_invoice_email(
     body: str,
     pdf_bytes: bytes,
     filename: str,
+    smtp_settings: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Send an email with a PDF attachment via SMTP (async).
@@ -391,14 +392,24 @@ async def send_invoice_email(
     Raises RuntimeError if SMTP credentials are not configured.
     Raises aiosmtplib.SMTPException on delivery failure.
     """
-    smtp_user = settings.SMTP_USER
-    smtp_password = settings.SMTP_PASSWORD
-    email_from = settings.EMAIL_FROM or smtp_user
+    # Fall back to settings if not provided in smtp_settings dict
+    smtp_host = (smtp_settings or {}).get("smtp_host") or settings.SMTP_HOST
+    smtp_port = (smtp_settings or {}).get("smtp_port") or settings.SMTP_PORT
+    smtp_user = (smtp_settings or {}).get("smtp_user") or settings.SMTP_USER
+    smtp_password = (smtp_settings or {}).get("smtp_password") or settings.SMTP_PASSWORD
+    email_from = (smtp_settings or {}).get("email_from") or settings.EMAIL_FROM or smtp_user
 
-    if not smtp_user or not smtp_password:
+    # Convert port to int if it's a string
+    if smtp_port is not None:
+        try:
+            smtp_port = int(smtp_port)
+        except ValueError:
+            smtp_port = 587
+
+    if not smtp_user or not smtp_password or not smtp_host:
         raise RuntimeError(
             "SMTP credentials are not configured. "
-            "Please set SMTP_USER, SMTP_PASSWORD, and EMAIL_FROM in your .env file."
+            "Please configure SMTP host, user, and password in Company Config or your .env file."
         )
 
     # Build MIME message
@@ -423,8 +434,8 @@ async def send_invoice_email(
     # Send via async SMTP
     await aiosmtplib.send(
         msg,
-        hostname=settings.SMTP_HOST,
-        port=settings.SMTP_PORT,
+        hostname=smtp_host,
+        port=smtp_port or 587,
         username=smtp_user,
         password=smtp_password,
         start_tls=True,

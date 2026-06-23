@@ -15,6 +15,11 @@ class CompanyOut(BaseModel):
     phone: Optional[str] = None
     financial_year_start: Optional[str] = None
     state_code: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    email_from: Optional[str] = None
     is_active: bool
 
     class Config:
@@ -30,6 +35,11 @@ class CompanyUpdate(BaseModel):
     phone: Optional[str] = None
     financial_year_start: Optional[str] = None
     state_code: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    email_from: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
