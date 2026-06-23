@@ -903,6 +903,7 @@ class TxServices:
             inv.customer_name = inv.sales_order.customer.name
             inv.customer_id = inv.sales_order.customer.id
             inv.customer_gstin = inv.sales_order.customer.gstin
+            inv.customer_email = inv.sales_order.customer.email
             inv.customer_billing_address = inv.sales_order.customer.billing_address
             inv.customer_shipping_address = inv.sales_order.customer.shipping_address
         for item in inv.items:
@@ -936,12 +937,14 @@ class TxServices:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
                 inv.customer_gstin = inv.sales_order.customer.gstin
+                inv.customer_email = inv.sales_order.customer.email
                 inv.customer_billing_address = inv.sales_order.customer.billing_address
                 inv.customer_shipping_address = inv.sales_order.customer.shipping_address
             else:
                 inv.customer_name = "Unknown"
                 inv.customer_id = None
                 inv.customer_gstin = None
+                inv.customer_email = None
                 inv.customer_billing_address = None
                 inv.customer_shipping_address = None
             for item in inv.items:

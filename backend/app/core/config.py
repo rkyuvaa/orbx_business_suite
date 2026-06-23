@@ -24,5 +24,12 @@ class Settings(BaseSettings):
     FIRST_BRANCH_NAME: str = "Headquarters"
     FIRST_BRANCH_CODE: str = "HQ"
 
+    # Email / SMTP Config
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM: str = ""
+
 
 settings = Settings()

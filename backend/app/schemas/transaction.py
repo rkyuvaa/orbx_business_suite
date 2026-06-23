@@ -1,7 +1,17 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+
+
+# ==========================================
+# EMAIL REQUEST SCHEMA
+# ==========================================
+class InvoiceEmailRequest(BaseModel):
+    recipient_email: Optional[EmailStr] = None
+    subject: Optional[str] = None
+    body: Optional[str] = None
+
 
 
 # ==========================================
@@ -264,6 +274,7 @@ class InvoiceOut(BaseModel):
     customer_name: Optional[str] = None
     customer_id: Optional[UUID] = None
     customer_gstin: Optional[str] = None
+    customer_email: Optional[str] = None
     customer_billing_address: Optional[str] = None
     customer_shipping_address: Optional[str] = None
     branch_id: UUID

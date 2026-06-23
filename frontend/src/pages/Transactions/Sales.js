@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import {
   Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField,
-  Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer
+  Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer,
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Snackbar
 } from '@mui/material';
 import {
   Add as AddIcon, Delete as DeleteIcon,
   Receipt as InvoiceIcon, Print as PrintIcon,
-  Edit as EditIcon, Block as CancelIcon
+  Edit as EditIcon, Block as CancelIcon,
+  Email as EmailIcon
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 
@@ -27,6 +29,14 @@ const Sales = () => {
   const [openSOModal, setOpenSOModal] = useState(false);
   const [openInvoiceModal, setOpenInvoiceModal] = useState(false);
   const [openPrintModal, setOpenPrintModal] = useState(false);
+
+  // Email dialog state
+  const [openEmailModal, setOpenEmailModal] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSnackbar, setEmailSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const [selectedSO, setSelectedSO] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -244,6 +254,41 @@ const Sales = () => {
     setSelectedSO(so);
     setPrintDocType('SalesOrder');
     setOpenPrintModal(true);
+  };
+
+  // ==========================================
+  // EMAIL INVOICE HANDLER
+  // ==========================================
+  const handleOpenEmailDialog = () => {
+    if (!selectedInvoice) return;
+    const companyName = company?.name || 'ORBX ERP';
+    const invDate = selectedInvoice.date ? new Date(selectedInvoice.date).toLocaleDateString('en-IN') : '';
+    const amount = selectedInvoice.total_amount?.toFixed(2) || '0.00';
+    setEmailTo(selectedInvoice.customer_email || '');
+    setEmailSubject(`Tax Invoice ${selectedInvoice.invoice_number} from ${companyName}`);
+    setEmailBody(
+      `Dear ${selectedInvoice.customer_name || 'Customer'},\n\nPlease find attached your Tax Invoice ${selectedInvoice.invoice_number}.\n\nInvoice Date: ${invDate}\nAmount Due: ₹${amount}\n\nThank you for your business.\n\nRegards,\n${companyName}`
+    );
+    setOpenEmailModal(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedInvoice) return;
+    setEmailSending(true);
+    try {
+      await apiClient.post(`/sales/invoices/${selectedInvoice.id}/email`, {
+        recipient_email: emailTo || null,
+        subject: emailSubject,
+        body: emailBody,
+      });
+      setOpenEmailModal(false);
+      setEmailSnackbar({ open: true, message: `Invoice emailed successfully to ${emailTo}`, severity: 'success' });
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Failed to send invoice email.';
+      setEmailSnackbar({ open: true, message: detail, severity: 'error' });
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const handlePrint = useReactToPrint({
@@ -892,6 +937,20 @@ const Sales = () => {
             <Button variant="contained" onClick={handleDownloadPDF}>
               Download PDF
             </Button>
+            {printDocType === 'Invoice' && (
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<EmailIcon />}
+                onClick={handleOpenEmailDialog}
+                sx={{
+                  background: 'linear-gradient(135deg, #1a237e 0%, #283593 100%)',
+                  '&:hover': { background: 'linear-gradient(135deg, #283593 0%, #3949ab 100%)' }
+                }}
+              >
+                Email to Customer
+              </Button>
+            )}
           </Box>
         }
       >
@@ -1110,6 +1169,130 @@ const Sales = () => {
         </Box>
         </Box>
       </CommonModal>
+
+      {/* EMAIL INVOICE DIALOG */}
+      <Dialog
+        open={openEmailModal}
+        onClose={() => !emailSending && setOpenEmailModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            pb: 2, color: '#f1f5f9'
+          }}
+        >
+          <EmailIcon sx={{ color: '#818cf8' }} />
+          Email Tax Invoice
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3, pb: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <TextField
+              id="email-to"
+              label="To"
+              fullWidth
+              size="small"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              placeholder="customer@example.com"
+              helperText={!emailTo ? "⚠ Customer has no email on record — please enter one" : ""}
+              sx={{
+                '& .MuiOutlinedInput-root': { color: '#f1f5f9', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } },
+                '& .MuiInputLabel-root': { color: '#94a3b8' },
+                '& .MuiFormHelperText-root': { color: '#f59e0b' }
+              }}
+            />
+            <TextField
+              id="email-subject"
+              label="Subject"
+              fullWidth
+              size="small"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': { color: '#f1f5f9', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } },
+                '& .MuiInputLabel-root': { color: '#94a3b8' }
+              }}
+            />
+            <TextField
+              id="email-body"
+              label="Message"
+              fullWidth
+              multiline
+              minRows={5}
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': { color: '#f1f5f9', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } },
+                '& .MuiInputLabel-root': { color: '#94a3b8' }
+              }}
+            />
+            <Box
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 1,
+                p: 1.5, borderRadius: '8px',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.2)'
+              }}
+            >
+              <EmailIcon sx={{ fontSize: 16, color: '#818cf8' }} />
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                A PDF copy of <strong style={{ color: '#c7d2fe' }}>{selectedInvoice?.invoice_number}</strong> will be attached automatically.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+          <Button
+            onClick={() => setOpenEmailModal(false)}
+            disabled={emailSending}
+            variant="outlined"
+            sx={{ color: '#94a3b8', borderColor: 'rgba(255,255,255,0.15)' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            id="send-email-btn"
+            onClick={handleSendEmail}
+            disabled={emailSending || !emailTo}
+            variant="contained"
+            startIcon={emailSending ? <CircularProgress size={16} color="inherit" /> : <EmailIcon />}
+            sx={{
+              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+              '&:hover': { background: 'linear-gradient(135deg, #4338ca 0%, #4f46e5 100%)' },
+              '&:disabled': { opacity: 0.5 }
+            }}
+          >
+            {emailSending ? 'Sending…' : 'Send Invoice'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* EMAIL SUCCESS / ERROR SNACKBAR */}
+      <Snackbar
+        open={emailSnackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setEmailSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setEmailSnackbar(prev => ({ ...prev, open: false }))}
+          severity={emailSnackbar.severity}
+          sx={{ width: '100%', borderRadius: '8px' }}
+        >
+          {emailSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

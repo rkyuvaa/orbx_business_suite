@@ -1,12 +1,17 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.core import deps
+from app.models.business import Branch, Company, Customer
+from app.models.sales import Invoice, InvoiceItem, SalesOrder
 from app.schemas.transaction import (
     SalesOrderOut, SalesOrderCreate,
-    InvoiceOut, InvoiceCreate
+    InvoiceOut, InvoiceCreate,
+    InvoiceEmailRequest
 )
 from app.services.tx_services import TxServices
 
@@ -113,3 +118,148 @@ async def delete_invoice(
     """Delete an invoice."""
     await TxServices.delete_invoice(db, invoice_id)
     return None
+
+
+# ==========================================
+# EMAIL INVOICE ENDPOINT
+# ==========================================
+@router.post("/invoices/{invoice_id}/email")
+async def email_invoice(
+    invoice_id: UUID,
+    email_req: InvoiceEmailRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "view"))
+):
+    """
+    Generate a PDF of the Tax Invoice and email it to the customer.
+
+    Recipient email falls back to the customer's email on record if not provided
+    in the request body.
+    """
+    from app.services.mail_service import generate_invoice_pdf, send_invoice_email
+
+    # ── 1. Fetch Invoice with all related data ──────────────────────────────
+    q_inv = await db.execute(
+        select(Invoice)
+        .filter(Invoice.id == invoice_id)
+        .options(
+            selectinload(Invoice.items).selectinload(InvoiceItem.product),
+            selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+            selectinload(Invoice.delivery_challan),
+        )
+    )
+    invoice = q_inv.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found.")
+
+    # ── 2. Resolve customer and recipient email ──────────────────────────────
+    customer = None
+    if invoice.sales_order and invoice.sales_order.customer:
+        customer = invoice.sales_order.customer
+    elif invoice.delivery_challan and invoice.delivery_challan.customer_id:
+        q_cust = await db.execute(
+            select(Customer).filter(Customer.id == invoice.delivery_challan.customer_id)
+        )
+        customer = q_cust.scalar_one_or_none()
+
+    recipient_email = email_req.recipient_email
+    if not recipient_email:
+        if customer and customer.email:
+            recipient_email = customer.email
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail="No recipient email provided and the customer has no email on record."
+            )
+
+    # ── 3. Fetch Company and Branch details ──────────────────────────────────
+    q_br = await db.execute(select(Branch).filter(Branch.id == invoice.branch_id))
+    branch = q_br.scalar_one_or_none()
+
+    company = None
+    if branch:
+        q_co = await db.execute(select(Company).filter(Company.id == branch.company_id))
+        company = q_co.scalar_one_or_none()
+
+    # ── 4. Build GST breakup ──────────────────────────────────────────────────
+    gst_breakup = invoice.gst_breakup if isinstance(invoice.gst_breakup, dict) else {}
+
+    # ── 5. Assemble PDF data dict ─────────────────────────────────────────────
+    items_data = []
+    for item in invoice.items:
+        product = item.product
+        items_data.append({
+            "product_name": product.name if product else "Unknown",
+            "hsn_code": product.hsn_code if product else "",
+            "qty": item.qty,
+            "rate": item.rate,
+            "discount_amount": item.discount_amount,
+            "tax_rate": item.tax_rate,
+            "tax_amount": item.tax_amount,
+            "amount": item.amount,
+        })
+
+    pdf_data = {
+        "invoice_number": invoice.invoice_number,
+        "date": invoice.date,
+        "due_date": invoice.due_date,
+        # Company
+        "company_name": company.name if company else "ORBX Corporation",
+        "company_address": company.address if company else "",
+        "company_gstin": company.gstin if company else "",
+        "company_email": company.email if company else "",
+        "company_phone": company.phone if company else "",
+        # Customer
+        "customer_name": customer.name if customer else "Unknown",
+        "customer_gstin": customer.gstin if customer else "",
+        "customer_billing_address": customer.billing_address if customer else "",
+        "customer_shipping_address": customer.shipping_address if customer else "",
+        # Branch
+        "branch_code": branch.code if branch else "",
+        "invoice_terms": branch.invoice_terms if branch else "",
+        "invoice_footer": branch.invoice_footer if branch else "",
+        # Financials
+        "items": items_data,
+        "subtotal": invoice.subtotal,
+        "discount_amount": invoice.discount_amount,
+        "tax_amount": invoice.tax_amount,
+        "total_amount": invoice.total_amount,
+        "gst_breakup": gst_breakup,
+    }
+
+    # ── 6. Generate PDF ───────────────────────────────────────────────────────
+    try:
+        pdf_bytes = generate_invoice_pdf(pdf_data)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
+
+    # ── 7. Build subject and body ──────────────────────────────────────────────
+    company_name = (company.name if company else "ORBX ERP")
+    subject = email_req.subject or (
+        f"Tax Invoice {invoice.invoice_number} from {company_name}"
+    )
+    body = email_req.body or (
+        f"Dear {customer.name if customer else 'Customer'},\n\n"
+        f"Please find attached your Tax Invoice {invoice.invoice_number}.\n\n"
+        f"Invoice Date: {invoice.date.strftime('%d-%m-%Y')}\n"
+        f"Amount Due: ₹{invoice.total_amount:.2f}\n\n"
+        f"Thank you for your business.\n\n"
+        f"Regards,\n{company_name}"
+    )
+    filename = f"Invoice_{invoice.invoice_number}.pdf"
+
+    # ── 8. Send email ──────────────────────────────────────────────────────────
+    try:
+        await send_invoice_email(
+            to_email=recipient_email,
+            subject=subject,
+            body=body,
+            pdf_bytes=pdf_bytes,
+            filename=filename,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Email delivery failed: {exc}")
+
+    return {"message": f"Invoice emailed successfully to {recipient_email}"}
