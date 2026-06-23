@@ -20,6 +20,8 @@ class CompanyOut(BaseModel):
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
     email_from: Optional[str] = None
+    email_subject_template: Optional[str] = None
+    email_body_template: Optional[str] = None
     is_active: bool
 
     class Config:
@@ -40,6 +42,8 @@ class CompanyUpdate(BaseModel):
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
     email_from: Optional[str] = None
+    email_subject_template: Optional[str] = None
+    email_body_template: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -182,3 +186,12 @@ class RoleOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SmtpTestRequest(BaseModel):
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    email_from: str
+    recipient_email: EmailStr

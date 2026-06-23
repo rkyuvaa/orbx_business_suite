@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Box, Button, Alert, Paper, Typography, CircularProgress, Divider } from '@mui/material';
+import {
+  Box, Button, Alert, Paper, Typography, CircularProgress, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField
+} from '@mui/material';
 import { Save as SaveIcon, CloudUpload as UploadIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -24,6 +27,8 @@ const schema = yup.object().shape({
   smtp_user: yup.string().nullable(),
   smtp_password: yup.string().nullable(),
   email_from: yup.string().email('Please enter a valid sender email').nullable(),
+  email_subject_template: yup.string().nullable(),
+  email_body_template: yup.string().nullable(),
 });
 
 const CompanyConfig = () => {
@@ -34,7 +39,14 @@ const CompanyConfig = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const { control, handleSubmit, reset } = useForm({
+  // SMTP test state variables
+  const [openTestModal, setOpenTestModal] = useState(false);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testSuccess, setTestSuccess] = useState(null);
+  const [testError, setTestError] = useState(null);
+
+  const { control, handleSubmit, reset, getValues } = useForm({
     resolver: yupResolver(schema),
   });
 
@@ -100,6 +112,41 @@ const CompanyConfig = () => {
       setError(err.response?.data?.detail || 'Failed to save configurations.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestSmtp = () => {
+    const values = getValues();
+    if (!values.smtp_host || !values.smtp_user || !values.smtp_password || !values.email_from) {
+      setError('Please fill in SMTP Host, Username, Password, and Sender Email to run the test.');
+      return;
+    }
+    setTestSuccess(null);
+    setTestError(null);
+    setTestRecipient('');
+    setOpenTestModal(true);
+  };
+
+  const submitTestEmail = async () => {
+    if (!testRecipient) return;
+    setTestingSmtp(true);
+    setTestSuccess(null);
+    setTestError(null);
+    try {
+      const values = getValues();
+      await apiClient.post('/admin/company/test-email', {
+        smtp_host: values.smtp_host,
+        smtp_port: parseInt(values.smtp_port) || 587,
+        smtp_user: values.smtp_user,
+        smtp_password: values.smtp_password,
+        email_from: values.email_from,
+        recipient_email: testRecipient,
+      });
+      setTestSuccess(`Test email sent successfully to ${testRecipient}!`);
+    } catch (err) {
+      setTestError(err.response?.data?.detail || 'SMTP connection/delivery failed.');
+    } finally {
+      setTestingSmtp(false);
     }
   };
 
@@ -188,11 +235,14 @@ const CompanyConfig = () => {
 
           <Divider sx={{ my: 4 }} />
 
-          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 3 }}>
-            SMTP Email Configuration (Optional)
+          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+            SMTP Email Configuration
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 3 }}>
+            Configure SMTP credentials to send transactional PDFs directly to customer emails.
           </Typography>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3, mb: 2 }}>
             <FormInput name="smtp_host" control={control} label="SMTP Host (e.g. smtp.gmail.com)" />
             <FormInput name="smtp_port" control={control} label="SMTP Port (e.g. 587)" type="number" />
             <FormInput name="smtp_user" control={control} label="SMTP Username / Email" />
@@ -202,7 +252,37 @@ const CompanyConfig = () => {
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+          <Box sx={{ display: 'flex', mb: 4 }}>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={handleTestSmtp}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Test SMTP Configuration
+            </Button>
+          </Box>
+
+          <Divider sx={{ my: 4 }} />
+
+          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+            Invoice Email Template Settings
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 3 }}>
+            Customize the default subject and message pre-filled when sending emails. Available placeholders: 
+            <strong style={{ color: '#4f46e5' }}> &#123;invoice_number&#125;</strong>, 
+            <strong style={{ color: '#4f46e5' }}> &#123;customer_name&#125;</strong>, 
+            <strong style={{ color: '#4f46e5' }}> &#123;company_name&#125;</strong>, 
+            <strong style={{ color: '#4f46e5' }}> &#123;invoice_date&#125;</strong>, 
+            <strong style={{ color: '#4f46e5' }}> &#123;amount_due&#125;</strong>.
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 3 }}>
+            <FormInput name="email_subject_template" control={control} label="Default Email Subject Template" />
+            <FormInput name="email_body_template" control={control} label="Default Email Message Template" type="textarea" rows={6} />
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 5 }}>
             <Button
               type="submit"
               variant="contained"
@@ -214,6 +294,71 @@ const CompanyConfig = () => {
             </Button>
           </Box>
         </form>
+
+        {/* SMTP CONNECTION TEST MODAL */}
+        <Dialog
+          open={openTestModal}
+          onClose={() => !testingSmtp && setOpenTestModal(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+            }
+          }}
+        >
+          <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.08)', pb: 2, color: '#f1f5f9', fontWeight: 600 }}>
+            Test SMTP Connection
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3, pb: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {testError && <Alert severity="error" sx={{ borderRadius: '8px' }}>{testError}</Alert>}
+              {testSuccess && <Alert severity="success" sx={{ borderRadius: '8px' }}>{testSuccess}</Alert>}
+              
+              <Typography variant="body2" sx={{ color: '#94a3b8', mb: 1 }}>
+                Enter a recipient email address to send a test message using your current SMTP form configurations.
+              </Typography>
+              
+              <TextField
+                id="test-recipient"
+                label="Recipient Email"
+                fullWidth
+                size="small"
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+                placeholder="test@example.com"
+                sx={{
+                  '& .MuiOutlinedInput-root': { color: '#f1f5f9', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' } },
+                  '& .MuiInputLabel-root': { color: '#94a3b8' }
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+            <Button
+              onClick={() => setOpenTestModal(false)}
+              disabled={testingSmtp}
+              variant="outlined"
+              sx={{ color: '#94a3b8', borderColor: 'rgba(255,255,255,0.15)' }}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={submitTestEmail}
+              disabled={testingSmtp || !testRecipient}
+              variant="contained"
+              sx={{
+                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                '&:hover': { background: 'linear-gradient(135deg, #4338ca 0%, #4f46e5 100%)' }
+              }}
+            >
+              {testingSmtp ? 'Testing...' : 'Send Test Email'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </Box>
   );

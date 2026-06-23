@@ -264,11 +264,28 @@ const Sales = () => {
     const companyName = company?.name || 'ORBX ERP';
     const invDate = selectedInvoice.date ? new Date(selectedInvoice.date).toLocaleDateString('en-IN') : '';
     const amount = selectedInvoice.total_amount?.toFixed(2) || '0.00';
+    const custName = selectedInvoice.customer_name || 'Customer';
+
+    const formatTemplate = (template, fallback) => {
+      if (!template) return fallback;
+      try {
+        return template
+          .replace(/{invoice_number}/g, selectedInvoice.invoice_number)
+          .replace(/{company_name}/g, companyName)
+          .replace(/{customer_name}/g, custName)
+          .replace(/{invoice_date}/g, invDate)
+          .replace(/{amount_due}/g, amount);
+      } catch (err) {
+        return fallback;
+      }
+    };
+
+    const defaultSubject = `Tax Invoice ${selectedInvoice.invoice_number} from ${companyName}`;
+    const defaultBody = `Dear ${custName},\n\nPlease find attached your Tax Invoice ${selectedInvoice.invoice_number}.\n\nInvoice Date: ${invDate}\nAmount Due: ₹${amount}\n\nThank you for your business.\n\nRegards,\n${companyName}`;
+
     setEmailTo(selectedInvoice.customer_email || '');
-    setEmailSubject(`Tax Invoice ${selectedInvoice.invoice_number} from ${companyName}`);
-    setEmailBody(
-      `Dear ${selectedInvoice.customer_name || 'Customer'},\n\nPlease find attached your Tax Invoice ${selectedInvoice.invoice_number}.\n\nInvoice Date: ${invDate}\nAmount Due: ₹${amount}\n\nThank you for your business.\n\nRegards,\n${companyName}`
-    );
+    setEmailSubject(formatTemplate(company?.email_subject_template, defaultSubject));
+    setEmailBody(formatTemplate(company?.email_body_template, defaultBody));
     setOpenEmailModal(true);
   };
 

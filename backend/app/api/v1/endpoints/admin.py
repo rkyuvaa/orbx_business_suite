@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import deps
 from app.schemas.admin import (
     CompanyOut, CompanyUpdate, BranchOut, BranchCreate, BranchUpdate,
-    RoleOut, RoleCreate, RoleUpdate
+    RoleOut, RoleCreate, RoleUpdate, SmtpTestRequest
 )
 from app.schemas.auth import UserOut, UserCreate, UserUpdate
 from app.services.admin_service import AdminService
@@ -66,6 +66,50 @@ async def upload_company_logo(
     await db.commit()
     await db.refresh(company)
     return company
+
+
+@router.post("/company/test-email")
+async def test_smtp_configuration(
+    test_req: SmtpTestRequest,
+    current_user = Depends(deps.PermissionChecker("admin", "edit"))
+):
+    """
+    Test the SMTP configuration by sending a simple text email.
+    """
+    import aiosmtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    msg = MIMEMultipart()
+    msg["From"] = test_req.email_from
+    msg["To"] = test_req.recipient_email
+    msg["Subject"] = "SMTP Configuration Test — ORBX ERP"
+    
+    body = (
+        "Hello,\n\n"
+        "This is a test email from ORBX ERP to verify that your SMTP configuration settings are correct.\n\n"
+        "If you received this message, your SMTP settings are working perfectly!\n\n"
+        "Regards,\n"
+        "ORBX ERP System"
+    )
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=test_req.smtp_host,
+            port=test_req.smtp_port,
+            username=test_req.smtp_user,
+            password=test_req.smtp_password,
+            start_tls=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"SMTP connection/delivery failed: {exc}"
+        )
+
+    return {"message": f"Test email sent successfully to {test_req.recipient_email}"}
 
 
 

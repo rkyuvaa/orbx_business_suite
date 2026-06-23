@@ -235,17 +235,55 @@ async def email_invoice(
 
     # ── 7. Build subject and body ──────────────────────────────────────────────
     company_name = (company.name if company else "ORBX ERP")
-    subject = email_req.subject or (
-        f"Tax Invoice {invoice.invoice_number} from {company_name}"
-    )
-    body = email_req.body or (
-        f"Dear {customer.name if customer else 'Customer'},\n\n"
-        f"Please find attached your Tax Invoice {invoice.invoice_number}.\n\n"
-        f"Invoice Date: {invoice.date.strftime('%d-%m-%Y')}\n"
-        f"Amount Due: ₹{invoice.total_amount:.2f}\n\n"
-        f"Thank you for your business.\n\n"
-        f"Regards,\n{company_name}"
-    )
+    cust_name = (customer.name if customer else "Customer")
+    inv_date_str = (invoice.date.strftime('%d-%m-%Y') if invoice.date else "")
+    amt_due_str = f"{invoice.total_amount:.2f}"
+
+    subject = email_req.subject
+    if not subject:
+        if company and company.email_subject_template:
+            try:
+                subject = company.email_subject_template.format(
+                    invoice_number=invoice.invoice_number,
+                    company_name=company_name,
+                    customer_name=cust_name,
+                    invoice_date=inv_date_str,
+                    amount_due=amt_due_str
+                )
+            except Exception:
+                subject = f"Tax Invoice {invoice.invoice_number} from {company_name}"
+        else:
+            subject = f"Tax Invoice {invoice.invoice_number} from {company_name}"
+
+    body = email_req.body
+    if not body:
+        if company and company.email_body_template:
+            try:
+                body = company.email_body_template.format(
+                    invoice_number=invoice.invoice_number,
+                    company_name=company_name,
+                    customer_name=cust_name,
+                    invoice_date=inv_date_str,
+                    amount_due=amt_due_str
+                )
+            except Exception:
+                body = (
+                    f"Dear {cust_name},\n\n"
+                    f"Please find attached your Tax Invoice {invoice.invoice_number}.\n\n"
+                    f"Invoice Date: {inv_date_str}\n"
+                    f"Amount Due: ₹{amt_due_str}\n\n"
+                    f"Thank you for your business.\n\n"
+                    f"Regards,\n{company_name}"
+                )
+        else:
+            body = (
+                f"Dear {cust_name},\n\n"
+                f"Please find attached your Tax Invoice {invoice.invoice_number}.\n\n"
+                f"Invoice Date: {inv_date_str}\n"
+                f"Amount Due: ₹{amt_due_str}\n\n"
+                f"Thank you for your business.\n\n"
+                f"Regards,\n{company_name}"
+            )
     filename = f"Invoice_{invoice.invoice_number}.pdf"
 
     # Assemble dynamic SMTP settings from database if configured

@@ -111,7 +111,9 @@ def generate_invoice_pdf(data: Dict[str, Any]) -> bytes:
     base_font = "Helvetica"
 
     def style(name, **kw):
-        s = ParagraphStyle(name, fontName=base_font, **kw)
+        if "fontName" not in kw:
+            kw["fontName"] = base_font
+        s = ParagraphStyle(name, **kw)
         return s
 
     s_company = style("company", fontSize=14, fontName="Helvetica-Bold",

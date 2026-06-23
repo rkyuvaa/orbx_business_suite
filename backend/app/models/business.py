@@ -25,6 +25,8 @@ class Company(Base):
     smtp_user: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     smtp_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email_from: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_subject_template: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_body_template: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     branches: Mapped[List["Branch"]] = relationship(back_populates="company", cascade="all, delete-orphan")
