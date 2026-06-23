@@ -23,13 +23,9 @@ def upgrade() -> None:
     op.add_column('companies', sa.Column('smtp_user', sa.String(length=255), nullable=True))
     op.add_column('companies', sa.Column('smtp_password', sa.String(length=255), nullable=True))
     op.add_column('companies', sa.Column('email_from', sa.String(length=255), nullable=True))
-    op.add_column('companies', sa.Column('email_subject_template', sa.String(length=255), nullable=True))
-    op.add_column('companies', sa.Column('email_body_template', sa.String(length=1000), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('companies', 'email_body_template')
-    op.drop_column('companies', 'email_subject_template')
     op.drop_column('companies', 'email_from')
     op.drop_column('companies', 'smtp_password')
     op.drop_column('companies', 'smtp_user')
