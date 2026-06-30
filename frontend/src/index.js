@@ -22,3 +22,17 @@ root.render(
     </Provider>
   </React.StrictMode>
 );
+
+// Register Progressive Web App Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('Progressive Web App ServiceWorker registered successfully:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('Progressive Web App ServiceWorker registration failed:', err);
+      });
+  });
+}
+

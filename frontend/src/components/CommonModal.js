@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  IconButton, Typography, Box
+  IconButton, Typography, Box, useTheme, useMediaQuery
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 
@@ -13,12 +13,16 @@ const CommonModal = ({
   maxWidth = 'sm',
   actions
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       fullWidth
       maxWidth={maxWidth}
+      fullScreen={isMobile}
       PaperProps={{
         sx: {
           borderRadius: '12px',

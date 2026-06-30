@@ -1,0 +1,25 @@
+{
+  "name": "ORBX Business Suite",
+  "short_name": "ORBX ERP",
+  "description": "Enterprise Resource Planning (ERP) System by ORBX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#081c15",
+  "theme_color": "#1b4332",
+  "orientation": "any",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

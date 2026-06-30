@@ -15,10 +15,21 @@ const PageHeader = ({
         display: 'flex',
         justifyContent: 'flex-end',
         mb: 2,
-        mt: -1
+        mt: -1,
+        width: '100%'
       }}
     >
-      <Box sx={{ display: 'flex', gap: 1 }}>{actions}</Box>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1,
+          flexWrap: 'wrap',
+          justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+          width: { xs: '100%', sm: 'auto' }
+        }}
+      >
+        {actions}
+      </Box>
     </Box>
   );
 };
