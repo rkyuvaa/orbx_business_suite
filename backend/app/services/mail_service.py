@@ -168,23 +168,6 @@ def generate_invoice_pdf(data: Dict[str, Any]) -> bytes:
         meta_rows.append([Paragraph(f"<b>Date:</b> {date_str}", s_doc_meta)])
     if due_str:
         meta_rows.append([Paragraph(f"<b>Due Date:</b> {due_str}", s_doc_meta)])
-    
-    so_num = data.get("sales_order_number")
-    if so_num:
-        meta_rows.append([Paragraph(f"<b>Sales Order No.:</b> {so_num}", s_doc_meta)])
-        
-    ref_note = data.get("reference_note")
-    if ref_note:
-        meta_rows.append([Paragraph(f"<b>Reference Note:</b> {ref_note}", s_doc_meta)])
-        
-    ref_date = data.get("reference_date")
-    if ref_date:
-        ref_date_str = ""
-        if hasattr(ref_date, "strftime"):
-            ref_date_str = ref_date.strftime("%d-%m-%Y")
-        else:
-            ref_date_str = str(ref_date)
-        meta_rows.append([Paragraph(f"<b>Reference Date:</b> {ref_date_str}", s_doc_meta)])
 
     meta_tbl = Table(meta_rows, colWidths=[PAGE_W - 2 * MARGIN])
     story.append(meta_tbl)
@@ -314,8 +297,29 @@ def generate_invoice_pdf(data: Dict[str, Any]) -> bytes:
     totals_rows.append(["Grand Total:", f"₹{total:.2f}"])
 
     terms_text = data.get("invoice_terms", "") or ""
+    
+    so_num = data.get("sales_order_number")
+    ref_note = data.get("reference_note")
+    ref_date = data.get("reference_date")
+    ref_date_str = ""
+    if ref_date:
+        if hasattr(ref_date, "strftime"):
+            ref_date_str = ref_date.strftime("%d-%m-%Y")
+        else:
+            ref_date_str = str(ref_date)
+            
+    ref_block_text = ""
+    if so_num or ref_note or ref_date_str:
+        ref_block_text += "<br/><br/><b>Invoice Reference:</b>"
+        if so_num:
+            ref_block_text += f"<br/>Sales Order No: {so_num}"
+        if ref_note:
+            ref_block_text += f"<br/>Reference Note: {ref_note}"
+        if ref_date_str:
+            ref_block_text += f"<br/>Reference Date: {ref_date_str}"
+            
     terms_para = Paragraph(
-        f"<b>Terms &amp; Conditions:</b><br/>{terms_text}",
+        f"<b>Terms &amp; Conditions:</b><br/>{terms_text}{ref_block_text}",
         ParagraphStyle("terms", fontName=base_font, fontSize=7, textColor=SLATE_700,
                        leading=10)
     )

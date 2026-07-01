@@ -1071,11 +1071,6 @@ const Sales = () => {
                   {printData?.invoice_number}
                 </span>
               </Typography>
-              {printDocType === 'Invoice' && printData?.sales_order_number && (
-                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
-                  Sales Order No: <strong>{printData.sales_order_number}</strong>
-                </Typography>
-              )}
               {printDocType === 'Invoice' && printData?.delivery_challan_number && (
                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                   Challan No: <strong>{printData.delivery_challan_number}</strong>
@@ -1084,16 +1079,6 @@ const Sales = () => {
               <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                 Date: <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
               </Typography>
-              {printDocType === 'Invoice' && printData?.reference_note && (
-                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
-                  Reference Note: <strong>{printData.reference_note}</strong>
-                </Typography>
-              )}
-              {printDocType === 'Invoice' && printData?.reference_date && (
-                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
-                  Reference Date: <strong>{formatBillingDate(printData.reference_date)}</strong>
-                </Typography>
-              )}
             </Box>
           </Box>
 
@@ -1161,9 +1146,30 @@ const Sales = () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
             <Box sx={{ width: '50%' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>Terms & Conditions:</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'pre-line', fontSize: '0.75rem', display: 'block', lineHeight: 1.3, mb: 2 }}>
                 {printBranch?.invoice_terms}
               </Typography>
+
+              {printDocType === 'Invoice' && (printData?.sales_order_number || printData?.reference_note || printData?.reference_date) && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>Invoice Reference:</Typography>
+                  {printData?.sales_order_number && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
+                      Sales Order No: <strong style={{ color: '#000000' }}>{printData.sales_order_number}</strong>
+                    </Typography>
+                  )}
+                  {printData?.reference_note && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
+                      Reference Note: <strong style={{ color: '#000000' }}>{printData.reference_note}</strong>
+                    </Typography>
+                  )}
+                  {printData?.reference_date && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block', lineHeight: 1.3 }}>
+                      Reference Date: <strong style={{ color: '#000000' }}>{formatBillingDate(printData.reference_date)}</strong>
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
             <Box sx={{ width: '42%', textAlign: 'right' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
