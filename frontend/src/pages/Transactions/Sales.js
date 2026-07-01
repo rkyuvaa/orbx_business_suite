@@ -50,6 +50,8 @@ const Sales = () => {
   const [soBranchId, setSoBranchId] = useState('');
   const [soDate, setSoDate] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
+  const [referenceNote, setReferenceNote] = useState('');
+  const [referenceDate, setReferenceDate] = useState('');
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
   const [error, setError] = useState(null);
@@ -213,6 +215,8 @@ const Sales = () => {
     setSelectedDCId('');
     setAvailableDCs([]);
     setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setReferenceNote('');
+    setReferenceDate('');
     
     // Fetch transferred DCs for this customer
     apiClient.get(`/inventory/transfers?customer_id=${so.customer_id}`)
@@ -231,7 +235,9 @@ const Sales = () => {
         sales_order_id: selectedSO.id,
         delivery_challan_id: selectedDCId || null,
         date: invoiceDate ? new Date(invoiceDate).toISOString() : null,
-        due_date: new Date(Date.now() + 15 * 86400000).toISOString()
+        due_date: new Date(Date.now() + 15 * 86400000).toISOString(),
+        reference_note: referenceNote || null,
+        reference_date: referenceDate ? new Date(referenceDate).toISOString() : null
       };
       await apiClient.post('/sales/invoices', payload);
       setOpenInvoiceModal(false);
@@ -511,6 +517,15 @@ const Sales = () => {
 
   const invoiceColumns = [
     { id: 'invoice_number', label: 'Invoice No.' },
+    {
+      id: 'sales_order_number',
+      label: 'Sales Order No.',
+      render: (row) => row.sales_order_number ? (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+          {row.sales_order_number}
+        </Typography>
+      ) : '-'
+    },
     {
       id: 'delivery_challan_number',
       label: 'Ref. Challan',
@@ -934,6 +949,25 @@ const Sales = () => {
           sx={{ mb: 3 }}
         />
 
+        <TextField
+          fullWidth
+          label="Reference Note"
+          value={referenceNote}
+          onChange={(e) => setReferenceNote(e.target.value)}
+          placeholder="Enter additional remarks or reference note"
+          sx={{ mb: 3 }}
+        />
+
+        <TextField
+          type="date"
+          fullWidth
+          label="Reference Date"
+          value={referenceDate}
+          onChange={(e) => setReferenceDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ mb: 3 }}
+        />
+
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button onClick={() => setOpenInvoiceModal(false)} variant="outlined">Cancel</Button>
           <Button onClick={submitInvoice} variant="contained">Generate invoice</Button>
@@ -1037,6 +1071,11 @@ const Sales = () => {
                   {printData?.invoice_number}
                 </span>
               </Typography>
+              {printDocType === 'Invoice' && printData?.sales_order_number && (
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                  Sales Order No: <strong>{printData.sales_order_number}</strong>
+                </Typography>
+              )}
               {printDocType === 'Invoice' && printData?.delivery_challan_number && (
                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                   Challan No: <strong>{printData.delivery_challan_number}</strong>
@@ -1045,6 +1084,16 @@ const Sales = () => {
               <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                 Date: <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
               </Typography>
+              {printDocType === 'Invoice' && printData?.reference_note && (
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                  Reference Note: <strong>{printData.reference_note}</strong>
+                </Typography>
+              )}
+              {printDocType === 'Invoice' && printData?.reference_date && (
+                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
+                  Reference Date: <strong>{formatBillingDate(printData.reference_date)}</strong>
+                </Typography>
+              )}
             </Box>
           </Box>
 

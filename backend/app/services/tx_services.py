@@ -846,7 +846,9 @@ class TxServices:
             tax_amount=so.tax_amount,
             discount_amount=so.discount_amount,
             total_amount=so.grand_total,
-            status="Unpaid"
+            status="Unpaid",
+            reference_note=inv_data.reference_note,
+            reference_date=inv_data.reference_date
         )
         db.add(invoice)
         await db.flush()
@@ -899,6 +901,7 @@ class TxServices:
         inv = q_final.scalar_one()
         inv.outstanding_amount = inv.total_amount
         inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
+        inv.sales_order_number = inv.sales_order.so_number if inv.sales_order else None
         if inv.sales_order and inv.sales_order.customer:
             inv.customer_name = inv.sales_order.customer.name
             inv.customer_id = inv.sales_order.customer.id
@@ -933,6 +936,7 @@ class TxServices:
             total_paid = sum([p.amount_paid for p in inv.payments])
             inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
             inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
+            inv.sales_order_number = inv.sales_order.so_number if inv.sales_order else None
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id
@@ -978,6 +982,7 @@ class TxServices:
             total_paid = sum([p.amount_paid for p in inv.payments])
             inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
             inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
+            inv.sales_order_number = inv.sales_order.so_number if inv.sales_order else None
             if inv.sales_order and inv.sales_order.customer:
                 inv.customer_name = inv.sales_order.customer.name
                 inv.customer_id = inv.sales_order.customer.id

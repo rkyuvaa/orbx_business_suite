@@ -264,11 +264,14 @@ class InvoiceCreate(BaseModel):
     delivery_challan_id: Optional[UUID] = None
     date: Optional[datetime] = None
     due_date: Optional[datetime] = None
+    reference_note: Optional[str] = None
+    reference_date: Optional[datetime] = None
 
 
 class InvoiceOut(BaseModel):
     id: UUID
     sales_order_id: Optional[UUID] = None
+    sales_order_number: Optional[str] = None
     delivery_challan_id: Optional[UUID] = None
     delivery_challan_number: Optional[str] = None
     customer_name: Optional[str] = None
@@ -289,6 +292,8 @@ class InvoiceOut(BaseModel):
     outstanding_amount: Optional[float] = None
     status: str
     print_ready_layout: Optional[str] = None
+    reference_note: Optional[str] = None
+    reference_date: Optional[datetime] = None
     items: List[InvoiceItemOut] = []
 
     class Config:
