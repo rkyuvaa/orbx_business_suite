@@ -29,6 +29,10 @@ const schema = yup.object().shape({
   email_from: yup.string().email('Please enter a valid sender email').nullable(),
   email_subject_template: yup.string().nullable(),
   email_body_template: yup.string().nullable(),
+  bank_name: yup.string().nullable(),
+  bank_account_no: yup.string().nullable(),
+  bank_ifsc_code: yup.string().nullable(),
+  bank_branch_location: yup.string().nullable(),
 });
 
 const CompanyConfig = () => {
@@ -231,6 +235,22 @@ const CompanyConfig = () => {
             <Box sx={{ gridColumn: 'span 2' }}>
               <FormInput name="address" control={control} label="Registered Head Office Address" type="textarea" rows={3} />
             </Box>
+          </Box>
+
+          <Divider sx={{ my: 4 }} />
+
+          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+            Company Bank Details
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 3 }}>
+            Configure default corporate bank account details printed on invoice copies.
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 3 }}>
+            <FormInput name="bank_name" control={control} label="Bank Name" />
+            <FormInput name="bank_account_no" control={control} label="Account Number" />
+            <FormInput name="bank_ifsc_code" control={control} label="IFSC Code" />
+            <FormInput name="bank_branch_location" control={control} label="Branch Location" />
           </Box>
 
           <Divider sx={{ my: 4 }} />

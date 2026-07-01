@@ -1221,6 +1221,20 @@ const Sales = () => {
 
           <Divider sx={{ mb: 3 }} />
 
+          {printDocType === 'Invoice' && company?.bank_name && (
+            <Box sx={{ mb: 3, px: 0.5 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b', mb: 0.25 }}>
+                Bank Details:
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.3 }}>
+                Bank Name: <strong>{company.bank_name}</strong> | A/C No: <strong>{company.bank_account_no}</strong>
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.3 }}>
+                IFSC Code: <strong>{company.bank_ifsc_code}</strong> | Branch: <strong>{company.bank_branch_location}</strong>
+              </Typography>
+            </Box>
+          )}
+
           {/* Signatures & Footer */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 3 }}>
             <Box>

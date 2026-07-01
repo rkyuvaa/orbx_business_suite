@@ -22,6 +22,10 @@ class CompanyOut(BaseModel):
     email_from: Optional[str] = None
     email_subject_template: Optional[str] = None
     email_body_template: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+    bank_branch_location: Optional[str] = None
     is_active: bool
 
     class Config:
@@ -44,6 +48,10 @@ class CompanyUpdate(BaseModel):
     email_from: Optional[str] = None
     email_subject_template: Optional[str] = None
     email_body_template: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+    bank_branch_location: Optional[str] = None
 
     @field_validator("gstin", mode="before")
     @classmethod

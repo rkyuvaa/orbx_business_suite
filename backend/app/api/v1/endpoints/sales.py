@@ -212,6 +212,10 @@ async def email_invoice(
         "company_gstin": company.gstin if company else "",
         "company_email": company.email if company else "",
         "company_phone": company.phone if company else "",
+        "company_bank_name": company.bank_name if company else None,
+        "company_bank_account_no": company.bank_account_no if company else None,
+        "company_bank_ifsc_code": company.bank_ifsc_code if company else None,
+        "company_bank_branch_location": company.bank_branch_location if company else None,
         # Customer
         "customer_name": customer.name if customer else "Unknown",
         "customer_gstin": customer.gstin if customer else "",
