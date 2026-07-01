@@ -379,7 +379,8 @@ def generate_invoice_pdf(data: Dict[str, Any]) -> bytes:
         story.append(Paragraph("<b>Bank Details:</b>", bank_title_style))
         story.append(Paragraph(f"Bank Name: <b>{bank_name}</b>  |  A/C No: <b>{bank_ac}</b>", bank_val_style))
         story.append(Paragraph(f"IFSC Code: <b>{bank_ifsc}</b>  |  Branch: <b>{bank_branch}</b>", bank_val_style))
-        story.append(Spacer(1, 3 * mm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=SLATE_200,
+                                 spaceBefore=3 * mm, spaceAfter=3 * mm))
 
     # ── SIGNATURE ROW ──────────────────────────────────────────────────────
     sig_style = ParagraphStyle("sig", fontName=base_font, fontSize=7.5,
