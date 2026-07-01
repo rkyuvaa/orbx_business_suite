@@ -1,6 +1,6 @@
-"""add_invoice_reference_fields
+"""add_invoice_refs
 
-Revision ID: 0018_add_invoice_reference_fields
+Revision ID: 0018_add_invoice_refs
 Revises: 0017_add_company_email_templates
 Create Date: 2026-07-01 20:00:00.000000
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0018_add_invoice_reference_fields'
+revision: str = '0018_add_invoice_refs'
 down_revision: Union[str, None] = '0017_add_company_email_templates'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
