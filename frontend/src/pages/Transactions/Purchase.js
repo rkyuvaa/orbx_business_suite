@@ -558,9 +558,9 @@ const Purchase = () => {
     }
   ];
 
-  // Calculate dynamic PO grand sums
   const poTotalAmountSum = poItems.reduce((acc, item) => acc + (parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0), 0);
   const poTotalTaxSum = poItems.reduce((acc, item) => acc + ((parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0) * (parseFloat(item.tax_rate) || 18) / 100), 0);
+  const printBranch = selectedPO ? branches.find((b) => b.id === selectedPO.branch_id) : null;
 
   return (
     <Box>
