@@ -592,11 +592,13 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
             
-        so_seq = branch.so_next_number
-        branch.so_next_number += 1
-        db.add(branch)
-        
-        so_no = f"{branch.so_prefix}{so_seq:05d}{branch.so_suffix}"
+        if so_data.so_number:
+            so_no = so_data.so_number
+        else:
+            so_seq = branch.so_next_number
+            branch.so_next_number += 1
+            db.add(branch)
+            so_no = f"{branch.so_prefix}{so_seq:05d}{branch.so_suffix}"
 
         so = SalesOrder(
             customer_id=so_data.customer_id,
@@ -709,6 +711,8 @@ class TxServices:
         
         so.customer_id = so_data.customer_id
         so.branch_id = so_data.branch_id
+        if so_data.so_number:
+            so.so_number = so_data.so_number
 
         from sqlalchemy import delete
         await db.execute(delete(SalesOrderItem).filter(SalesOrderItem.sales_order_id == so_id))
@@ -803,13 +807,13 @@ class TxServices:
         q_comp = await db.execute(select(Company).filter(Company.id == branch.company_id))
         company = q_comp.scalar_one_or_none()
 
-        # Generate Invoice Number
-        invoice_seq = branch.invoice_next_number
-        branch.invoice_next_number += 1
-        db.add(branch)
-
-        # E.g. INV-00005
-        invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}{branch.invoice_suffix}"
+        if inv_data.invoice_number:
+            invoice_no = inv_data.invoice_number
+        else:
+            invoice_seq = branch.invoice_next_number
+            branch.invoice_next_number += 1
+            db.add(branch)
+            invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}{branch.invoice_suffix}"
 
         # ---------------------------------------------
         # GST BREAKUP CALCULATION

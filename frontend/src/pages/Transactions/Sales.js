@@ -52,6 +52,8 @@ const Sales = () => {
   const [invoiceDate, setInvoiceDate] = useState('');
   const [referenceNote, setReferenceNote] = useState('');
   const [referenceDate, setReferenceDate] = useState('');
+  const [manualSoNumber, setManualSoNumber] = useState('');
+  const [manualInvoiceNumber, setManualInvoiceNumber] = useState('');
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
   const [error, setError] = useState(null);
@@ -124,13 +126,29 @@ const Sales = () => {
     }
   };
 
+  const getNextSoNumber = (branchId, branchList = branches) => {
+    const br = branchList.find((b) => b.id === branchId);
+    if (!br) return '';
+    const nextNum = String(br.so_next_number).padStart(5, '0');
+    return `${br.so_prefix || ''}${nextNum}${br.so_suffix || ''}`;
+  };
+
+  const getNextInvoiceNumber = (branchId, branchList = branches) => {
+    const br = branchList.find((b) => b.id === branchId);
+    if (!br) return '';
+    const nextNum = String(br.invoice_next_number).padStart(5, '0');
+    return `${br.invoice_prefix || ''}${nextNum}${br.invoice_suffix || ''}`;
+  };
+
   const handleOpenAddSO = () => {
     setSelectedSO(null);
     setSoCustomerId('');
     setSelectedCustomer(null);
-    setSoBranchId(branches.length > 0 ? branches[0].id : '');
+    const defaultBranchId = branches.length > 0 ? branches[0].id : '';
+    setSoBranchId(defaultBranchId);
     setSoDate(new Date().toISOString().split('T')[0]);
     setSoItems([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
+    setManualSoNumber(getNextSoNumber(defaultBranchId));
     setOpenSOModal(true);
   };
 
@@ -157,6 +175,7 @@ const Sales = () => {
         sku: item.sku
       }))
     );
+    setManualSoNumber(so.so_number || '');
     setOpenSOModal(true);
   };
 
@@ -184,6 +203,7 @@ const Sales = () => {
       const payload = {
         customer_id: soCustomerId,
         branch_id: soBranchId,
+        so_number: manualSoNumber || null,
         date: soDate ? new Date(soDate).toISOString() : null,
         items: soItems.map(item => ({
           product_id: item.product_id,
@@ -217,6 +237,7 @@ const Sales = () => {
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setReferenceNote('');
     setReferenceDate('');
+    setManualInvoiceNumber(getNextInvoiceNumber(so.branch_id));
     
     // Fetch transferred DCs for this customer
     apiClient.get(`/inventory/transfers?customer_id=${so.customer_id}`)
@@ -234,6 +255,7 @@ const Sales = () => {
       const payload = {
         sales_order_id: selectedSO.id,
         delivery_challan_id: selectedDCId || null,
+        invoice_number: manualInvoiceNumber || null,
         date: invoiceDate ? new Date(invoiceDate).toISOString() : null,
         due_date: new Date(Date.now() + 15 * 86400000).toISOString(),
         reference_note: referenceNote || null,
@@ -766,14 +788,29 @@ const Sales = () => {
               fullWidth
               size="small"
               value={soBranchId}
-              onChange={(e) => setSoBranchId(e.target.value)}
+              onChange={(e) => {
+                const bId = e.target.value;
+                setSoBranchId(bId);
+                if (!selectedSO) {
+                  setManualSoNumber(getNextSoNumber(bId));
+                }
+              }}
             >
               {branches.map((b) => (
                 <MenuItem key={b.id} value={b.id}>{b.branch_name} ({b.code})</MenuItem>
               ))}
             </TextField>
           </Box>
-          <Box sx={{ flex: '1 1 200px' }}>
+          <Box sx={{ flex: '1 1 180px' }}>
+            <TextField
+              label="Sales Order Number"
+              fullWidth
+              size="small"
+              value={manualSoNumber}
+              onChange={(e) => setManualSoNumber(e.target.value)}
+            />
+          </Box>
+          <Box sx={{ flex: '1 1 150px' }}>
             <TextField
               type="date"
               label="Order Date"
@@ -938,6 +975,15 @@ const Sales = () => {
             No pending Delivery Challans found for this customer. Stock will be deducted from inventory.
           </Typography>
         )}
+
+        <TextField
+          fullWidth
+          size="small"
+          label="Invoice Number"
+          value={manualInvoiceNumber}
+          onChange={(e) => setManualInvoiceNumber(e.target.value)}
+          sx={{ mb: 3 }}
+        />
 
         <TextField
           type="date"

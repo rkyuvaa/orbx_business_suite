@@ -216,6 +216,7 @@ class SalesOrderItemOut(BaseModel):
 class SalesOrderCreate(BaseModel):
     customer_id: UUID
     branch_id: UUID
+    so_number: Optional[str] = None
     date: Optional[datetime] = None
     items: List[SalesOrderItemCreate]
 
@@ -262,6 +263,7 @@ class InvoiceItemOut(BaseModel):
 class InvoiceCreate(BaseModel):
     sales_order_id: Optional[UUID] = None
     delivery_challan_id: Optional[UUID] = None
+    invoice_number: Optional[str] = None
     date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     reference_note: Optional[str] = None
