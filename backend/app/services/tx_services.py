@@ -592,13 +592,14 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
             
-        if so_data.so_number:
-            so_no = so_data.so_number
-        else:
+        expected_so_no = f"{branch.so_prefix}{branch.so_next_number:05d}{branch.so_suffix}"
+        if not so_data.so_number or so_data.so_number == expected_so_no:
             so_seq = branch.so_next_number
             branch.so_next_number += 1
             db.add(branch)
-            so_no = f"{branch.so_prefix}{so_seq:05d}{branch.so_suffix}"
+            so_no = expected_so_no
+        else:
+            so_no = so_data.so_number
 
         so = SalesOrder(
             customer_id=so_data.customer_id,
@@ -808,13 +809,14 @@ class TxServices:
         q_comp = await db.execute(select(Company).filter(Company.id == branch.company_id))
         company = q_comp.scalar_one_or_none()
 
-        if inv_data.invoice_number:
-            invoice_no = inv_data.invoice_number
-        else:
+        expected_invoice_no = f"{branch.invoice_prefix}{branch.invoice_next_number:05d}{branch.invoice_suffix}"
+        if not inv_data.invoice_number or inv_data.invoice_number == expected_invoice_no:
             invoice_seq = branch.invoice_next_number
             branch.invoice_next_number += 1
             db.add(branch)
-            invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}{branch.invoice_suffix}"
+            invoice_no = expected_invoice_no
+        else:
+            invoice_no = inv_data.invoice_number
 
         # ---------------------------------------------
         # GST BREAKUP CALCULATION
