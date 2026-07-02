@@ -28,21 +28,38 @@ const AuthLayout = () => {
           textAlign: 'center',
         }}
       >
-        <Box sx={{ mb: 4 }}>
-          <Typography
-            variant="h4"
+        <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            component="img"
+            src="/logo.svg"
+            alt="ORBX Logo"
             sx={{
-              fontWeight: 800,
-              color: 'primary.main',
-              letterSpacing: '-0.5px',
-              mb: 1,
+              height: 72,
+              width: 'auto',
+              filter: 'drop-shadow(0px 4px 10px rgba(27, 67, 50, 0.15))',
+              animation: 'pulse 3s infinite ease-in-out',
+              '@keyframes pulse': {
+                '0%, 100%': { transform: 'scale(1)' },
+                '50%': { transform: 'scale(1.06)' },
+              }
             }}
-          >
-            ORBX
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Enterprise Resource Planning Suite
-          </Typography>
+          />
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                color: 'primary.main',
+                letterSpacing: '-0.5px',
+                mb: 0.5,
+              }}
+            >
+              ORBX
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Enterprise Resource Planning Suite
+            </Typography>
+          </Box>
         </Box>
         
         <Outlet />

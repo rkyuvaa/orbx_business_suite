@@ -351,9 +351,24 @@ const AppLayout = () => {
               <HomeIcon />
             </IconButton>
 
-            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 800, fontSize: isSmallMobile ? '0.95rem' : '1.1rem', letterSpacing: '-0.3px', color: '#1b4332' }}>
-              ORBX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+              <Box
+                component="img"
+                src="/logo.svg"
+                alt="ORBX Logo"
+                sx={{
+                  height: 32,
+                  width: 'auto',
+                  transition: 'transform 0.3s ease',
+                  '&:hover': {
+                    transform: 'rotate(8deg) scale(1.1)',
+                  }
+                }}
+              />
+              <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 800, fontSize: isSmallMobile ? '0.95rem' : '1.1rem', letterSpacing: '-0.3px', color: '#1b4332', lineHeight: 1 }}>
+                ORBX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
+              </Typography>
+            </Box>
 
             {!isDashboard && (
               <Box sx={{ display: 'flex', alignItems: 'center', ml: isSmallMobile ? 1 : 2.5, gap: isSmallMobile ? 1 : 1.5 }}>
