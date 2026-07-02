@@ -187,8 +187,9 @@ class TxServices:
         if not po:
             raise HTTPException(status_code=404, detail="Purchase Order not found.")
         
-        if po.status != "Draft":
-            raise HTTPException(status_code=400, detail="Only Draft Purchase Orders can be edited.")
+        # Allow editing non-Draft purchase orders too
+        # if po.status != "Draft":
+        #     raise HTTPException(status_code=400, detail="Only Draft Purchase Orders can be edited.")
         
         po.supplier_id = po_data.supplier_id
         po.branch_id = po_data.branch_id

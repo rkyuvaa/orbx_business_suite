@@ -194,7 +194,7 @@ const Purchase = () => {
           tax_rate: item.tax_rate
         }))
       };
-      if (selectedPO && selectedPO.status === 'Draft') {
+      if (selectedPO) {
         await apiClient.put(`/purchase/po/${selectedPO.id}`, payload);
       } else {
         await apiClient.post('/purchase/po', payload);
@@ -421,7 +421,6 @@ const Purchase = () => {
             {
               icon: <EditIcon />,
               label: 'Edit Purchase Order',
-              condition: (row) => row.status === 'Draft',
               onClick: handleOpenEditPO,
               color: 'secondary'
             },
