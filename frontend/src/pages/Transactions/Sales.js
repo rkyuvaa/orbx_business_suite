@@ -689,7 +689,6 @@ const Sales = () => {
             {
               icon: <EditIcon />,
               label: 'Edit Sales Order',
-              condition: (row) => row.status === 'Draft',
               onClick: handleOpenEditSO,
               color: 'secondary'
             },

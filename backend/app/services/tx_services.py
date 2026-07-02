@@ -706,8 +706,9 @@ class TxServices:
         if not so:
             raise HTTPException(status_code=404, detail="Sales Order not found.")
         
-        if so.status != "Draft":
-            raise HTTPException(status_code=400, detail="Only Draft Sales Orders can be edited.")
+        # Allow editing non-Draft sales orders too (e.g. to fix sales order number typos)
+        # if so.status != "Draft":
+        #     raise HTTPException(status_code=400, detail="Only Draft Sales Orders can be edited.")
         
         so.customer_id = so_data.customer_id
         so.branch_id = so_data.branch_id
