@@ -341,23 +341,24 @@ const AppLayout = () => {
               </IconButton>
             )}
 
-            <IconButton
+            <Box
               component={RouterLink}
               to="/"
-              color="inherit"
-              edge="start"
-              sx={{ color: 'primary.main', mr: 0.5 }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                textDecoration: 'none',
+                color: 'inherit',
+                cursor: 'pointer'
+              }}
             >
-              <HomeIcon />
-            </IconButton>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
               <Box
                 component="img"
                 src="/logo.svg"
-                alt="ORBX Logo"
+                alt="OrbX Logo"
                 sx={{
-                  height: 32,
+                  height: 42,
                   width: 'auto',
                   transition: 'transform 0.3s ease',
                   '&:hover': {
@@ -366,7 +367,7 @@ const AppLayout = () => {
                 }}
               />
               <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 800, fontSize: isSmallMobile ? '0.95rem' : '1.1rem', letterSpacing: '-0.3px', color: '#1b4332', lineHeight: 1 }}>
-                ORBX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
+                OrbX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
               </Typography>
             </Box>
 
