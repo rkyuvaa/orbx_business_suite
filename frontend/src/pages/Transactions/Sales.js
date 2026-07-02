@@ -213,7 +213,7 @@ const Sales = () => {
           tax_rate: item.tax_rate
         }))
       };
-      if (selectedSO && selectedSO.status === 'Draft') {
+      if (selectedSO) {
         await apiClient.put(`/sales/so/${selectedSO.id}`, payload);
       } else {
         await apiClient.post('/sales/so', payload);
