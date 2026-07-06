@@ -11,7 +11,7 @@ from app.models.product import Product, ProductCategory
 from app.models.purchase import PurchaseOrder, PurchaseEntry
 from app.models.inventory import CurrentStock, StockTransaction
 from app.models.sales import SalesOrder, Invoice, InvoiceItem
-from app.models.finance import Payment
+from app.models.finance import Payment, VendorPayment
 from app.schemas.transaction import (
     DashboardResponse, KPICardsOut, SalesByCategoryOut,
     MonthlySalesTrendOut, TopProductSalesOut, RecentTransactionOut,
@@ -343,16 +343,41 @@ class ReportService:
         q_bills = await db.execute(stmt_bills.order_by(PurchaseEntry.billing_date.asc()))
         bills = q_bills.scalars().all()
 
-        # 3. Construct ledger entries
+        # 3. Fetch Payments (VendorPayment)
+        stmt_payments = select(VendorPayment).filter(VendorPayment.supplier_id == supplier_id).options(selectinload(VendorPayment.purchase_entry))
+        if start_dt:
+            stmt_payments = stmt_payments.filter(VendorPayment.payment_date >= start_dt)
+        if end_dt:
+            stmt_payments = stmt_payments.filter(VendorPayment.payment_date <= end_dt)
+        q_payments = await db.execute(stmt_payments.order_by(VendorPayment.payment_date.asc()))
+        payments = q_payments.scalars().all()
+
+        # 4. Merge entries chronologically
         entries = []
         for bill in bills:
-            paid_amt = bill.total_amount if bill.status == "Paid" else 0.0
             entries.append({
                 "date": bill.billing_date,
                 "tx_type": "Purchase Bill",
                 "reference_no": bill.invoice_number,
                 "debit": bill.total_amount,
-                "credit": paid_amt
+                "credit": 0.0
+            })
+        for pay in payments:
+            ref_no = pay.reference_number
+            if not ref_no or ref_no == "-":
+                if pay.purchase_entry:
+                    ref_no = pay.purchase_entry.invoice_number
+                else:
+                    ref_no = "Advance Payment"
+            elif pay.purchase_entry:
+                ref_no = f"{ref_no} ({pay.purchase_entry.invoice_number})"
+            
+            entries.append({
+                "date": pay.payment_date,
+                "tx_type": "Payment",
+                "reference_no": ref_no,
+                "debit": 0.0,
+                "credit": pay.amount_paid
             })
 
         # Sort entries by date
