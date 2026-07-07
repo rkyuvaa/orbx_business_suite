@@ -160,6 +160,11 @@ const VendorPayments = () => {
 
   const columns = [
     {
+      id: 'id',
+      label: 'Transaction ID',
+      render: (row) => `TXN-${row.id.substring(0, 8).toUpperCase()}`
+    },
+    {
       id: 'payment_date',
       label: 'Payment Date',
       render: (row) => new Date(row.payment_date).toLocaleDateString('en-IN')
@@ -190,8 +195,13 @@ const VendorPayments = () => {
     },
     {
       id: 'reference_number',
-      label: 'Reference Number',
+      label: 'Ref Number / Cheque #',
       render: (row) => row.reference_number || '-'
+    },
+    {
+      id: 'notes',
+      label: 'Reference Notes',
+      render: (row) => row.notes || '-'
     }
   ];
 
