@@ -9,6 +9,13 @@ import App from './App';
 import store from './app/store';
 import theme from './theme';
 
+// Disable scroll wheel increment/decrement on number inputs globally
+document.addEventListener('wheel', (e) => {
+  if (document.activeElement && document.activeElement.type === 'number') {
+    e.preventDefault();
+  }
+}, { passive: false });
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
