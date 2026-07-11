@@ -595,8 +595,10 @@ const Sales = () => {
       return selectedInvoice;
     } else if (printDocType === 'SalesOrder') {
       if (!selectedSO) return null;
-      const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '22');
-      const customerState = selectedSO.customer_gstin ? selectedSO.customer_gstin.substring(0, 2) : '22';
+      const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
+      const customerGstin = selectedSO.customer_gstin;
+      const hasCustomerGst = customerGstin && customerGstin !== 'N/A' && customerGstin.trim() !== '';
+      const customerState = hasCustomerGst ? customerGstin.substring(0, 2) : companyState;
       const isIntrastate = companyState === customerState;
       const cgst = isIntrastate ? selectedSO.tax_amount / 2 : 0;
       const sgst = isIntrastate ? selectedSO.tax_amount / 2 : 0;

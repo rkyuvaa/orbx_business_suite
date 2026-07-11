@@ -1096,8 +1096,10 @@ const Purchase = () => {
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedPO?.total_amount?.toFixed(2)}</Typography>
                   
                   {(() => {
-                    const companyState = company?.gstin ? company.gstin.substring(0, 2) : '22';
-                    const supplierState = selectedPO?.supplier?.gstin ? selectedPO.supplier.gstin.substring(0, 2) : '22';
+                    const companyState = company?.gstin ? company.gstin.substring(0, 2) : '33';
+                    const supplierGstin = selectedPO?.supplier?.gstin;
+                    const hasSupplierGst = supplierGstin && supplierGstin !== 'N/A' && supplierGstin.trim() !== '';
+                    const supplierState = hasSupplierGst ? supplierGstin.substring(0, 2) : companyState;
                     const isIntrastate = companyState === supplierState;
                     const taxAmt = selectedPO?.tax_amount || 0;
                     if (isIntrastate && taxAmt > 0) {
