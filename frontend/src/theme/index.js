@@ -77,6 +77,17 @@ const theme = createTheme({
     borderRadius: 8, // Modern rounded inputs and buttons
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        'input::-webkit-outer-spin-button, input::-webkit-inner-spin-button': {
+          '-webkit-appearance': 'none',
+          margin: 0,
+        },
+        'input[type=number]': {
+          '-moz-appearance': 'textfield',
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
