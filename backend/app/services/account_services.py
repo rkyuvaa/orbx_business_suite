@@ -282,11 +282,12 @@ class AccountServices:
             raise ValueError(f"Voucher type '{voucher_type_name}' not found.")
 
         # 2. Validate Dr == Cr and amounts > 0 using Decimal
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         dr_total = Decimal("0.00")
         cr_total = Decimal("0.00")
+        quantized_lines = []
         for line in lines:
-            amt = Decimal(str(line.amount))
+            amt = Decimal(str(line.amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             if amt <= Decimal("0.00"):
                 raise ValueError("Journal line amount must be greater than zero.")
             if line.dr_cr == "Dr":
@@ -295,6 +296,7 @@ class AccountServices:
                 cr_total += amt
             else:
                 raise ValueError(f"Invalid debit/credit flag: '{line.dr_cr}'. Must be 'Dr' or 'Cr'.")
+            quantized_lines.append((line, amt))
 
         if dr_total != cr_total:
             raise ValueError(f"Journal entry imbalanced: Dr {dr_total} != Cr {cr_total}")
@@ -339,13 +341,13 @@ class AccountServices:
         db.add(entry)
 
         # 4. Create JournalLines
-        for line in lines:
+        for line, amt in quantized_lines:
             jl = JournalLine(
                 id=uuid4(),
                 journal_entry_id=entry.id,
                 ledger_id=line.ledger_id,
                 dr_cr=line.dr_cr,
-                amount=float(line.amount),
+                amount=float(amt),
                 narration=line.narration
             )
             db.add(jl)
