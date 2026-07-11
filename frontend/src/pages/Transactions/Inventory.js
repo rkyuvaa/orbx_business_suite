@@ -858,7 +858,7 @@ const Inventory = () => {
             sx={{
               backgroundColor: '#ffffff',
               color: '#000000',
-              fontFamily: '"Outfit", sans-serif',
+              fontFamily: 'sans-serif',
               boxShadow: 'none',
               '@media print': {
                 width: '210mm !important',

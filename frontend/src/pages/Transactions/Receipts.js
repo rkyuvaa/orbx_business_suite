@@ -218,7 +218,7 @@ const Receipts = () => {
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             color: '#000000',
-            fontFamily: '"Outfit", sans-serif',
+            fontFamily: 'sans-serif',
             boxShadow: 'none',
             border: '1px dashed #cbd5e1',
             '@media print': {
