@@ -407,7 +407,7 @@ class TxServices:
                 sgst_amount = tax_val / Decimal("2.00")
 
             # Create PurchaseEntry instance
-            entry_dict = entry_data.model_dump()
+            entry_dict = entry_data.model_dump(exclude_none=True)
             entry_dict["payable_ledger_id"] = payable_ledger_id
             entry_dict["purchase_account_id"] = purchase_account_id
             entry_dict["tax_ledger_id"] = tax_ledger_id
