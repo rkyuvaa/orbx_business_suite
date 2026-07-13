@@ -10,6 +10,7 @@ const SalesReport = () => {
   const [invoices, setInvoices] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [company, setCompany] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -27,6 +28,8 @@ const SalesReport = () => {
     try {
       const res = await apiClient.get('/sales/invoices');
       setInvoices(res.data);
+      const cRes = await apiClient.get('/admin/company');
+      setCompany(cRes.data);
     } catch (err) {
       setError('Failed to fetch sales reports.');
     }
@@ -36,19 +39,53 @@ const SalesReport = () => {
     loadReport();
   }, []);
 
+  const getTaxDetails = (row) => {
+    const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
+    const customerGstin = row.customer_gstin;
+    const hasCustomerGst = customerGstin && customerGstin !== 'N/A' && customerGstin.trim() !== '';
+    const customerState = hasCustomerGst ? customerGstin.substring(0, 2) : companyState;
+    const isIntrastate = companyState === customerState;
+
+    const gstRate = row.items && row.items.length > 0 ? (row.items[0].tax_rate || 18) : 18;
+
+    const cgstPct = isIntrastate ? gstRate / 2 : 0;
+    const sgstPct = isIntrastate ? gstRate / 2 : 0;
+    const igstPct = !isIntrastate ? gstRate : 0;
+
+    const cgstAmt = isIntrastate ? row.tax_amount / 2 : 0;
+    const sgstAmt = isIntrastate ? row.tax_amount / 2 : 0;
+    const igstAmt = !isIntrastate ? row.tax_amount : 0;
+
+    return { cgstPct, cgstAmt, sgstPct, sgstAmt, igstPct, igstAmt };
+  };
+
   const handleExportCSV = () => {
     if (invoices.length === 0) return;
     
-    // Header columns
-    const headers = ['Invoice Number', 'Date', 'Subtotal', 'Tax Amount', 'Total Value', 'Status'];
-    const rows = invoices.map((inv) => [
-      inv.invoice_number,
-      new Date(inv.date).toLocaleDateString(),
-      inv.subtotal,
-      inv.tax_amount,
-      inv.total_amount,
-      inv.status,
-    ]);
+    const headers = [
+      'Invoice Number', 'Date', 'Customer Name', 'GSTIN', 'Taxable Value',
+      'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt',
+      'Total Tax', 'Total Invoice', 'Status'
+    ];
+    const rows = invoices.map((inv) => {
+      const { cgstPct, cgstAmt, sgstPct, sgstAmt, igstPct, igstAmt } = getTaxDetails(inv);
+      return [
+        inv.invoice_number,
+        new Date(inv.date).toLocaleDateString(),
+        inv.customer_name || 'Unknown',
+        inv.customer_gstin || 'N/A',
+        inv.subtotal,
+        `${cgstPct}%`,
+        cgstAmt.toFixed(2),
+        `${sgstPct}%`,
+        sgstAmt.toFixed(2),
+        `${igstPct}%`,
+        igstAmt.toFixed(2),
+        inv.tax_amount,
+        inv.total_amount,
+        inv.status,
+      ];
+    });
 
     const csvContent =
       'data:text/csv;charset=utf-8,' +
@@ -66,9 +103,17 @@ const SalesReport = () => {
   const columns = [
     { id: 'invoice_number', label: 'Invoice No.' },
     { id: 'date', label: 'Billing Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    { id: 'subtotal', label: 'Subtotal (₹)', render: (row) => `₹${row.subtotal.toFixed(2)}` },
-    { id: 'tax_amount', label: 'Tax (GST) (₹)', render: (row) => `₹${row.tax_amount.toFixed(2)}` },
-    { id: 'total_amount', label: 'Grand Total (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
+    { id: 'customer_name', label: 'Customer Name', render: (row) => row.customer_name || 'Unknown' },
+    { id: 'customer_gstin', label: 'GSTIN', render: (row) => row.customer_gstin || 'N/A' },
+    { id: 'subtotal', label: 'Taxable Value (₹)', render: (row) => `₹${row.subtotal.toFixed(2)}` },
+    { id: 'cgst_pct', label: 'CGST %', render: (row) => `${getTaxDetails(row).cgstPct}%` },
+    { id: 'cgst_amt', label: 'CGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).cgstAmt.toFixed(2)}` },
+    { id: 'sgst_pct', label: 'SGST %', render: (row) => `${getTaxDetails(row).sgstPct}%` },
+    { id: 'sgst_amt', label: 'SGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).sgstAmt.toFixed(2)}` },
+    { id: 'igst_pct', label: 'IGST %', render: (row) => `${getTaxDetails(row).igstPct}%` },
+    { id: 'igst_amt', label: 'IGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).igstAmt.toFixed(2)}` },
+    { id: 'tax_amount', label: 'Total Tax (₹)', render: (row) => `₹${row.tax_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Total Invoice (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
     {
       id: 'status',
       label: 'Status',
@@ -109,11 +154,30 @@ const SalesReport = () => {
     const totalTax = filteredRows.reduce((sum, row) => sum + (row.tax_amount || 0), 0);
     const totalGrand = filteredRows.reduce((sum, row) => sum + (row.total_amount || 0), 0);
 
+    let totalCgstAmt = 0;
+    let totalSgstAmt = 0;
+    let totalIgstAmt = 0;
+
+    filteredRows.forEach((row) => {
+      const { cgstAmt, sgstAmt, igstAmt } = getTaxDetails(row);
+      totalCgstAmt += cgstAmt;
+      totalSgstAmt += sgstAmt;
+      totalIgstAmt += igstAmt;
+    });
+
     return (
       <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
         <TableCell>Total</TableCell>
         <TableCell></TableCell>
+        <TableCell></TableCell>
+        <TableCell></TableCell>
         <TableCell>₹{totalSubtotal.toFixed(2)}</TableCell>
+        <TableCell></TableCell>
+        <TableCell>₹{totalCgstAmt.toFixed(2)}</TableCell>
+        <TableCell></TableCell>
+        <TableCell>₹{totalSgstAmt.toFixed(2)}</TableCell>
+        <TableCell></TableCell>
+        <TableCell>₹{totalIgstAmt.toFixed(2)}</TableCell>
         <TableCell>₹{totalTax.toFixed(2)}</TableCell>
         <TableCell>₹{totalGrand.toFixed(2)}</TableCell>
         <TableCell></TableCell>
