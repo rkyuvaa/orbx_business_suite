@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, TextField } from '@mui/material';
+import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, TextField, TableRow, TableCell } from '@mui/material';
 import { FileDownload as ExportIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -180,11 +180,32 @@ const InventoryReport = () => {
         </Tabs>
       </Paper>
 
-      {tabIndex === 0 ? (
-        <CommonTable columns={valuationColumns} rows={stocks} searchKey="qty" />
-      ) : (
-        <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
-      )}
+      {(() => {
+        const renderValuationSummary = (filteredRows) => {
+          const totalQty = filteredRows.reduce((sum, row) => sum + (row.qty || 0), 0);
+          const totalValuation = filteredRows.reduce((sum, row) => {
+            const prod = products.find((p) => p.id === row.product_id);
+            const val = prod ? row.qty * prod.purchase_price : 0;
+            return sum + val;
+          }, 0);
+
+          return (
+            <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
+              <TableCell>Total</TableCell>
+              <TableCell></TableCell>
+              <TableCell>{totalQty}</TableCell>
+              <TableCell></TableCell>
+              <TableCell sx={{ color: 'primary.main' }}>₹{totalValuation.toFixed(2)}</TableCell>
+            </TableRow>
+          );
+        };
+
+        return tabIndex === 0 ? (
+          <CommonTable columns={valuationColumns} rows={stocks} searchKey="qty" renderSummary={renderValuationSummary} />
+        ) : (
+          <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
+        );
+      })()}
     </Box>
   );
 };

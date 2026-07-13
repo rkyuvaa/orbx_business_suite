@@ -18,7 +18,8 @@ const CommonTable = ({
   actions = [], // Array of { label, icon, onClick, color, condition }
   searchPlaceholder = "Search records...",
   searchKey = "name",
-  tableActions = null
+  tableActions = null,
+  renderSummary = null
 }) => {
   const [order, setOrder] = useState('asc');
   const [orderBy, setOrderBy] = useState('');
@@ -178,6 +179,7 @@ const CommonTable = ({
                 </TableRow>
               ))
             )}
+            {filteredRows.length > 0 && renderSummary && renderSummary(filteredRows)}
           </TableBody>
         </Table>
       </TableContainer>

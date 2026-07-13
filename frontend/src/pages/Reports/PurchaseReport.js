@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Alert, Typography, Grid, TextField, Paper } from '@mui/material';
+import { Box, Button, Alert, Typography, Grid, TextField, Paper, TableRow, TableCell } from '@mui/material';
 import { FileDownload as ExportIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -93,6 +93,23 @@ const PurchaseReport = () => {
     },
   ];
 
+  const renderSummary = (filteredRows) => {
+    const totalSubtotal = filteredRows.reduce((sum, row) => sum + (row.total_amount || 0), 0);
+    const totalTax = filteredRows.reduce((sum, row) => sum + (row.tax_amount || 0), 0);
+    const totalGrand = filteredRows.reduce((sum, row) => sum + (row.grand_total || 0), 0);
+
+    return (
+      <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
+        <TableCell>Total</TableCell>
+        <TableCell></TableCell>
+        <TableCell>₹{totalSubtotal.toFixed(2)}</TableCell>
+        <TableCell>₹{totalTax.toFixed(2)}</TableCell>
+        <TableCell>₹{totalGrand.toFixed(2)}</TableCell>
+        <TableCell></TableCell>
+      </TableRow>
+    );
+  };
+
   return (
     <Box>
       <PageHeader
@@ -144,7 +161,7 @@ const PurchaseReport = () => {
         </Grid>
       </Paper>
 
-      <CommonTable columns={columns} rows={pos} searchKey="status" />
+      <CommonTable columns={columns} rows={pos} searchKey="status" renderSummary={renderSummary} />
     </Box>
   );
 };
