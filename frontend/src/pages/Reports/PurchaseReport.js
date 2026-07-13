@@ -9,9 +9,20 @@ import CommonTable from '../../components/CommonTable';
 const PurchaseReport = () => {
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [startDate, setStartDate] = useState('2026-05-01');
-  const [endDate, setEndDate] = useState('2026-06-30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const startStr = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const end = new Date(y, m + 1, 0);
+    const endStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+    setStartDate(startStr);
+    setEndDate(endStr);
+  }, []);
 
   const loadReport = async () => {
     try {
@@ -93,6 +104,20 @@ const PurchaseReport = () => {
     },
   ];
 
+  const filteredPos = pos.filter((po) => {
+    if (!po.date) return false;
+    const poDate = new Date(po.date);
+    const year = poDate.getFullYear();
+    const month = String(poDate.getMonth() + 1).padStart(2, '0');
+    const day = String(poDate.getDate()).padStart(2, '0');
+    const poDateStr = `${year}-${month}-${day}`;
+    
+    const start = startDate || '1970-01-01';
+    const end = endDate || '9999-12-31';
+    
+    return poDateStr >= start && poDateStr <= end;
+  });
+
   const renderSummary = (filteredRows) => {
     const totalSubtotal = filteredRows.reduce((sum, row) => sum + (row.total_amount || 0), 0);
     const totalTax = filteredRows.reduce((sum, row) => sum + (row.tax_amount || 0), 0);
@@ -161,7 +186,7 @@ const PurchaseReport = () => {
         </Grid>
       </Paper>
 
-      <CommonTable columns={columns} rows={pos} searchKey="status" renderSummary={renderSummary} />
+      <CommonTable columns={columns} rows={filteredPos} searchKey="status" renderSummary={renderSummary} />
     </Box>
   );
 };
