@@ -38,25 +38,28 @@ class ReportService:
         # 1. KPI CARDS SUMS
         # ---------------------------------------------
         # Today's Sales
-        stmt_today = select(func.sum(Invoice.total_amount)).filter(Invoice.date >= start_of_today)
+        stmt_today = select(func.sum(Invoice.total_amount)).filter(Invoice.date >= start_of_today).filter(Invoice.status != "Cancelled")
         if branch_id:
             stmt_today = stmt_today.filter(Invoice.branch_id == branch_id)
         q_today = await db.execute(stmt_today)
         today_sales = q_today.scalar() or 0.0
 
         # Monthly Sales
-        stmt_month = select(func.sum(Invoice.total_amount)).filter(Invoice.date >= start_of_month)
+        stmt_month = select(func.sum(Invoice.total_amount)).filter(Invoice.date >= start_of_month).filter(Invoice.status != "Cancelled")
         if branch_id:
             stmt_month = stmt_month.filter(Invoice.branch_id == branch_id)
         q_month = await db.execute(stmt_month)
         monthly_sales = q_month.scalar() or 0.0
 
         # Outstanding Payments
-        stmt_out = select(func.sum(Invoice.total_amount)).filter(Invoice.status != "Paid")
+        stmt_out = select(Invoice).filter(Invoice.status.in_(["Unpaid", "PartiallyPaid"])).options(selectinload(Invoice.payments))
         if branch_id:
             stmt_out = stmt_out.filter(Invoice.branch_id == branch_id)
         q_out = await db.execute(stmt_out)
-        outstanding = q_out.scalar() or 0.0
+        outstanding = 0.0
+        for inv in q_out.scalars().all():
+            total_paid = sum([p.amount_paid for p in inv.payments])
+            outstanding += max(0.0, inv.total_amount - total_paid)
 
         # Low Stock count
         # Select products where min_stock_level > current_stock
@@ -81,6 +84,7 @@ class ReportService:
             .join(Product, Product.category_id == ProductCategory.id)
             .join(InvoiceItem, InvoiceItem.product_id == Product.id)
             .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+            .filter(Invoice.status != "Cancelled")
         )
         if branch_id:
             stmt_cat = stmt_cat.filter(Invoice.branch_id == branch_id)
@@ -101,7 +105,7 @@ class ReportService:
         
         # Pull invoice sums grouped by month
         for idx, m_name in enumerate(months):
-            stmt_trend = select(func.sum(Invoice.total_amount)).filter(func.extract('month', Invoice.date) == (idx + 1))
+            stmt_trend = select(func.sum(Invoice.total_amount)).filter(Invoice.status != "Cancelled").filter(func.extract('month', Invoice.date) == (idx + 1))
             if branch_id:
                 stmt_trend = stmt_trend.filter(Invoice.branch_id == branch_id)
             q_trend = await db.execute(stmt_trend)
@@ -116,6 +120,7 @@ class ReportService:
             select(Product.name, Product.sku, func.sum(InvoiceItem.qty), func.sum(InvoiceItem.amount))
             .join(InvoiceItem, InvoiceItem.product_id == Product.id)
             .join(Invoice, Invoice.id == InvoiceItem.invoice_id)
+            .filter(Invoice.status != "Cancelled")
         )
         if branch_id:
             stmt_top = stmt_top.filter(Invoice.branch_id == branch_id)
