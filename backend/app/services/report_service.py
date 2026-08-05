@@ -51,15 +51,47 @@ class ReportService:
         q_month = await db.execute(stmt_month)
         monthly_sales = q_month.scalar() or 0.0
 
-        # Outstanding Payments
-        stmt_out = select(Invoice).filter(Invoice.status.in_(["Unpaid", "PartiallyPaid"])).options(selectinload(Invoice.payments))
+        # Outstanding Payments (Overall Customer ledger outstanding balances including opening balances)
+        stmt_inv_sub = (
+            select(SalesOrder.customer_id, func.sum(Invoice.total_amount).label("inv_total"))
+            .join(Invoice, Invoice.sales_order_id == SalesOrder.id)
+            .filter(Invoice.status != "Cancelled")
+        )
         if branch_id:
-            stmt_out = stmt_out.filter(Invoice.branch_id == branch_id)
-        q_out = await db.execute(stmt_out)
+            stmt_inv_sub = stmt_inv_sub.filter(Invoice.branch_id == branch_id)
+        stmt_inv_sub = stmt_inv_sub.group_by(SalesOrder.customer_id).subquery()
+
+        stmt_pay_sub = (
+            select(Payment.customer_id, func.sum(Payment.amount_paid).label("pay_total"))
+        )
+        if branch_id:
+            stmt_pay_sub = stmt_pay_sub.filter(Payment.branch_id == branch_id)
+        stmt_pay_sub = stmt_pay_sub.group_by(Payment.customer_id).subquery()
+
+        stmt_out_agg = (
+            select(
+                Customer.opening_bal,
+                Customer.opening_bal_type,
+                func.coalesce(stmt_inv_sub.c.inv_total, 0.0).label("invoices_sum"),
+                func.coalesce(stmt_pay_sub.c.pay_total, 0.0).label("payments_sum")
+            )
+            .outerjoin(stmt_inv_sub, stmt_inv_sub.c.customer_id == Customer.id)
+            .outerjoin(stmt_pay_sub, stmt_pay_sub.c.customer_id == Customer.id)
+        )
+        if branch_id:
+            stmt_out_agg = stmt_out_agg.filter(Customer.branch_id == branch_id)
+
+        q_out_agg = await db.execute(stmt_out_agg)
         outstanding = 0.0
-        for inv in q_out.scalars().all():
-            total_paid = sum([p.amount_paid for p in inv.payments])
-            outstanding += max(0.0, inv.total_amount - total_paid)
+        for row in q_out_agg.all():
+            op_bal = float(row[0])
+            op_type = row[1]
+            op_signed = op_bal if op_type == "Dr" else -op_bal
+            inv_sum = float(row[2])
+            pay_sum = float(row[3])
+            net_bal = op_signed + inv_sum - pay_sum
+            if net_bal > 0:
+                outstanding += net_bal
 
         # Low Stock count
         # Select products where min_stock_level > current_stock
