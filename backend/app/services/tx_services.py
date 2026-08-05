@@ -2027,6 +2027,9 @@ class TxServices:
             if result.invoice.sales_order and result.invoice.sales_order.customer:
                 result.customer_name = result.invoice.sales_order.customer.name
                 result.customer_id = result.invoice.sales_order.customer.id
+                result.customer_gstin = result.invoice.sales_order.customer.gstin
+                result.customer_billing_address = result.invoice.sales_order.customer.billing_address
+                result.customer_shipping_address = result.invoice.sales_order.customer.shipping_address
         for it in result.items:
             it.product_name = it.product.name if it.product else "Unknown"
             it.sku = it.product.sku if it.product else ""
@@ -2050,6 +2053,9 @@ class TxServices:
                 if cn.invoice.sales_order and cn.invoice.sales_order.customer:
                     cn.customer_name = cn.invoice.sales_order.customer.name
                     cn.customer_id = cn.invoice.sales_order.customer.id
+                    cn.customer_gstin = cn.invoice.sales_order.customer.gstin
+                    cn.customer_billing_address = cn.invoice.sales_order.customer.billing_address
+                    cn.customer_shipping_address = cn.invoice.sales_order.customer.shipping_address
             for it in cn.items:
                 it.product_name = it.product.name if it.product else "Unknown"
                 it.sku = it.product.sku if it.product else ""
@@ -2210,6 +2216,10 @@ class TxServices:
         )
         result = q_final.scalar_one()
         result.supplier_name = result.supplier.name if result.supplier else "Unknown"
+        if result.supplier:
+            result.supplier_gstin = result.supplier.gstin
+            result.supplier_address = result.supplier.address
+            result.supplier_phone = result.supplier.phone
         if result.purchase_entry:
             result.purchase_entry_number = result.purchase_entry.invoice_number
         for it in result.items:
@@ -2232,6 +2242,10 @@ class TxServices:
         dns = result.scalars().all()
         for dn in dns:
             dn.supplier_name = dn.supplier.name if dn.supplier else "Unknown"
+            if dn.supplier:
+                dn.supplier_gstin = dn.supplier.gstin
+                dn.supplier_address = dn.supplier.address
+                dn.supplier_phone = dn.supplier.phone
             if dn.purchase_entry:
                 dn.purchase_entry_number = dn.purchase_entry.invoice_number
             for it in dn.items:

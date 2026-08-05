@@ -551,6 +551,9 @@ class CreditNoteOut(BaseModel):
     invoice_number: Optional[str] = None
     customer_id: Optional[UUID] = None
     customer_name: Optional[str] = None
+    customer_gstin: Optional[str] = None
+    customer_billing_address: Optional[str] = None
+    customer_shipping_address: Optional[str] = None
     branch_id: UUID
     credit_note_number: str
     date: datetime
@@ -606,6 +609,9 @@ class DebitNoteOut(BaseModel):
     purchase_entry_number: Optional[str] = None
     supplier_id: UUID
     supplier_name: Optional[str] = None
+    supplier_gstin: Optional[str] = None
+    supplier_address: Optional[str] = None
+    supplier_phone: Optional[str] = None
     branch_id: UUID
     debit_note_number: str
     date: datetime
