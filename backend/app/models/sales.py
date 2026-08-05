@@ -90,8 +90,42 @@ class InvoiceItem(Base):
     tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
     amount: Mapped[float] = mapped_column(Float)
 
+
     # Relationships
     invoice: Mapped["Invoice"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()
 
 
+class CreditNote(Base):
+    __tablename__ = "credit_notes"
+
+    invoice_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, index=True)
+    branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    credit_note_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    subtotal: Mapped[float] = mapped_column(Float, default=0.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(30), default="Issued")  # Issued, Cancelled
+
+    # Relationships
+    invoice: Mapped[Optional["Invoice"]] = relationship()
+    branch: Mapped["Branch"] = relationship()
+    items: Mapped[List["CreditNoteItem"]] = relationship(back_populates="credit_note", cascade="all, delete-orphan")
+
+
+class CreditNoteItem(Base):
+    __tablename__ = "credit_note_items"
+
+    credit_note_id: Mapped[UUID] = mapped_column(ForeignKey("credit_notes.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), index=True)
+    qty: Mapped[float] = mapped_column(Float)
+    rate: Mapped[float] = mapped_column(Float)
+    tax_rate: Mapped[float] = mapped_column(Float, default=18.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Float)
+
+    # Relationships
+    credit_note: Mapped["CreditNote"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship()

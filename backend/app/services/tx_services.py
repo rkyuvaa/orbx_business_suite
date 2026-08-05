@@ -9,14 +9,15 @@ from sqlalchemy.orm import selectinload
 from app.models.auth import User
 from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product
-from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry
+from app.models.purchase import PurchaseOrder, PurchaseOrderItem, GRN, GRNItem, PurchaseEntry, DebitNote, DebitNoteItem
 from app.models.inventory import StockTransaction, CurrentStock, StockTransfer, StockTransferItem
-from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem
+from app.models.sales import SalesOrder, SalesOrderItem, Invoice, InvoiceItem, CreditNote, CreditNoteItem
 from app.models.finance import Payment, PaymentReceipt, VendorPayment
 from app.schemas.transaction import (
     PurchaseOrderCreate, GRNCreate, PurchaseEntryCreate,
     StockTransactionCreate, SalesOrderCreate, InvoiceCreate,
-    PaymentCreate, StockTransferCreate, VendorPaymentCreate
+    PaymentCreate, StockTransferCreate, VendorPaymentCreate,
+    CreditNoteCreate, DebitNoteCreate
 )
 
 
@@ -1902,3 +1903,368 @@ class TxServices:
             await db.rollback()
             raise HTTPException(status_code=400, detail="Failed to delete Invoice due to database constraints.")
 
+    # ==========================================
+    # CREDIT NOTE SERVICES (Sales Returns)
+    # ==========================================
+    @staticmethod
+    async def create_credit_note(db: AsyncSession, cn_data: CreditNoteCreate) -> CreditNote:
+        """Create a Credit Note against a Tax Invoice. Restores stock and reduces invoice outstanding."""
+        # 1. Get branch for auto-number
+        q_br = await db.execute(select(Branch).filter(Branch.id == cn_data.branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found.")
+
+        cn_seq = branch.cn_next_number
+        branch.cn_next_number += 1
+        db.add(branch)
+
+        cn_no = f"{branch.cn_prefix}{cn_seq:05d}{branch.cn_suffix}"
+
+        # 2. Optionally fetch linked invoice
+        invoice = None
+        if cn_data.invoice_id:
+            q_inv = await db.execute(
+                select(Invoice)
+                .filter(Invoice.id == cn_data.invoice_id)
+                .options(selectinload(Invoice.items).selectinload(InvoiceItem.product))
+            )
+            invoice = q_inv.scalar_one_or_none()
+            if not invoice:
+                raise HTTPException(status_code=404, detail="Linked Invoice not found.")
+
+        # 3. Create CreditNote header
+        cn = CreditNote(
+            invoice_id=cn_data.invoice_id,
+            branch_id=cn_data.branch_id,
+            credit_note_number=cn_no,
+            reason=cn_data.reason,
+            subtotal=0.0,
+            tax_amount=0.0,
+            total_amount=0.0,
+            status="Issued"
+        )
+        if cn_data.date:
+            cn.date = cn_data.date
+        db.add(cn)
+        await db.flush()
+
+        subtotal = 0.0
+        tax_amount = 0.0
+
+        # 4. Create line items and restore stock
+        for item in cn_data.items:
+            q_p = await db.execute(select(Product).filter(Product.id == item.product_id))
+            product = q_p.scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found.")
+
+            item_amount = item.qty * item.rate
+            item_tax = item_amount * (item.tax_rate / 100)
+            subtotal += item_amount
+            tax_amount += item_tax
+
+            cn_item = CreditNoteItem(
+                credit_note_id=cn.id,
+                product_id=item.product_id,
+                qty=item.qty,
+                rate=item.rate,
+                tax_rate=item.tax_rate,
+                tax_amount=item_tax,
+                amount=item_amount
+            )
+            db.add(cn_item)
+
+            # Restore stock (goods returned from customer)
+            await TxServices.update_stock(
+                db=db,
+                product_id=item.product_id,
+                branch_id=cn_data.branch_id,
+                qty_change=item.qty,
+                tx_type="In",
+                ref_type="Credit Note",
+                ref_id=cn.id,
+                reason=cn_data.reason or "Customer return"
+            )
+
+        cn.subtotal = subtotal
+        cn.tax_amount = tax_amount
+        cn.total_amount = subtotal + tax_amount
+        db.add(cn)
+
+        # 5. Reduce linked invoice outstanding
+        if invoice:
+            invoice.total_amount = max(0.0, invoice.total_amount - cn.total_amount)
+            # Recompute status
+            paid_q = await db.execute(
+                select(Payment).filter(Payment.invoice_id == invoice.id)
+            )
+            payments = paid_q.scalars().all()
+            total_paid = sum(p.amount_paid for p in payments)
+            if total_paid >= invoice.total_amount:
+                invoice.status = "Paid"
+            elif total_paid > 0:
+                invoice.status = "PartiallyPaid"
+            else:
+                invoice.status = "Unpaid"
+            db.add(invoice)
+
+        await db.commit()
+
+        # 6. Re-fetch with full relationships
+        q_final = await db.execute(
+            select(CreditNote)
+            .filter(CreditNote.id == cn.id)
+            .options(
+                selectinload(CreditNote.invoice),
+                selectinload(CreditNote.items).selectinload(CreditNoteItem.product)
+            )
+        )
+        result = q_final.scalar_one()
+        # Populate computed fields
+        if result.invoice:
+            result.invoice_number = result.invoice.invoice_number
+        for it in result.items:
+            it.product_name = it.product.name if it.product else "Unknown"
+            it.sku = it.product.sku if it.product else ""
+        return result
+
+    @staticmethod
+    async def list_credit_notes(db: AsyncSession, branch_id: Optional[UUID] = None) -> list:
+        """List all Credit Notes with invoice and item details."""
+        q = select(CreditNote).options(
+            selectinload(CreditNote.invoice),
+            selectinload(CreditNote.items).selectinload(CreditNoteItem.product)
+        )
+        if branch_id:
+            q = q.filter(CreditNote.branch_id == branch_id)
+        q = q.order_by(CreditNote.date.desc())
+        result = await db.execute(q)
+        cns = result.scalars().all()
+        for cn in cns:
+            if cn.invoice:
+                cn.invoice_number = cn.invoice.invoice_number
+            for it in cn.items:
+                it.product_name = it.product.name if it.product else "Unknown"
+                it.sku = it.product.sku if it.product else ""
+        return cns
+
+    @staticmethod
+    async def delete_credit_note(db: AsyncSession, cn_id: UUID) -> None:
+        """Cancel/delete a Credit Note, reversing stock and invoice adjustments."""
+        from sqlalchemy import delete as sql_delete
+        q = await db.execute(
+            select(CreditNote)
+            .filter(CreditNote.id == cn_id)
+            .options(selectinload(CreditNote.items), selectinload(CreditNote.invoice))
+        )
+        cn = q.scalar_one_or_none()
+        if not cn:
+            raise HTTPException(status_code=404, detail="Credit Note not found.")
+
+        # Reverse stock
+        for item in cn.items:
+            await TxServices.update_stock(
+                db=db,
+                product_id=item.product_id,
+                branch_id=cn.branch_id,
+                qty_change=-item.qty,
+                tx_type="Out",
+                ref_type="Credit Note Cancel",
+                ref_id=cn_id,
+                reason="Credit Note cancelled"
+            )
+
+        # Restore invoice total
+        if cn.invoice:
+            cn.invoice.total_amount += cn.total_amount
+            cn.invoice.status = "Unpaid"
+            db.add(cn.invoice)
+
+        await db.execute(sql_delete(CreditNoteItem).filter(CreditNoteItem.credit_note_id == cn_id))
+        await db.delete(cn)
+        await db.commit()
+
+    # ==========================================
+    # DEBIT NOTE SERVICES (Purchase Returns)
+    # ==========================================
+    @staticmethod
+    async def create_debit_note(db: AsyncSession, dn_data: DebitNoteCreate) -> DebitNote:
+        """Create a Debit Note against a Purchase Bill. Removes stock and reduces bill outstanding."""
+        # 1. Get branch for auto-number
+        q_br = await db.execute(select(Branch).filter(Branch.id == dn_data.branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch not found.")
+
+        dn_seq = branch.dn_next_number
+        branch.dn_next_number += 1
+        db.add(branch)
+
+        dn_no = f"{branch.dn_prefix}{dn_seq:05d}{branch.dn_suffix}"
+
+        # 2. Optionally fetch linked purchase entry
+        purchase_entry = None
+        if dn_data.purchase_entry_id:
+            q_pe = await db.execute(
+                select(PurchaseEntry).filter(PurchaseEntry.id == dn_data.purchase_entry_id)
+            )
+            purchase_entry = q_pe.scalar_one_or_none()
+            if not purchase_entry:
+                raise HTTPException(status_code=404, detail="Linked Purchase Bill not found.")
+
+        # 3. Create DebitNote header
+        dn = DebitNote(
+            purchase_entry_id=dn_data.purchase_entry_id,
+            supplier_id=dn_data.supplier_id,
+            branch_id=dn_data.branch_id,
+            debit_note_number=dn_no,
+            reason=dn_data.reason,
+            subtotal=0.0,
+            tax_amount=0.0,
+            total_amount=0.0,
+            status="Issued"
+        )
+        if dn_data.date:
+            dn.date = dn_data.date
+        db.add(dn)
+        await db.flush()
+
+        subtotal = 0.0
+        tax_amount = 0.0
+
+        # 4. Create line items and remove stock
+        for item in dn_data.items:
+            q_p = await db.execute(select(Product).filter(Product.id == item.product_id))
+            product = q_p.scalar_one_or_none()
+            if not product:
+                raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found.")
+
+            item_amount = item.qty * item.rate
+            item_tax = item_amount * (item.tax_rate / 100)
+            subtotal += item_amount
+            tax_amount += item_tax
+
+            dn_item = DebitNoteItem(
+                debit_note_id=dn.id,
+                product_id=item.product_id,
+                qty=item.qty,
+                rate=item.rate,
+                tax_rate=item.tax_rate,
+                tax_amount=item_tax,
+                amount=item_amount
+            )
+            db.add(dn_item)
+
+            # Remove stock (goods going back to supplier)
+            await TxServices.update_stock(
+                db=db,
+                product_id=item.product_id,
+                branch_id=dn_data.branch_id,
+                qty_change=-item.qty,
+                tx_type="Out",
+                ref_type="Debit Note",
+                ref_id=dn.id,
+                reason=dn_data.reason or "Supplier return"
+            )
+
+        dn.subtotal = subtotal
+        dn.tax_amount = tax_amount
+        dn.total_amount = subtotal + tax_amount
+        db.add(dn)
+
+        # 5. Reduce linked purchase entry outstanding
+        if purchase_entry:
+            purchase_entry.total_amount = max(0.0, purchase_entry.total_amount - dn.total_amount)
+            # Recompute status
+            paid_q = await db.execute(
+                select(VendorPayment).filter(VendorPayment.purchase_entry_id == purchase_entry.id)
+            )
+            payments = paid_q.scalars().all()
+            total_paid = sum(p.amount_paid for p in payments)
+            if total_paid >= purchase_entry.total_amount:
+                purchase_entry.status = "Paid"
+            elif total_paid > 0:
+                purchase_entry.status = "PartiallyPaid"
+            else:
+                purchase_entry.status = "Unpaid"
+            db.add(purchase_entry)
+
+        await db.commit()
+
+        # 6. Re-fetch with full relationships
+        q_final = await db.execute(
+            select(DebitNote)
+            .filter(DebitNote.id == dn.id)
+            .options(
+                selectinload(DebitNote.supplier),
+                selectinload(DebitNote.purchase_entry),
+                selectinload(DebitNote.items).selectinload(DebitNoteItem.product)
+            )
+        )
+        result = q_final.scalar_one()
+        result.supplier_name = result.supplier.name if result.supplier else "Unknown"
+        if result.purchase_entry:
+            result.purchase_entry_number = result.purchase_entry.invoice_number
+        for it in result.items:
+            it.product_name = it.product.name if it.product else "Unknown"
+            it.sku = it.product.sku if it.product else ""
+        return result
+
+    @staticmethod
+    async def list_debit_notes(db: AsyncSession, supplier_id: Optional[UUID] = None) -> list:
+        """List all Debit Notes with supplier and item details."""
+        q = select(DebitNote).options(
+            selectinload(DebitNote.supplier),
+            selectinload(DebitNote.purchase_entry),
+            selectinload(DebitNote.items).selectinload(DebitNoteItem.product)
+        )
+        if supplier_id:
+            q = q.filter(DebitNote.supplier_id == supplier_id)
+        q = q.order_by(DebitNote.date.desc())
+        result = await db.execute(q)
+        dns = result.scalars().all()
+        for dn in dns:
+            dn.supplier_name = dn.supplier.name if dn.supplier else "Unknown"
+            if dn.purchase_entry:
+                dn.purchase_entry_number = dn.purchase_entry.invoice_number
+            for it in dn.items:
+                it.product_name = it.product.name if it.product else "Unknown"
+                it.sku = it.product.sku if it.product else ""
+        return dns
+
+    @staticmethod
+    async def delete_debit_note(db: AsyncSession, dn_id: UUID) -> None:
+        """Cancel/delete a Debit Note, reversing stock and purchase bill adjustments."""
+        from sqlalchemy import delete as sql_delete
+        q = await db.execute(
+            select(DebitNote)
+            .filter(DebitNote.id == dn_id)
+            .options(selectinload(DebitNote.items), selectinload(DebitNote.purchase_entry))
+        )
+        dn = q.scalar_one_or_none()
+        if not dn:
+            raise HTTPException(status_code=404, detail="Debit Note not found.")
+
+        # Reverse stock removal
+        for item in dn.items:
+            await TxServices.update_stock(
+                db=db,
+                product_id=item.product_id,
+                branch_id=dn.branch_id,
+                qty_change=item.qty,
+                tx_type="In",
+                ref_type="Debit Note Cancel",
+                ref_id=dn_id,
+                reason="Debit Note cancelled"
+            )
+
+        # Restore purchase entry total
+        if dn.purchase_entry:
+            dn.purchase_entry.total_amount += dn.total_amount
+            dn.purchase_entry.status = "Unpaid"
+            db.add(dn.purchase_entry)
+
+        await db.execute(sql_delete(DebitNoteItem).filter(DebitNoteItem.debit_note_id == dn_id))
+        await db.delete(dn)
+        await db.commit()

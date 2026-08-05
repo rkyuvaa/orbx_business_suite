@@ -11,7 +11,8 @@ from app.models.sales import Invoice, InvoiceItem, SalesOrder
 from app.schemas.transaction import (
     SalesOrderOut, SalesOrderCreate,
     InvoiceOut, InvoiceCreate,
-    InvoiceEmailRequest
+    InvoiceEmailRequest,
+    CreditNoteCreate, CreditNoteOut
 )
 from app.services.tx_services import TxServices
 
@@ -320,3 +321,37 @@ async def email_invoice(
         raise HTTPException(status_code=502, detail=f"Email delivery failed: {exc}")
 
     return {"message": f"Invoice emailed successfully to {recipient_email}"}
+
+
+# ==========================================
+# CREDIT NOTES ENDPOINTS
+# ==========================================
+@router.get("/credit-notes", response_model=List[CreditNoteOut])
+async def list_credit_notes(
+    branch_id: Optional[UUID] = Query(None, description="Filter by branch"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "view"))
+):
+    """List all Credit Notes."""
+    return await TxServices.list_credit_notes(db, branch_id)
+
+
+@router.post("/credit-notes", response_model=CreditNoteOut, status_code=status.HTTP_201_CREATED)
+async def create_credit_note(
+    cn_data: CreditNoteCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "create"))
+):
+    """Create a Credit Note against a Tax Invoice (Sales Return)."""
+    return await TxServices.create_credit_note(db, cn_data)
+
+
+@router.delete("/credit-notes/{cn_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_credit_note(
+    cn_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("sales", "delete"))
+):
+    """Delete/cancel a Credit Note and reverse all effects."""
+    await TxServices.delete_credit_note(db, cn_id)
+    return None

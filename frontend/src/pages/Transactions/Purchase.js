@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer, Divider } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon, Print as PrintIcon } from '@mui/icons-material';
+import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Chip, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer, Divider, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon, Print as PrintIcon, NoteAdd as DebitNoteIcon } from '@mui/icons-material';
 import { useReactToPrint } from 'react-to-print';
 import { useSelector } from 'react-redux';
 
@@ -16,6 +16,16 @@ const Purchase = () => {
   const [grns, setGrns] = useState([]);
   const [bills, setBills] = useState([]);
   const [branches, setBranches] = useState([]);
+  // Debit Notes
+  const [debitNotes, setDebitNotes] = useState([]);
+  const [openDNModal, setOpenDNModal] = useState(false);
+  const [dnBillId, setDnBillId] = useState('');
+  const [dnSupplierId, setDnSupplierId] = useState('');
+  const [dnBranchId, setDnBranchId] = useState('');
+  const [dnReason, setDnReason] = useState('');
+  const [dnDate, setDnDate] = useState('');
+  const [dnItems, setDnItems] = useState([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
+  const [dnError, setDnError] = useState(null);
   
   const [openPOModal, setOpenPOModal] = useState(false);
   const [openGRNModal, setOpenGRNModal] = useState(false);
@@ -55,12 +65,14 @@ const Purchase = () => {
       const billRes = await apiClient.get('/purchase/bills');
       const brRes = await apiClient.get('/admin/branches');
       const compRes = await apiClient.get('/admin/company');
+      const dnRes = await apiClient.get('/purchase/debit-notes');
 
       setPos(poRes.data);
       setGrns(grnRes.data);
       setBills(billRes.data);
       setBranches(brRes.data);
       setCompany(compRes.data);
+      setDebitNotes(dnRes.data);
     } catch (err) {
       setError('Failed to load transaction data records.');
     }
@@ -575,6 +587,7 @@ const Purchase = () => {
           <Tab label="Purchase Orders" sx={{ fontWeight: 600 }} />
           <Tab label="Goods Receipt Notes (GRN)" sx={{ fontWeight: 600 }} />
           <Tab label="Purchase Entries (Bills)" sx={{ fontWeight: 600 }} />
+          <Tab label="Debit Notes" sx={{ fontWeight: 600 }} icon={<DebitNoteIcon />} iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -677,6 +690,173 @@ const Purchase = () => {
           searchKey="invoice_number"
         />
       )}
+
+      {tabIndex === 3 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>Debit Notes (Purchase Returns)</Typography>
+            <Button variant="contained" color="error" startIcon={<AddIcon />} onClick={() => { setDnError(null); setDnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setDnBillId(''); setDnSupplierId(''); setDnBranchId(''); setDnReason(''); setDnDate(''); setOpenDNModal(true); }}>
+              New Debit Note
+            </Button>
+          </Box>
+          <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#fff5f5' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>DN Number</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Bill Ref.</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Supplier</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Subtotal (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Tax (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total (₹)</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {debitNotes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No Debit Notes found. Create one when returning goods to a supplier.
+                    </TableCell>
+                  </TableRow>
+                ) : debitNotes.map((dn) => (
+                  <TableRow key={dn.id} hover>
+                    <TableCell><strong>{dn.debit_note_number}</strong></TableCell>
+                    <TableCell>{new Date(dn.date).toLocaleDateString('en-IN')}</TableCell>
+                    <TableCell>{dn.purchase_entry_number || '—'}</TableCell>
+                    <TableCell>{dn.supplier_name || '—'}</TableCell>
+                    <TableCell sx={{ maxWidth: 200 }}><Typography noWrap variant="body2">{dn.reason || '—'}</Typography></TableCell>
+                    <TableCell align="right">₹{(dn.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell align="right">₹{(dn.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell align="right"><strong>₹{(dn.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></TableCell>
+                    <TableCell>
+                      <Chip label={dn.status} size="small" color={dn.status === 'Issued' ? 'warning' : 'default'} />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" color="error" onClick={async () => { if (window.confirm(`Delete Debit Note ${dn.debit_note_number}? This will reverse stock.`)) { try { await apiClient.delete(`/purchase/debit-notes/${dn.id}`); loadData(); } catch(e) { setError(e.response?.data?.detail || 'Failed to delete Debit Note.'); } } }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Paper>
+        </Box>
+      )}
+
+      {/* DEBIT NOTE MODAL */}
+      <Dialog open={openDNModal} onClose={() => setOpenDNModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)', color: '#fff' }}>New Debit Note</DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {dnError && <Alert severity="error" sx={{ mb: 2 }}>{dnError}</Alert>}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, mt: 1 }}>
+            <TextField
+              select label="Linked Purchase Bill (optional)" size="small" sx={{ flex: '1 1 280px' }}
+              value={dnBillId} onChange={(e) => {
+                setDnBillId(e.target.value);
+                const bill = bills.find(b => b.id === e.target.value);
+                if (bill) { setDnSupplierId(bill.supplier_id); setDnBranchId(bill.branch_id); }
+              }}
+            >
+              <MenuItem value="">— No linked bill —</MenuItem>
+              {bills.filter(b => b.status !== 'Cancelled').map(b => (
+                <MenuItem key={b.id} value={b.id}>{b.invoice_number} — {b.supplier_name} (₹{(b.total_amount || 0).toLocaleString('en-IN')})</MenuItem>
+              ))}
+            </TextField>
+            <Box sx={{ flex: '1 1 250px' }}>
+              <FormAutocomplete
+                label="Supplier"
+                endpoint="/suppliers/"
+                value={dnSupplierId}
+                size="small"
+                onChange={(val) => setDnSupplierId(val)}
+              />
+            </Box>
+            <TextField
+              select label="Branch" size="small" sx={{ flex: '1 1 160px' }}
+              value={dnBranchId} onChange={(e) => setDnBranchId(e.target.value)}
+            >
+              {branches.map(b => <MenuItem key={b.id} value={b.id}>{b.branch_name}</MenuItem>)}
+            </TextField>
+            <TextField type="date" label="Date" size="small" sx={{ flex: '1 1 150px' }} InputLabelProps={{ shrink: true }} value={dnDate} onChange={(e) => setDnDate(e.target.value)} />
+            <TextField label="Reason for Return" size="small" sx={{ flex: '1 1 100%' }} value={dnReason} onChange={(e) => setDnReason(e.target.value)} placeholder="e.g. Defective goods, over-supply..." />
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'error.main' }}>Return Items (Stock will be removed)</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#fef2f2' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 80 }}>Qty</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 120 }}>Rate (₹)</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 90 }}>GST %</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Amount (₹)</TableCell>
+                  <TableCell sx={{ width: 50 }} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {dnItems.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <FormAutocomplete
+                        label="Product"
+                        endpoint="/products/"
+                        value={item.product_id}
+                        size="small"
+                        onChange={(val) => { const updated = [...dnItems]; updated[idx].product_id = val; setDnItems(updated); }}
+                        onChangeOverride={(p) => { if (p) { const updated = [...dnItems]; updated[idx].product_id = p.id; updated[idx].rate = p.cost_price || p.base_price || 0; setDnItems(updated); } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.qty} inputProps={{ min: 0 }} onChange={(e) => { const updated = [...dnItems]; updated[idx].qty = parseFloat(e.target.value) || 0; setDnItems(updated); }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.rate} inputProps={{ min: 0 }} onChange={(e) => { const updated = [...dnItems]; updated[idx].rate = parseFloat(e.target.value) || 0; setDnItems(updated); }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.tax_rate} inputProps={{ min: 0, max: 28 }} onChange={(e) => { const updated = [...dnItems]; updated[idx].tax_rate = parseFloat(e.target.value) || 0; setDnItems(updated); }} />
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 0.5 }}>
+                      ₹{((item.qty * item.rate) * (1 + item.tax_rate / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <IconButton size="small" onClick={() => setDnItems(dnItems.filter((_, i) => i !== idx))} disabled={dnItems.length === 1}><DeleteIcon fontSize="small" /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Button size="small" startIcon={<AddIcon />} onClick={() => setDnItems([...dnItems, { product_id: '', qty: 1, rate: 0, tax_rate: 18 }])}>Add Item</Button>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setOpenDNModal(false)} variant="outlined">Cancel</Button>
+          <Button variant="contained" color="error" onClick={async () => {
+            if (!dnSupplierId) { setDnError('Please select a supplier.'); return; }
+            if (!dnBranchId) { setDnError('Please select a branch.'); return; }
+            if (dnItems.some(it => !it.product_id)) { setDnError('All items must have a product selected.'); return; }
+            try {
+              await apiClient.post('/purchase/debit-notes', {
+                purchase_entry_id: dnBillId || null,
+                supplier_id: dnSupplierId,
+                branch_id: dnBranchId,
+                date: dnDate || undefined,
+                reason: dnReason || undefined,
+                items: dnItems.map(it => ({ product_id: it.product_id, qty: it.qty, rate: it.rate, tax_rate: it.tax_rate }))
+              });
+              setOpenDNModal(false);
+              loadData();
+            } catch (e) {
+              setDnError(e.response?.data?.detail || 'Failed to create Debit Note.');
+            }
+          }}>Issue Debit Note</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* PO CREATE MODAL */}
       <CommonModal

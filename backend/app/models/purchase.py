@@ -145,3 +145,39 @@ class PurchaseReturn(Base):
     journal_entry: Mapped[Optional[JournalEntry]] = relationship(foreign_keys=[journal_entry_id])
     debit_note_ledger: Mapped[Optional[LedgerAccount]] = relationship(foreign_keys=[debit_note_ledger_id])
 
+
+class DebitNote(Base):
+    __tablename__ = "debit_notes"
+
+    purchase_entry_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("purchase_entries.id", ondelete="SET NULL"), nullable=True, index=True)
+    supplier_id: Mapped[UUID] = mapped_column(ForeignKey("suppliers.id", ondelete="RESTRICT"), index=True)
+    branch_id: Mapped[UUID] = mapped_column(ForeignKey("branches.id", ondelete="RESTRICT"), index=True)
+    debit_note_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    subtotal: Mapped[float] = mapped_column(Float, default=0.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(30), default="Issued")  # Issued, Cancelled
+
+    # Relationships
+    purchase_entry: Mapped[Optional["PurchaseEntry"]] = relationship()
+    supplier: Mapped["Supplier"] = relationship()
+    branch: Mapped["Branch"] = relationship()
+    items: Mapped[List["DebitNoteItem"]] = relationship(back_populates="debit_note", cascade="all, delete-orphan")
+
+
+class DebitNoteItem(Base):
+    __tablename__ = "debit_note_items"
+
+    debit_note_id: Mapped[UUID] = mapped_column(ForeignKey("debit_notes.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), index=True)
+    qty: Mapped[float] = mapped_column(Float)
+    rate: Mapped[float] = mapped_column(Float)
+    tax_rate: Mapped[float] = mapped_column(Float, default=18.0)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Float)
+
+    # Relationships
+    debit_note: Mapped["DebitNote"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship()

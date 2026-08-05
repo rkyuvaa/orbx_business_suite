@@ -509,3 +509,112 @@ class StockTransferOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==========================================
+# 6. CREDIT NOTE SCHEMAS (Sales Returns)
+# ==========================================
+class CreditNoteItemCreate(BaseModel):
+    product_id: UUID
+    qty: float
+    rate: float
+    tax_rate: float = 18.0
+
+
+class CreditNoteItemOut(BaseModel):
+    id: UUID
+    credit_note_id: UUID
+    product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
+    qty: float
+    rate: float
+    tax_rate: float
+    tax_amount: float
+    amount: float
+
+    class Config:
+        from_attributes = True
+
+
+class CreditNoteCreate(BaseModel):
+    invoice_id: Optional[UUID] = None
+    branch_id: UUID
+    date: Optional[datetime] = None
+    reason: Optional[str] = None
+    items: List[CreditNoteItemCreate]
+
+
+class CreditNoteOut(BaseModel):
+    id: UUID
+    invoice_id: Optional[UUID] = None
+    invoice_number: Optional[str] = None
+    customer_id: Optional[UUID] = None
+    customer_name: Optional[str] = None
+    branch_id: UUID
+    credit_note_number: str
+    date: datetime
+    reason: Optional[str] = None
+    subtotal: float
+    tax_amount: float
+    total_amount: float
+    status: str
+    items: List[CreditNoteItemOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# 7. DEBIT NOTE SCHEMAS (Purchase Returns)
+# ==========================================
+class DebitNoteItemCreate(BaseModel):
+    product_id: UUID
+    qty: float
+    rate: float
+    tax_rate: float = 18.0
+
+
+class DebitNoteItemOut(BaseModel):
+    id: UUID
+    debit_note_id: UUID
+    product_id: UUID
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
+    qty: float
+    rate: float
+    tax_rate: float
+    tax_amount: float
+    amount: float
+
+    class Config:
+        from_attributes = True
+
+
+class DebitNoteCreate(BaseModel):
+    purchase_entry_id: Optional[UUID] = None
+    supplier_id: UUID
+    branch_id: UUID
+    date: Optional[datetime] = None
+    reason: Optional[str] = None
+    items: List[DebitNoteItemCreate]
+
+
+class DebitNoteOut(BaseModel):
+    id: UUID
+    purchase_entry_id: Optional[UUID] = None
+    purchase_entry_number: Optional[str] = None
+    supplier_id: UUID
+    supplier_name: Optional[str] = None
+    branch_id: UUID
+    debit_note_number: str
+    date: datetime
+    reason: Optional[str] = None
+    subtotal: float
+    tax_amount: float
+    total_amount: float
+    status: str
+    items: List[DebitNoteItemOut] = []
+
+    class Config:
+        from_attributes = True

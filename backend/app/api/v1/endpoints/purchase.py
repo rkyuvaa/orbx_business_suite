@@ -8,7 +8,8 @@ from app.schemas.transaction import (
     PurchaseOrderOut, PurchaseOrderCreate,
     GRNOut, GRNCreate,
     PurchaseEntryOut, PurchaseEntryCreate,
-    VendorPaymentCreate, VendorPaymentOut
+    VendorPaymentCreate, VendorPaymentOut,
+    DebitNoteCreate, DebitNoteOut
 )
 from app.services.tx_services import TxServices
 
@@ -209,4 +210,38 @@ async def delete_vendor_payment(
 ):
     """Delete a vendor payment."""
     await TxServices.cancel_vendor_payment(db, payment_id)
+    return None
+
+
+# ==========================================
+# DEBIT NOTES ENDPOINTS
+# ==========================================
+@router.get("/debit-notes", response_model=List[DebitNoteOut])
+async def list_debit_notes(
+    supplier_id: Optional[UUID] = Query(None, description="Filter by supplier"),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "view"))
+):
+    """List all Debit Notes."""
+    return await TxServices.list_debit_notes(db, supplier_id)
+
+
+@router.post("/debit-notes", response_model=DebitNoteOut, status_code=status.HTTP_201_CREATED)
+async def create_debit_note(
+    dn_data: DebitNoteCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "create"))
+):
+    """Create a Debit Note against a Purchase Bill (Purchase Return)."""
+    return await TxServices.create_debit_note(db, dn_data)
+
+
+@router.delete("/debit-notes/{dn_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_debit_note(
+    dn_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("purchase", "delete"))
+):
+    """Delete/cancel a Debit Note and reverse all effects."""
+    await TxServices.delete_debit_note(db, dn_id)
     return None

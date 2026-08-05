@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import {
-  Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField,
+  Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Chip,
   Table, TableHead, TableRow, TableCell, TableBody, IconButton, Divider, TableContainer,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Snackbar
 } from '@mui/material';
@@ -9,7 +9,7 @@ import {
   Add as AddIcon, Delete as DeleteIcon,
   Receipt as InvoiceIcon, Print as PrintIcon,
   Edit as EditIcon, Block as CancelIcon,
-  Email as EmailIcon
+  Email as EmailIcon, NoteAdd as CreditNoteIcon
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 
@@ -25,6 +25,15 @@ const Sales = () => {
   const [invoices, setInvoices] = useState([]);
   const [branches, setBranches] = useState([]);
   const [company, setCompany] = useState(null);
+  // Credit Notes
+  const [creditNotes, setCreditNotes] = useState([]);
+  const [openCNModal, setOpenCNModal] = useState(false);
+  const [cnInvoiceId, setCnInvoiceId] = useState('');
+  const [cnBranchId, setCnBranchId] = useState('');
+  const [cnReason, setCnReason] = useState('');
+  const [cnDate, setCnDate] = useState('');
+  const [cnItems, setCnItems] = useState([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]);
+  const [cnError, setCnError] = useState(null);
 
   const [openSOModal, setOpenSOModal] = useState(false);
   const [openInvoiceModal, setOpenInvoiceModal] = useState(false);
@@ -68,11 +77,13 @@ const Sales = () => {
       const invRes = await apiClient.get('/sales/invoices');
       const brRes = await apiClient.get('/admin/branches');
       const compRes = await apiClient.get('/admin/company');
+      const cnRes = await apiClient.get('/sales/credit-notes');
 
       setSos(soRes.data);
       setInvoices(invRes.data);
       setBranches(brRes.data);
       setCompany(compRes.data);
+      setCreditNotes(cnRes.data);
     } catch (err) {
       setError('Failed to load transaction sales documents.');
     }
@@ -674,6 +685,7 @@ const Sales = () => {
         <Tabs value={tabIndex} onChange={(e, idx) => setTabIndex(idx)} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
           <Tab label="Sales Orders" sx={{ fontWeight: 600 }} />
           <Tab label="Tax Invoices" sx={{ fontWeight: 600 }} />
+          <Tab label="Credit Notes" sx={{ fontWeight: 600 }} icon={<CreditNoteIcon />} iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -756,7 +768,161 @@ const Sales = () => {
         />
       )}
 
-      {/* SALES ORDER MODAL */}
+      {tabIndex === 2 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>Credit Notes (Sales Returns)</Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCnError(null); setCnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setCnInvoiceId(''); setCnBranchId(''); setCnReason(''); setCnDate(''); setOpenCNModal(true); }} color="primary">
+              New Credit Note
+            </Button>
+          </Box>
+          <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f0f7ff' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>CN Number</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Invoice Ref.</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Subtotal (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Tax (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total (₹)</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {creditNotes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                      No Credit Notes found. Create one to offset a Tax Invoice.
+                    </TableCell>
+                  </TableRow>
+                ) : creditNotes.map((cn) => (
+                  <TableRow key={cn.id} hover>
+                    <TableCell><strong>{cn.credit_note_number}</strong></TableCell>
+                    <TableCell>{new Date(cn.date).toLocaleDateString('en-IN')}</TableCell>
+                    <TableCell>{cn.invoice_number || '—'}</TableCell>
+                    <TableCell>{cn.customer_name || '—'}</TableCell>
+                    <TableCell sx={{ maxWidth: 200 }}><Typography noWrap variant="body2">{cn.reason || '—'}</Typography></TableCell>
+                    <TableCell align="right">₹{(cn.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell align="right">₹{(cn.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell align="right"><strong>₹{(cn.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></TableCell>
+                    <TableCell>
+                      <Chip label={cn.status} size="small" color={cn.status === 'Issued' ? 'success' : 'default'} />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" color="error" onClick={async () => { if (window.confirm(`Delete Credit Note ${cn.credit_note_number}? This will reverse stock.`)) { try { await apiClient.delete(`/sales/credit-notes/${cn.id}`); loadData(); } catch(e) { setError(e.response?.data?.detail || 'Failed to delete Credit Note.'); } } }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Paper>
+        </Box>
+      )}
+
+      {/* CREDIT NOTE MODAL */}
+      <Dialog open={openCNModal} onClose={() => setOpenCNModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)', color: '#fff' }}>New Credit Note</DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {cnError && <Alert severity="error" sx={{ mb: 2 }}>{cnError}</Alert>}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 3, mt: 1 }}>
+            <TextField
+              select label="Linked Invoice (optional)" size="small" sx={{ flex: '1 1 280px' }}
+              value={cnInvoiceId} onChange={(e) => {
+                setCnInvoiceId(e.target.value);
+                const inv = invoices.find(i => i.id === e.target.value);
+                if (inv) setCnBranchId(inv.branch_id);
+              }}
+            >
+              <MenuItem value="">— No linked invoice —</MenuItem>
+              {invoices.filter(i => i.status !== 'Cancelled').map(inv => (
+                <MenuItem key={inv.id} value={inv.id}>{inv.invoice_number} — {inv.customer_name} (₹{(inv.total_amount || 0).toLocaleString('en-IN')})</MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select label="Branch" size="small" sx={{ flex: '1 1 180px' }}
+              value={cnBranchId} onChange={(e) => setCnBranchId(e.target.value)}
+            >
+              {branches.map(b => <MenuItem key={b.id} value={b.id}>{b.branch_name}</MenuItem>)}
+            </TextField>
+            <TextField type="date" label="Date" size="small" sx={{ flex: '1 1 150px' }} InputLabelProps={{ shrink: true }} value={cnDate} onChange={(e) => setCnDate(e.target.value)} />
+            <TextField label="Reason for Return" size="small" sx={{ flex: '1 1 100%' }} value={cnReason} onChange={(e) => setCnReason(e.target.value)} placeholder="e.g. Goods damaged, wrong quantity..." />
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>Return Items</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f8fafc' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 80 }}>Qty</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 120 }}>Rate (₹)</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 600, width: 90 }}>GST %</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Amount (₹)</TableCell>
+                  <TableCell sx={{ width: 50 }} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {cnItems.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <FormAutocomplete
+                        label="Product"
+                        endpoint="/products/"
+                        value={item.product_id}
+                        size="small"
+                        onChange={(val) => { const updated = [...cnItems]; updated[idx].product_id = val; setCnItems(updated); }}
+                        onChangeOverride={(p) => { if (p) { const updated = [...cnItems]; updated[idx].product_id = p.id; updated[idx].rate = p.selling_price || p.base_price || 0; setCnItems(updated); } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.qty} inputProps={{ min: 0 }} onChange={(e) => { const updated = [...cnItems]; updated[idx].qty = parseFloat(e.target.value) || 0; setCnItems(updated); }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.rate} inputProps={{ min: 0 }} onChange={(e) => { const updated = [...cnItems]; updated[idx].rate = parseFloat(e.target.value) || 0; setCnItems(updated); }} />
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <TextField type="number" size="small" value={item.tax_rate} inputProps={{ min: 0, max: 28 }} onChange={(e) => { const updated = [...cnItems]; updated[idx].tax_rate = parseFloat(e.target.value) || 0; setCnItems(updated); }} />
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 0.5 }}>
+                      ₹{((item.qty * item.rate) * (1 + item.tax_rate / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.5 }}>
+                      <IconButton size="small" onClick={() => setCnItems(cnItems.filter((_, i) => i !== idx))} disabled={cnItems.length === 1}><DeleteIcon fontSize="small" /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Button size="small" startIcon={<AddIcon />} onClick={() => setCnItems([...cnItems, { product_id: '', qty: 1, rate: 0, tax_rate: 18 }])}>Add Item</Button>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setOpenCNModal(false)} variant="outlined">Cancel</Button>
+          <Button variant="contained" onClick={async () => {
+            if (!cnBranchId) { setCnError('Please select a branch.'); return; }
+            if (cnItems.some(it => !it.product_id)) { setCnError('All items must have a product selected.'); return; }
+            try {
+              await apiClient.post('/sales/credit-notes', {
+                invoice_id: cnInvoiceId || null,
+                branch_id: cnBranchId,
+                date: cnDate || undefined,
+                reason: cnReason || undefined,
+                items: cnItems.map(it => ({ product_id: it.product_id, qty: it.qty, rate: it.rate, tax_rate: it.tax_rate }))
+              });
+              setOpenCNModal(false);
+              loadData();
+            } catch (e) {
+              setCnError(e.response?.data?.detail || 'Failed to create Credit Note.');
+            }
+          }}>Issue Credit Note</Button>
+        </DialogActions>
+      </Dialog>
       <CommonModal
         open={openSOModal}
         onClose={() => setOpenSOModal(false)}

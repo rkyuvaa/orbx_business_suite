@@ -71,6 +71,14 @@ class Branch(Base):
     receipt_suffix: Mapped[str] = mapped_column(String(20), default="")
     receipt_next_number: Mapped[int] = mapped_column(default=1)
 
+    cn_prefix: Mapped[str] = mapped_column(String(20), default="CN-")
+    cn_suffix: Mapped[str] = mapped_column(String(20), default="")
+    cn_next_number: Mapped[int] = mapped_column(default=1)
+
+    dn_prefix: Mapped[str] = mapped_column(String(20), default="DN-")
+    dn_suffix: Mapped[str] = mapped_column(String(20), default="")
+    dn_next_number: Mapped[int] = mapped_column(default=1)
+
     invoice_terms: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     invoice_footer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
