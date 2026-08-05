@@ -17,6 +17,7 @@ const FormAutocomplete = ({
   value,
   onChange,
   initialOption,
+  filterFunc,
 }) => {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState([]);
@@ -67,8 +68,11 @@ const FormAutocomplete = ({
   }, [open]);
 
   const renderAutocomplete = (fieldVal, fieldOnChange, fieldError) => {
-    const autocompleteOptions = [...options];
-    if (fieldVal && initialOption && !options.some((opt) => opt.id === fieldVal)) {
+    let autocompleteOptions = [...options];
+    if (filterFunc) {
+      autocompleteOptions = autocompleteOptions.filter(filterFunc);
+    }
+    if (fieldVal && initialOption && !autocompleteOptions.some((opt) => opt.id === fieldVal)) {
       autocompleteOptions.unshift(initialOption);
     }
     const selectedOption = autocompleteOptions.find((opt) => opt.id === fieldVal) || null;
@@ -80,6 +84,10 @@ const FormAutocomplete = ({
         onClose={() => setOpen(false)}
         disabled={disabled}
         getOptionLabel={(option) => {
+          if (option.invoice_number) {
+            const partner = option.customer_name || option.supplier_name;
+            return partner ? `${option.invoice_number} — ${partner}` : option.invoice_number;
+          }
           if (option.sku) {
             return `${option.name} (${option.sku})`;
           }
