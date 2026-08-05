@@ -20,6 +20,14 @@ import CommonTable from '../../components/CommonTable';
 import CommonModal from '../../components/CommonModal';
 import FormAutocomplete from '../../components/FormAutocomplete';
 
+const formatIndianCurrency = (val) => {
+  if (val === undefined || val === null || isNaN(val)) return '0.00';
+  return Number(val).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const Sales = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = parseInt(searchParams.get('tab')) || 0;
@@ -319,7 +327,7 @@ const Sales = () => {
     if (!selectedInvoice) return;
     const companyName = company?.name || 'ORBX ERP';
     const invDate = selectedInvoice.date ? new Date(selectedInvoice.date).toLocaleDateString('en-IN') : '';
-    const amount = selectedInvoice.total_amount?.toFixed(2) || '0.00';
+    const amount = formatIndianCurrency(selectedInvoice.total_amount);
     const custName = selectedInvoice.customer_name || 'Customer';
 
     const formatTemplate = (template, fallback) => {
@@ -537,7 +545,7 @@ const Sales = () => {
       label: 'Customer',
       render: (row) => row.customer_name || 'Unknown'
     },
-    { id: 'grand_total', label: 'Grand Total (₹)', render: (row) => `₹${row.grand_total.toFixed(2)}` },
+    { id: 'grand_total', label: 'Grand Total (₹)', render: (row) => `₹${formatIndianCurrency(row.grand_total)}` },
     {
       id: 'status',
       label: 'Status',
@@ -591,7 +599,7 @@ const Sales = () => {
       label: 'Customer Name',
       render: (row) => row.customer_name || 'Unknown'
     },
-    { id: 'total_amount', label: 'Invoice Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
+    { id: 'total_amount', label: 'Invoice Value (₹)', render: (row) => `₹${formatIndianCurrency(row.total_amount)}` },
     {
       id: 'status',
       label: 'Status',
@@ -1133,7 +1141,7 @@ const Sales = () => {
                     />
                   </TableCell>
                   <TableCell align="right" sx={{ py: 0.5, px: 0.5, fontWeight: 600 }}>
-                    {(((item.qty * item.rate) - item.discount_amount) * (1 + item.tax_rate / 100)).toFixed(2)}
+                    {formatIndianCurrency(((item.qty * item.rate) - item.discount_amount) * (1 + item.tax_rate / 100))}
                   </TableCell>
                   <TableCell align="center" sx={{ py: 0.5, px: 0.5 }}>
                     <IconButton color="error" size="small" onClick={() => handleRemoveItemRow(idx)} disabled={soItems.length === 1}>
@@ -1151,10 +1159,10 @@ const Sales = () => {
         </Button>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, borderTop: '1px solid #e2e8f0', pt: 2 }}>
-          <Typography variant="body2">Subtotal: <strong>₹{soTotalSum.toFixed(2)}</strong></Typography>
-          <Typography variant="body2">Discount: <strong>-₹{soTotalDiscount.toFixed(2)}</strong></Typography>
-          <Typography variant="body2">Taxes (GST): <strong>₹{soTotalTax.toFixed(2)}</strong></Typography>
-          <Typography variant="subtitle1" color="primary.main">Grand Total: <strong>₹{(soTotalSum - soTotalDiscount + soTotalTax).toFixed(2)}</strong></Typography>
+          <Typography variant="body2">Subtotal: <strong>₹{formatIndianCurrency(soTotalSum)}</strong></Typography>
+          <Typography variant="body2">Discount: <strong>-₹{formatIndianCurrency(soTotalDiscount)}</strong></Typography>
+          <Typography variant="body2">Taxes (GST): <strong>₹{formatIndianCurrency(soTotalTax)}</strong></Typography>
+          <Typography variant="subtitle1" color="primary.main">Grand Total: <strong>₹{formatIndianCurrency(soTotalSum - soTotalDiscount + soTotalTax)}</strong></Typography>
         </Box>
       </CommonModal>
 
@@ -1393,10 +1401,10 @@ const Sales = () => {
                           <TableCell sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</TableCell>
                           <TableCell align="center">{item.hsn_code || 'N/A'}</TableCell>
                           <TableCell align="center">{item.qty}</TableCell>
-                          <TableCell align="center">{item.rate.toFixed(2)}</TableCell>
-                          {hasDiscount && <TableCell align="center">{item.discount_amount.toFixed(2)}</TableCell>}
+                          <TableCell align="center">{formatIndianCurrency(item.rate)}</TableCell>
+                          {hasDiscount && <TableCell align="center">{formatIndianCurrency(item.discount_amount)}</TableCell>}
                           <TableCell align="center">{item.tax_rate}%</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>{item.amount.toFixed(2)}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{formatIndianCurrency(item.amount)}</TableCell>
                         </TableRow>
                       );
                     })}
@@ -1438,33 +1446,33 @@ const Sales = () => {
             <Box sx={{ width: '42%', textAlign: 'right' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
                 <Typography variant="body2" sx={{ textAlign: 'left' }}>Subtotal:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.subtotal?.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{formatIndianCurrency(printData?.subtotal)}</Typography>
                 
                 {printData?.discount_amount > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>Discount:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{printData.discount_amount.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>-₹{formatIndianCurrency(printData.discount_amount)}</Typography>
                   </>
                 )}
 
                 {printData?.gst_breakup?.cgst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>CGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.cgst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{formatIndianCurrency(printData?.gst_breakup?.cgst)}</Typography>
                   </>
                 )}
 
                 {printData?.gst_breakup?.sgst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>SGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.sgst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{formatIndianCurrency(printData?.gst_breakup?.sgst)}</Typography>
                   </>
                 )}
 
                 {printData?.gst_breakup?.igst > 0 && (
                   <>
                     <Typography variant="body2" sx={{ textAlign: 'left' }}>IGST:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.gst_breakup?.igst?.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{formatIndianCurrency(printData?.gst_breakup?.igst)}</Typography>
                   </>
                 )}
               </Box>
@@ -1472,7 +1480,7 @@ const Sales = () => {
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.9rem' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'left' }}>Grand Total:</Typography>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  ₹{printData?.total_amount?.toFixed(2)}
+                  ₹{formatIndianCurrency(printData?.total_amount)}
                 </Typography>
               </Box>
               <Box sx={{ mt: 1 }}>
