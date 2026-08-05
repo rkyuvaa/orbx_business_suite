@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Chip, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer, Divider, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon, Print as PrintIcon, NoteAdd as DebitNoteIcon } from '@mui/icons-material';
 import { useReactToPrint } from 'react-to-print';
+import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
@@ -11,7 +12,11 @@ import CommonModal from '../../components/CommonModal';
 import FormAutocomplete from '../../components/FormAutocomplete';
 
 const Purchase = () => {
-  const [tabIndex, setTabIndex] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = parseInt(searchParams.get('tab')) || 0;
+  const [tabIndex, setTabIndex] = useState(initialTab);
+  const [selectedDN, setSelectedDN] = useState(null);
+  const [printDocType, setPrintDocType] = useState('PO');
   const [pos, setPos] = useState([]);
   const [grns, setGrns] = useState([]);
   const [bills, setBills] = useState([]);
@@ -82,8 +87,22 @@ const Purchase = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const t = parseInt(searchParams.get('tab'));
+    if (!isNaN(t) && t !== tabIndex) {
+      setTabIndex(t);
+    }
+  }, [searchParams]);
+
   const handleOpenPrint = (po) => {
     setSelectedPO(po);
+    setPrintDocType('PO');
+    setOpenPrintModal(true);
+  };
+
+  const handleOpenPrintDN = (dn) => {
+    setSelectedDN(dn);
+    setPrintDocType('DebitNote');
     setOpenPrintModal(true);
   };
 
@@ -572,7 +591,45 @@ const Purchase = () => {
 
   const poTotalAmountSum = poItems.reduce((acc, item) => acc + (parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0), 0);
   const poTotalTaxSum = poItems.reduce((acc, item) => acc + ((parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0) * (parseFloat(item.tax_rate) || 18) / 100), 0);
-  const printBranch = selectedPO ? branches.find((b) => b.id === selectedPO.branch_id) : null;
+  const printData = (() => {
+    if (printDocType === 'DebitNote') {
+      if (!selectedDN) return null;
+      return {
+        document_title: 'DEBIT NOTE',
+        document_number: selectedDN.debit_note_number,
+        date: selectedDN.date,
+        partner_title: 'VENDOR / SUPPLIER:',
+        partner_name: selectedDN.supplier_name,
+        partner_address: selectedDN.supplier?.address || '',
+        partner_phone: selectedDN.supplier?.phone || '',
+        partner_gstin: selectedDN.supplier?.gstin || 'N/A',
+        total_amount: selectedDN.subtotal,
+        tax_amount: selectedDN.tax_amount,
+        grand_total: selectedDN.total_amount,
+        items: selectedDN.items || [],
+        branch_id: selectedDN.branch_id
+      };
+    }
+    if (!selectedPO) return null;
+    return {
+      document_title: 'PURCHASE ORDER',
+      document_number: selectedPO.po_number || `PO-${selectedPO.id?.substring(0, 6).toUpperCase()}`,
+      date: selectedPO.date,
+      expected_delivery: selectedPO.expected_delivery,
+      partner_title: 'VENDOR / SUPPLIER:',
+      partner_name: selectedPO.supplier_name,
+      partner_address: selectedPO.supplier?.address || '',
+      partner_phone: selectedPO.supplier?.phone || '',
+      partner_gstin: selectedPO.supplier?.gstin || 'N/A',
+      total_amount: selectedPO.total_amount,
+      tax_amount: selectedPO.tax_amount,
+      grand_total: selectedPO.grand_total,
+      items: selectedPO.items || [],
+      branch_id: selectedPO.branch_id
+    };
+  })();
+
+  const printBranch = printData ? branches.find((b) => b.id === printData.branch_id) : null;
 
   return (
     <Box>
@@ -583,7 +640,7 @@ const Purchase = () => {
       )}
 
       <Paper sx={{ mb: 3, borderRadius: '8px' }}>
-        <Tabs value={tabIndex} onChange={(e, idx) => setTabIndex(idx)} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
+        <Tabs value={tabIndex} onChange={(e, idx) => { setTabIndex(idx); setSearchParams({ tab: idx }); }} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
           <Tab label="Purchase Orders" sx={{ fontWeight: 600 }} />
           <Tab label="Goods Receipt Notes (GRN)" sx={{ fontWeight: 600 }} />
           <Tab label="Purchase Entries (Bills)" sx={{ fontWeight: 600 }} />
@@ -736,6 +793,9 @@ const Purchase = () => {
                       <Chip label={dn.status} size="small" color={dn.status === 'Issued' ? 'warning' : 'default'} />
                     </TableCell>
                     <TableCell align="center">
+                      <IconButton size="small" color="primary" onClick={() => handleOpenPrintDN(dn)} sx={{ mr: 1 }}>
+                        <PrintIcon fontSize="small" />
+                      </IconButton>
                       <IconButton size="small" color="error" onClick={async () => { if (window.confirm(`Delete Debit Note ${dn.debit_note_number}? This will reverse stock.`)) { try { await apiClient.delete(`/purchase/debit-notes/${dn.id}`); loadData(); } catch(e) { setError(e.response?.data?.detail || 'Failed to delete Debit Note.'); } } }}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
@@ -1123,12 +1183,12 @@ const Purchase = () => {
       <CommonModal
         open={openPrintModal}
         onClose={() => setOpenPrintModal(false)}
-        title="Print Purchase Order"
+        title={printDocType === 'DebitNote' ? "Print Debit Note" : "Print Purchase Order"}
         maxWidth="md"
         actions={
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}>
-              Print PO
+              {printDocType === 'DebitNote' ? "Print Debit Note" : "Print PO"}
             </Button>
             <Button variant="contained" onClick={handleDownloadPDF}>
               Download PDF
@@ -1197,15 +1257,15 @@ const Purchase = () => {
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
               <Box sx={{ textAlign: 'right' }}>
                 <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                  PURCHASE ORDER{' '}
+                  {printData?.document_title || 'DOCUMENT'}{' '}
                   <span style={{ fontWeight: 600, color: '#334155', fontSize: '1.15rem', marginLeft: '6px' }}>
-                    {selectedPO?.po_number || `PO-${selectedPO?.id?.substring(0, 6).toUpperCase()}`}
+                    {printData?.document_number}
                   </span>
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
-                  Date: <strong>{selectedPO ? formatBillingDate(selectedPO.date) : ''}</strong>
+                  Date: <strong>{printData ? formatBillingDate(printData.date) : ''}</strong>
                 </Typography>
-                {selectedPO?.expected_delivery && (
+                {printDocType === 'PO' && selectedPO?.expected_delivery && (
                   <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#475569', mt: 0.5 }}>
                     Expected Delivery: <strong>{formatBillingDate(selectedPO.expected_delivery)}</strong>
                   </Typography>
@@ -1218,13 +1278,13 @@ const Purchase = () => {
             {/* Addresses */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
               <Box sx={{ width: '48%' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>VENDOR / SUPPLIER:</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedPO?.supplier_name}</Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{selectedPO?.supplier?.address}</Typography>
-                {selectedPO?.supplier?.phone && (
-                  <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>Phone: {selectedPO.supplier.phone}</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>{printData?.partner_title || 'PARTY DETAILS:'}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>{printData?.partner_name}</Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '0.85rem', color: 'text.secondary' }}>{printData?.partner_address}</Typography>
+                {printData?.partner_phone && (
+                  <Typography variant="body2" sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>Phone: {printData.partner_phone}</Typography>
                 )}
-                <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{selectedPO?.supplier?.gstin || 'N/A'}</strong></Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.9rem', mt: 0.5 }}>GSTIN: <strong>{printData?.partner_gstin}</strong></Typography>
               </Box>
               <Box sx={{ width: '48%' }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.9rem' }}>SHIP TO / BILL TO:</Typography>
@@ -1255,7 +1315,7 @@ const Purchase = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {selectedPO?.items?.map((item, idx) => (
+                  {printData?.items?.map((item, idx) => (
                     <TableRow key={idx} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                       <TableCell>{idx + 1}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{item.product_name || 'Unknown'}</TableCell>
@@ -1281,15 +1341,15 @@ const Purchase = () => {
               <Box sx={{ width: '42%', textAlign: 'right' }}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, fontSize: '0.85rem' }}>
                   <Typography variant="body2" sx={{ textAlign: 'left' }}>Subtotal:</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{selectedPO?.total_amount?.toFixed(2)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>₹{printData?.total_amount?.toFixed(2)}</Typography>
                   
                   {(() => {
                     const companyState = company?.gstin ? company.gstin.substring(0, 2) : '33';
-                    const supplierGstin = selectedPO?.supplier?.gstin;
+                    const supplierGstin = printData?.partner_gstin;
                     const hasSupplierGst = supplierGstin && supplierGstin !== 'N/A' && supplierGstin.trim() !== '';
                     const supplierState = hasSupplierGst ? supplierGstin.substring(0, 2) : companyState;
                     const isIntrastate = companyState === supplierState;
-                    const taxAmt = selectedPO?.tax_amount || 0;
+                    const taxAmt = printData?.tax_amount || 0;
                     if (isIntrastate && taxAmt > 0) {
                       return (
                         <>
@@ -1314,12 +1374,12 @@ const Purchase = () => {
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '0.9rem' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'left' }}>Grand Total:</Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                    ₹{selectedPO?.grand_total?.toFixed(2)}
+                    ₹{printData?.grand_total?.toFixed(2)}
                   </Typography>
                 </Box>
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.8rem' }}>
-                    Rupees: {selectedPO ? numberToWords(selectedPO.grand_total) : ''}
+                    Rupees: {printData ? numberToWords(printData.grand_total) : ''}
                   </Typography>
                 </Box>
               </Box>

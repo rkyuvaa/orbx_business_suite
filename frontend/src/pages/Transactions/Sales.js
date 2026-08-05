@@ -11,6 +11,7 @@ import {
   Edit as EditIcon, Block as CancelIcon,
   Email as EmailIcon, NoteAdd as CreditNoteIcon
 } from '@mui/icons-material';
+import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 import apiClient from '../../api/client';
@@ -20,7 +21,10 @@ import CommonModal from '../../components/CommonModal';
 import FormAutocomplete from '../../components/FormAutocomplete';
 
 const Sales = () => {
-  const [tabIndex, setTabIndex] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = parseInt(searchParams.get('tab')) || 0;
+  const [tabIndex, setTabIndex] = useState(initialTab);
+  const [selectedCN, setSelectedCN] = useState(null);
   const [sos, setSos] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -92,6 +96,13 @@ const Sales = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const t = parseInt(searchParams.get('tab'));
+    if (!isNaN(t) && t !== tabIndex) {
+      setTabIndex(t);
+    }
+  }, [searchParams]);
 
   const handleCancelSO = async (so) => {
     if (window.confirm(`Are you sure you want to cancel Sales Order ${so.so_number || `SO-${so.id.substring(0, 6).toUpperCase()}`}?`)) {
@@ -292,6 +303,12 @@ const Sales = () => {
   const handleOpenPrintSO = (so) => {
     setSelectedSO(so);
     setPrintDocType('SalesOrder');
+    setOpenPrintModal(true);
+  };
+
+  const handleOpenPrintCN = (cn) => {
+    setSelectedCN(cn);
+    setPrintDocType('CreditNote');
     setOpenPrintModal(true);
   };
 
@@ -629,6 +646,30 @@ const Sales = () => {
         gst_breakup: { cgst, sgst, igst },
         branch_id: selectedSO.branch_id
       };
+    } else if (printDocType === 'CreditNote') {
+      if (!selectedCN) return null;
+      const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
+      const customerGstin = selectedCN.invoice?.customer_gstin || '';
+      const customerState = customerGstin ? customerGstin.substring(0, 2) : companyState;
+      const isIntrastate = companyState === customerState;
+      const cgst = isIntrastate ? selectedCN.tax_amount / 2 : 0;
+      const sgst = isIntrastate ? selectedCN.tax_amount / 2 : 0;
+      const igst = !isIntrastate ? selectedCN.tax_amount : 0;
+      return {
+        invoice_number: selectedCN.credit_note_number,
+        date: selectedCN.date,
+        customer_name: selectedCN.invoice?.customer_name || 'Walk-in Customer',
+        customer_gstin: customerGstin,
+        customer_billing_address: selectedCN.invoice?.customer_billing_address || '',
+        customer_shipping_address: selectedCN.invoice?.customer_shipping_address || '',
+        subtotal: selectedCN.subtotal,
+        discount_amount: 0,
+        tax_amount: selectedCN.tax_amount,
+        total_amount: selectedCN.total_amount,
+        items: selectedCN.items || [],
+        gst_breakup: { cgst, sgst, igst },
+        branch_id: selectedCN.branch_id
+      };
     }
     return null;
   })();
@@ -682,7 +723,7 @@ const Sales = () => {
       )}
 
       <Paper sx={{ mb: 3, borderRadius: '8px' }}>
-        <Tabs value={tabIndex} onChange={(e, idx) => setTabIndex(idx)} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
+        <Tabs value={tabIndex} onChange={(e, idx) => { setTabIndex(idx); setSearchParams({ tab: idx }); }} sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
           <Tab label="Sales Orders" sx={{ fontWeight: 600 }} />
           <Tab label="Tax Invoices" sx={{ fontWeight: 600 }} />
           <Tab label="Credit Notes" sx={{ fontWeight: 600 }} icon={<CreditNoteIcon />} iconPosition="start" />
@@ -813,6 +854,9 @@ const Sales = () => {
                       <Chip label={cn.status} size="small" color={cn.status === 'Issued' ? 'success' : 'default'} />
                     </TableCell>
                     <TableCell align="center">
+                      <IconButton size="small" color="primary" onClick={() => handleOpenPrintCN(cn)} sx={{ mr: 1 }}>
+                        <PrintIcon fontSize="small" />
+                      </IconButton>
                       <IconButton size="small" color="error" onClick={async () => { if (window.confirm(`Delete Credit Note ${cn.credit_note_number}? This will reverse stock.`)) { try { await apiClient.delete(`/sales/credit-notes/${cn.id}`); loadData(); } catch(e) { setError(e.response?.data?.detail || 'Failed to delete Credit Note.'); } } }}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
@@ -1198,12 +1242,12 @@ const Sales = () => {
       <CommonModal
         open={openPrintModal}
         onClose={() => setOpenPrintModal(false)}
-        title={printDocType === 'Invoice' ? "Print Tax Invoice" : "Print Sales Order"}
+        title={printDocType === 'Invoice' ? "Print Tax Invoice" : printDocType === 'CreditNote' ? "Print Credit Note" : "Print Sales Order"}
         maxWidth="md"
         actions={
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}>
-              {printDocType === 'Invoice' ? 'Print Invoice' : 'Print Sales Order'}
+              {printDocType === 'Invoice' ? 'Print Invoice' : printDocType === 'CreditNote' ? 'Print Credit Note' : 'Print Sales Order'}
             </Button>
             <Button variant="contained" onClick={handleDownloadPDF}>
               Download PDF
@@ -1286,7 +1330,7 @@ const Sales = () => {
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <Box sx={{ textAlign: 'right' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                {printDocType === 'Invoice' ? 'TAX INVOICE' : 'SALES ORDER'}{' '}
+                {printDocType === 'Invoice' ? 'TAX INVOICE' : printDocType === 'CreditNote' ? 'CREDIT NOTE' : 'SALES ORDER'}{' '}
                 <span style={{ fontWeight: 600, color: '#334155', fontSize: '1.15rem', marginLeft: '6px' }}>
                   {printData?.invoice_number}
                 </span>

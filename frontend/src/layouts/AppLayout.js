@@ -22,7 +22,8 @@ import {
   Settings as AdminIcon,
   Business as BranchIcon,
   Backup as BackupIcon,
-  AccountTree as AccountTreeIcon
+  AccountTree as AccountTreeIcon,
+  Note as NoteIcon
 } from '@mui/icons-material';
 
 import { logoutUser, fetchUserProfile } from '../app/slices/authSlice';
@@ -220,6 +221,7 @@ const AppLayout = () => {
     if (path.startsWith('/transactions/purchase') || path.startsWith('/masters/suppliers')) {
       return [
         { label: 'Purchase Module', icon: <SupplierIcon />, to: '/transactions/purchase' },
+        { label: 'Debit Notes', icon: <NoteIcon />, to: '/transactions/purchase?tab=3' },
         { label: 'Supplier Master', icon: <PeopleIcon />, to: '/masters/suppliers' },
       ];
     }
@@ -233,6 +235,7 @@ const AppLayout = () => {
     if (path.startsWith('/transactions/sales') || path.startsWith('/masters/customers')) {
       return [
         { label: 'Sales Module', icon: <SalesIcon />, to: '/transactions/sales' },
+        { label: 'Credit Notes', icon: <NoteIcon />, to: '/transactions/sales?tab=2' },
         { label: 'Customer Master', icon: <PeopleIcon />, to: '/masters/customers' },
       ];
     }
