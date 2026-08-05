@@ -2016,7 +2016,7 @@ class TxServices:
             select(CreditNote)
             .filter(CreditNote.id == cn.id)
             .options(
-                selectinload(CreditNote.invoice),
+                selectinload(CreditNote.invoice).selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
                 selectinload(CreditNote.items).selectinload(CreditNoteItem.product)
             )
         )
@@ -2024,6 +2024,9 @@ class TxServices:
         # Populate computed fields
         if result.invoice:
             result.invoice_number = result.invoice.invoice_number
+            if result.invoice.sales_order and result.invoice.sales_order.customer:
+                result.customer_name = result.invoice.sales_order.customer.name
+                result.customer_id = result.invoice.sales_order.customer.id
         for it in result.items:
             it.product_name = it.product.name if it.product else "Unknown"
             it.sku = it.product.sku if it.product else ""
@@ -2033,7 +2036,7 @@ class TxServices:
     async def list_credit_notes(db: AsyncSession, branch_id: Optional[UUID] = None) -> list:
         """List all Credit Notes with invoice and item details."""
         q = select(CreditNote).options(
-            selectinload(CreditNote.invoice),
+            selectinload(CreditNote.invoice).selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
             selectinload(CreditNote.items).selectinload(CreditNoteItem.product)
         )
         if branch_id:
@@ -2044,6 +2047,9 @@ class TxServices:
         for cn in cns:
             if cn.invoice:
                 cn.invoice_number = cn.invoice.invoice_number
+                if cn.invoice.sales_order and cn.invoice.sales_order.customer:
+                    cn.customer_name = cn.invoice.sales_order.customer.name
+                    cn.customer_id = cn.invoice.sales_order.customer.id
             for it in cn.items:
                 it.product_name = it.product.name if it.product else "Unknown"
                 it.sku = it.product.sku if it.product else ""
