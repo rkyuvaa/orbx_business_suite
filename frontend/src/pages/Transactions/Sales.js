@@ -649,7 +649,7 @@ const Sales = () => {
     } else if (printDocType === 'CreditNote') {
       if (!selectedCN) return null;
       const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
-      const customerGstin = selectedCN.invoice?.customer_gstin || '';
+      const customerGstin = selectedCN.customer_gstin || '';
       const customerState = customerGstin ? customerGstin.substring(0, 2) : companyState;
       const isIntrastate = companyState === customerState;
       const cgst = isIntrastate ? selectedCN.tax_amount / 2 : 0;
@@ -658,10 +658,10 @@ const Sales = () => {
       return {
         invoice_number: selectedCN.credit_note_number,
         date: selectedCN.date,
-        customer_name: selectedCN.invoice?.customer_name || 'Walk-in Customer',
+        customer_name: selectedCN.customer_name || 'Walk-in Customer',
         customer_gstin: customerGstin,
-        customer_billing_address: selectedCN.invoice?.customer_billing_address || '',
-        customer_shipping_address: selectedCN.invoice?.customer_shipping_address || '',
+        customer_billing_address: selectedCN.customer_billing_address || '',
+        customer_shipping_address: selectedCN.customer_shipping_address || '',
         subtotal: selectedCN.subtotal,
         discount_amount: 0,
         tax_amount: selectedCN.tax_amount,
