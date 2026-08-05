@@ -91,6 +91,12 @@ class BranchCreate(BaseModel):
     receipt_prefix: str = "RCPT-"
     receipt_suffix: str = ""
     receipt_next_number: int = 1
+    cn_prefix: str = "CN-"
+    cn_suffix: str = ""
+    cn_next_number: int = 1
+    dn_prefix: str = "DN-"
+    dn_suffix: str = ""
+    dn_next_number: int = 1
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
 
@@ -117,6 +123,12 @@ class BranchUpdate(BaseModel):
     receipt_prefix: Optional[str] = None
     receipt_suffix: Optional[str] = None
     receipt_next_number: Optional[int] = None
+    cn_prefix: Optional[str] = None
+    cn_suffix: Optional[str] = None
+    cn_next_number: Optional[int] = None
+    dn_prefix: Optional[str] = None
+    dn_suffix: Optional[str] = None
+    dn_next_number: Optional[int] = None
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
     is_active: Optional[bool] = None
@@ -146,6 +158,12 @@ class BranchOut(BaseModel):
     receipt_prefix: str
     receipt_suffix: str
     receipt_next_number: int
+    cn_prefix: str
+    cn_suffix: str
+    cn_next_number: int
+    dn_prefix: str
+    dn_suffix: str
+    dn_next_number: int
     invoice_terms: Optional[str] = None
     invoice_footer: Optional[str] = None
     is_active: bool

@@ -33,6 +33,12 @@ const schema = yup.object().shape({
   receipt_prefix: yup.string().required('Receipt prefix is required'),
   receipt_suffix: yup.string().nullable(),
   receipt_next_number: yup.number().typeError('Must be a number').required('Sequence is required'),
+  cn_prefix: yup.string().required('Credit Note prefix is required'),
+  cn_suffix: yup.string().nullable(),
+  cn_next_number: yup.number().typeError('Must be a number').required('Sequence is required'),
+  dn_prefix: yup.string().required('Debit Note prefix is required'),
+  dn_suffix: yup.string().nullable(),
+  dn_next_number: yup.number().typeError('Must be a number').required('Sequence is required'),
   invoice_terms: yup.string().nullable(),
   invoice_footer: yup.string().nullable(),
 });
@@ -84,6 +90,12 @@ const Branches = () => {
       receipt_prefix: 'RCPT-',
       receipt_suffix: '',
       receipt_next_number: 1,
+      cn_prefix: 'CN-',
+      cn_suffix: '',
+      cn_next_number: 1,
+      dn_prefix: 'DN-',
+      dn_suffix: '',
+      dn_next_number: 1,
       invoice_terms: '',
       invoice_footer: '',
     });
@@ -255,6 +267,30 @@ const Branches = () => {
                 <FormInput name="receipt_prefix" control={control} label="Receipt Prefix" />
                 <FormInput name="receipt_suffix" control={control} label="Receipt Suffix" />
                 <FormInput name="receipt_next_number" control={control} label="Next No." type="number" />
+              </Box>
+            </Box>
+
+            {/* Credit Note Sequence */}
+            <Box sx={{ gridColumn: 'span 2', mt: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#475569', mb: 1.5 }}>
+                Credit Note (CN) Sequence
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: 2 }}>
+                <FormInput name="cn_prefix" control={control} label="CN Prefix" />
+                <FormInput name="cn_suffix" control={control} label="CN Suffix" />
+                <FormInput name="cn_next_number" control={control} label="Next No." type="number" />
+              </Box>
+            </Box>
+
+            {/* Debit Note Sequence */}
+            <Box sx={{ gridColumn: 'span 2', mt: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#475569', mb: 1.5 }}>
+                Debit Note (DN) Sequence
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr', gap: 2 }}>
+                <FormInput name="dn_prefix" control={control} label="DN Prefix" />
+                <FormInput name="dn_suffix" control={control} label="DN Suffix" />
+                <FormInput name="dn_next_number" control={control} label="Next No." type="number" />
               </Box>
             </Box>
 
