@@ -232,8 +232,9 @@ const AuthLayout = () => {
               src="/logo_light.svg"
               alt="OrbX Logo"
               sx={{
-                height: { xs: 140, sm: 180, md: 210 },
-                width: 'auto',
+                width: '100%',
+                maxWidth: { xs: 180, sm: 220, md: 260 },
+                height: 'auto',
                 filter: 'drop-shadow(0px 4px 10px rgba(27, 67, 50, 0.15))',
                 animation: 'pulse 3s infinite ease-in-out',
                 '@keyframes pulse': {
