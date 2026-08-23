@@ -358,10 +358,10 @@ const AppLayout = () => {
             >
               <Box
                 component="img"
-                src="/logo.svg"
+                src="/logo_light.svg"
                 alt="OrbX Logo"
                 sx={{
-                  height: 42,
+                  height: 32,
                   width: 'auto',
                   transition: 'transform 0.3s ease',
                   '&:hover': {
@@ -369,9 +369,11 @@ const AppLayout = () => {
                   }
                 }}
               />
-              <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 800, fontSize: isSmallMobile ? '0.95rem' : '1.1rem', letterSpacing: '-0.3px', color: '#1b4332', lineHeight: 1 }}>
-                OrbX {!isSmallMobile && <span style={{ fontWeight: 400, opacity: 0.8, color: '#334155' }}>Business Suite</span>}
-              </Typography>
+              {!isSmallMobile && (
+                <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 400, fontSize: '1.1rem', letterSpacing: '-0.3px', color: '#334155', lineHeight: 1, opacity: 0.8 }}>
+                  Business Suite
+                </Typography>
+              )}
             </Box>
 
             {!isDashboard && (
