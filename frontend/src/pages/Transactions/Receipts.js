@@ -66,7 +66,6 @@ const Receipts = () => {
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
-    pageStyle: '@page { size: A4 portrait; margin: 0 !important; }'
   });
 
   // Simple number-to-words generator for Rupees

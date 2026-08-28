@@ -89,7 +89,6 @@ const CustomerLedger = () => {
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
-    pageStyle: '@page { size: A4 portrait; margin: 0 !important; }'
   });
 
   const handleExportCSV = () => {
