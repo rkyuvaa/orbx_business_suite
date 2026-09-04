@@ -687,35 +687,34 @@ const Sales = () => {
   const getHsnTaxSummary = () => {
     if (!printData || !printData.items) return [];
     const summary = {};
-    const isIntrastate = (printData.gst_breakup?.cgst || 0) > 0 || (printData.gst_breakup?.sgst || 0) > 0;
 
     printData.items.forEach(item => {
       const hsn = item.hsn_code || 'N/A';
-      const taxableValue = (item.rate * item.qty) - (item.discount_amount || 0);
-      const gstRate = item.tax_rate || 18;
-      const taxAmt = item.tax_amount || 0;
+      const qty = parseFloat(item.qty) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      const discount = parseFloat(item.discount_amount) || 0;
+      const taxableValue = (rate * qty) - discount;
+      const gstRate = parseFloat(item.tax_rate) || 18;
+      const taxAmt = (item.tax_amount !== undefined && item.tax_amount !== null && item.tax_amount > 0)
+        ? parseFloat(item.tax_amount)
+        : (taxableValue * (gstRate / 100));
 
-      if (!summary[hsn]) {
-        summary[hsn] = {
+      const key = `${hsn}_${gstRate}`;
+
+      if (!summary[key]) {
+        summary[key] = {
           hsn,
+          qty: 0,
           taxableValue: 0,
-          cgstRate: isIntrastate ? (gstRate / 2) : 0,
-          cgstAmount: 0,
-          sgstRate: isIntrastate ? (gstRate / 2) : 0,
-          sgstAmount: 0,
-          igstRate: !isIntrastate ? gstRate : 0,
-          igstAmount: 0,
-          totalTax: 0
+          gstRate,
+          taxValue: 0,
+          taxAmount: 0
         };
       }
-      summary[hsn].taxableValue += taxableValue;
-      if (isIntrastate) {
-        summary[hsn].cgstAmount += (taxAmt / 2);
-        summary[hsn].sgstAmount += (taxAmt / 2);
-      } else {
-        summary[hsn].igstAmount += taxAmt;
-      }
-      summary[hsn].totalTax += taxAmt;
+      summary[key].qty += qty;
+      summary[key].taxableValue += taxableValue;
+      summary[key].taxValue += taxAmt;
+      summary[key].taxAmount += taxAmt;
     });
 
     return Object.values(summary);
@@ -1483,13 +1482,52 @@ const Sales = () => {
                   ₹{formatIndianCurrency(printData?.total_amount)}
                 </Typography>
               </Box>
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, display: 'block', color: 'text.secondary', fontSize: '0.8rem' }}>
-                  Rupees: {printData ? numberToWords(printData.total_amount) : ''}
-                </Typography>
-              </Box>
             </Box>
           </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontStyle: 'italic', fontWeight: 600, color: 'text.secondary', fontSize: '0.85rem' }}>
+              Rupees: {printData ? numberToWords(printData.total_amount) : ''}
+            </Typography>
+          </Box>
+
+          {/* HSN Summary */}
+          {getHsnTaxSummary().length > 0 && (
+            <Box sx={{ mb: 2.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.85rem' }}>
+                HSN Summary:
+              </Typography>
+              <TableContainer sx={{ borderRadius: 0 }}>
+                <Table size="small" sx={{
+                  border: '1px solid #cbd5e1',
+                  '& .MuiTableCell-root': { py: 0.5, px: 1, fontSize: '0.8rem', borderBottom: '1px solid #cbd5e1' }
+                }}>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#f8fafc', borderBottom: '1.5px solid #cbd5e1' }}>
+                      <TableCell sx={{ fontWeight: 700 }}>HSN Code</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Qty</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>Taxable Value (₹)</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Tax Rate</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>Tax Value (₹)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>Tax Amount (₹)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {getHsnTaxSummary().map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell sx={{ fontWeight: 600 }}>{row.hsn}</TableCell>
+                        <TableCell align="center">{row.qty}</TableCell>
+                        <TableCell align="right">{formatIndianCurrency(row.taxableValue)}</TableCell>
+                        <TableCell align="center">{row.gstRate}%</TableCell>
+                        <TableCell align="right">{formatIndianCurrency(row.taxValue)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>{formatIndianCurrency(row.taxAmount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
 
           <Divider sx={{ my: 1.5 }} />
 
