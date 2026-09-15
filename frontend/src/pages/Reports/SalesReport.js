@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Button, Alert, Typography, Grid, TextField, Paper, Tabs, Tab,
+  Box, Button, Alert, Typography, Grid, TextField, Paper,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer
 } from '@mui/material';
-import { FileDownload as ExportIcon, Receipt as ReportIcon, Layers as LayersIcon, Inventory as ItemIcon } from '@mui/icons-material';
+import { FileDownload as ExportIcon, Receipt as ReportIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -14,7 +14,6 @@ const formatCurrency = (val) => {
 };
 
 const SalesReport = () => {
-  const [reportTab, setReportTab] = useState(0); // 0: Invoice Tax Consolidation, 1: Item-Wise Details
   const [invoices, setInvoices] = useState([]);
   const [creditNotes, setCreditNotes] = useState([]);
   const [startDate, setStartDate] = useState('');
@@ -229,73 +228,37 @@ const SalesReport = () => {
 
   const taxSlabs = getTaxSlabSummary();
 
-  // CSV Export including Tax Slabs, Consolidated Tax Groups, and Item Details
+  // CSV Export
   const handleExportCSV = () => {
-    if (itemizedRows.length === 0) return;
+    if (consolidatedTaxRows.length === 0) return;
 
     let csv = '';
 
     // Section 1: Overall GST Slab Summary
-    csv += 'TAX RATE SLAB SUMMARY\n';
-    csv += 'GST Rate,Taxable Value (INR),CGST Amount (INR),SGST Amount (INR),IGST Amount (INR),Total Tax (INR),Total Value (INR)\n';
+    csv += 'GST TAX RATE SLAB SUMMARY\n';
+    csv += 'GST Rate,Line Items,Taxable Value (INR),CGST Amount (INR),SGST Amount (INR),IGST Amount (INR),Total Tax (INR),Total Sales Value (INR)\n';
     taxSlabs.forEach((slab) => {
-      csv += `${slab.gstRate}%,${slab.taxableValue.toFixed(2)},${slab.cgstAmt.toFixed(2)},${slab.sgstAmt.toFixed(2)},${slab.igstAmt.toFixed(2)},${slab.totalTax.toFixed(2)},${slab.totalValue.toFixed(2)}\n`;
+      csv += `${slab.gstRate}%,${slab.count},${slab.taxableValue.toFixed(2)},${slab.cgstAmt.toFixed(2)},${slab.sgstAmt.toFixed(2)},${slab.igstAmt.toFixed(2)},${slab.totalTax.toFixed(2)},${slab.totalValue.toFixed(2)}\n`;
     });
 
     // Section 2: Invoice Tax Consolidation
     csv += '\nINVOICE TAX CONSOLIDATION (Grouped by Invoice No + Tax Rate)\n';
-    csv += 'Document No,Doc Type,Date,Customer Name,GSTIN,GST Rate,Items Count,Taxable Value (INR),CGST Amt (INR),SGST Amt (INR),IGST Amt (INR),Total Tax (INR),Total Invoice Value (INR)\n';
+    csv += 'Document No,Doc Type,Date,Customer Name,GSTIN,GST Rate,Items Count,Consolidated Taxable Value (INR),CGST Amt (INR),SGST Amt (INR),IGST Amt (INR),Total Tax (INR),Total Invoice Value (INR)\n';
     consolidatedTaxRows.forEach((r) => {
       csv += `${r.doc_number},${r.doc_type},${new Date(r.date).toLocaleDateString()},"${r.customer_name.replace(/"/g, '""')}",${r.customer_gstin},${r.gst_rate}%,${r.items_count},${r.taxable_value.toFixed(2)},${r.cgst_amt.toFixed(2)},${r.sgst_amt.toFixed(2)},${r.igst_amt.toFixed(2)},${r.total_tax.toFixed(2)},${r.line_total.toFixed(2)}\n`;
-    });
-
-    // Section 3: Itemized Product Details
-    csv += '\nITEM-WISE DETAILED PRODUCT SALES TRANSACTIONS\n';
-    const headers = [
-      'Document No', 'Doc Type', 'Date', 'Customer Name', 'GSTIN',
-      'Product Name', 'SKU / Code', 'Qty', 'Unit Rate', 'Discount', 'Taxable Value',
-      'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt',
-      'Total Tax', 'Line Total', 'Status'
-    ];
-    csv += headers.join(',') + '\n';
-
-    itemizedRows.forEach((r) => {
-      const line = [
-        r.doc_number,
-        r.doc_type,
-        new Date(r.date).toLocaleDateString(),
-        `"${r.customer_name.replace(/"/g, '""')}"`,
-        r.customer_gstin,
-        `"${r.product_name.replace(/"/g, '""')}"`,
-        r.sku,
-        r.qty,
-        r.rate,
-        r.discount.toFixed(2),
-        r.taxable_value.toFixed(2),
-        `${r.cgst_pct}%`,
-        r.cgst_amt.toFixed(2),
-        `${r.sgst_pct}%`,
-        r.sgst_amt.toFixed(2),
-        `${r.igst_pct}%`,
-        r.igst_amt.toFixed(2),
-        r.total_tax.toFixed(2),
-        r.line_total.toFixed(2),
-        r.status
-      ];
-      csv += line.join(',') + '\n';
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Sales_Tax_Report_${startDate}_to_${endDate}.csv`);
+    link.setAttribute('download', `Sales_Tax_Consolidation_Report_${startDate}_to_${endDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Columns for Consolidated Tax Group View
+  // Columns for Consolidated Tax View
   const consolidatedColumns = [
     { id: 'doc_number', label: 'Invoice No.', render: (row) => <strong>{row.doc_number}</strong> },
     { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
@@ -309,21 +272,6 @@ const SalesReport = () => {
     { id: 'igst_amt', label: 'IGST (₹)', align: 'right', render: (row) => formatCurrency(row.igst_amt) },
     { id: 'total_tax', label: 'Total Tax (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.total_tax)}</strong> },
     { id: 'line_total', label: 'Total Invoice Value (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.line_total)}</strong> },
-  ];
-
-  // Columns for Item-Wise Product Details View
-  const itemizedColumns = [
-    { id: 'doc_number', label: 'Invoice No.', render: (row) => row.doc_number || 'N/A' },
-    { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    { id: 'customer_name', label: 'Customer Name', render: (row) => row.customer_name },
-    { id: 'customer_gstin', label: 'GSTIN', render: (row) => row.customer_gstin },
-    { id: 'product_name', label: 'Product Name', render: (row) => row.product_name },
-    { id: 'sku', label: 'SKU / HSN', render: (row) => row.sku },
-    { id: 'qty', label: 'Qty', align: 'right', render: (row) => row.qty },
-    { id: 'rate', label: 'Rate (₹)', align: 'right', render: (row) => formatCurrency(row.rate) },
-    { id: 'taxable_value', label: 'Taxable Value (₹)', align: 'right', render: (row) => formatCurrency(row.taxable_value) },
-    { id: 'gst_rate', label: 'GST Rate', align: 'center', render: (row) => `${row.gst_rate}%` },
-    { id: 'line_total', label: 'Line Total (₹)', align: 'right', render: (row) => formatCurrency(row.line_total) },
   ];
 
   const renderConsolidatedSummary = (filteredRows) => {
@@ -347,32 +295,18 @@ const SalesReport = () => {
     );
   };
 
-  const renderItemizedSummary = (filteredRows) => {
-    const totalTaxable = filteredRows.reduce((sum, row) => sum + (row.taxable_value || 0), 0);
-    const totalGrand = filteredRows.reduce((sum, row) => sum + (row.line_total || 0), 0);
-
-    return (
-      <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
-        <TableCell colSpan={8} align="center">TOTAL ITEM DETAILS</TableCell>
-        <TableCell align="right">{formatCurrency(totalTaxable)}</TableCell>
-        <TableCell></TableCell>
-        <TableCell align="right">{formatCurrency(totalGrand)}</TableCell>
-      </TableRow>
-    );
-  };
-
   return (
     <Box>
       <PageHeader
-        title="Sales Tax & Item Reports"
-        subtitle="Distinguish between Item Details and Invoice Tax Consolidation (Grouped by Invoice No + Tax Rate)"
+        title="Sales Tax Consolidation Reports"
+        subtitle="Consolidated tax reporting grouped by Invoice Number, Tax Type, and GST Rate slab"
         breadcrumbs={[
           { label: 'Dashboard', to: '/' },
           { label: 'Sales Reports' },
         ]}
         actions={
           <Button variant="contained" startIcon={<ExportIcon />} onClick={handleExportCSV}>
-            Export Tax & Item Report CSV
+            Export Tax Report CSV
           </Button>
         }
       />
@@ -462,48 +396,15 @@ const SalesReport = () => {
         </TableContainer>
       </Paper>
 
-      {/* Report View Tabs: Invoice Tax Consolidation vs Itemized Product Details */}
-      <Paper sx={{ mb: 2, borderRadius: '8px' }}>
-        <Tabs
-          value={reportTab}
-          onChange={(e, val) => setReportTab(val)}
-          sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}
-        >
-          <Tab
-            icon={<LayersIcon />}
-            iconPosition="start"
-            label="Invoice Tax Consolidation (Same Invoice + Same GST Rate)"
-            sx={{ fontWeight: 600 }}
-          />
-          <Tab
-            icon={<ItemIcon />}
-            iconPosition="start"
-            label="Item-Wise Product Details (Every Item)"
-            sx={{ fontWeight: 600 }}
-          />
-        </Tabs>
-      </Paper>
-
-      {/* Main Table View */}
-      {reportTab === 0 ? (
-        <CommonTable
-          columns={consolidatedColumns}
-          rows={consolidatedTaxRows}
-          loading={loading}
-          searchKey="doc_number"
-          searchPlaceholder="Search invoice number, customer..."
-          renderSummary={renderConsolidatedSummary}
-        />
-      ) : (
-        <CommonTable
-          columns={itemizedColumns}
-          rows={itemizedRows}
-          loading={loading}
-          searchKey="product_name"
-          searchPlaceholder="Search product name, SKU, invoice no..."
-          renderSummary={renderItemizedSummary}
-        />
-      )}
+      {/* Main Consolidated Tax Common Table */}
+      <CommonTable
+        columns={consolidatedColumns}
+        rows={consolidatedTaxRows}
+        loading={loading}
+        searchKey="doc_number"
+        searchPlaceholder="Search invoice number, customer name..."
+        renderSummary={renderConsolidatedSummary}
+      />
     </Box>
   );
 };
