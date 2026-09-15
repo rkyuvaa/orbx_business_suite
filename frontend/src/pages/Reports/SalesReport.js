@@ -52,17 +52,55 @@ const SalesReport = () => {
     const customerState = hasCustomerGst ? customerGstin.substring(0, 2) : companyState;
     const isIntrastate = companyState === customerState;
 
-    const gstRate = row.items && row.items.length > 0 ? (row.items[0].tax_rate || 18) : 18;
+    let totalTaxable = 0;
+    let cgstAmt = 0;
+    let sgstAmt = 0;
+    let igstAmt = 0;
 
-    const cgstPct = isIntrastate ? gstRate / 2 : 0;
-    const sgstPct = isIntrastate ? gstRate / 2 : 0;
-    const igstPct = !isIntrastate ? gstRate : 0;
+    if (row.items && row.items.length > 0) {
+      row.items.forEach((item) => {
+        const qty = parseFloat(item.qty) || 0;
+        const rate = parseFloat(item.rate) || 0;
+        const discount = parseFloat(item.discount_amount) || 0;
+        const itemTaxable = (qty * rate) - discount;
+        const taxRate = parseFloat(item.tax_rate) || 18;
 
-    const cgstAmt = isIntrastate ? row.tax_amount / 2 : 0;
-    const sgstAmt = isIntrastate ? row.tax_amount / 2 : 0;
-    const igstAmt = !isIntrastate ? row.tax_amount : 0;
+        const itemTaxAmt = (item.tax_amount !== undefined && item.tax_amount !== null && item.tax_amount > 0)
+          ? parseFloat(item.tax_amount)
+          : (itemTaxable * (taxRate / 100));
 
-    return { cgstPct, cgstAmt, sgstPct, sgstAmt, igstPct, igstAmt };
+        totalTaxable += itemTaxable;
+
+        if (isIntrastate) {
+          cgstAmt += itemTaxAmt / 2;
+          sgstAmt += itemTaxAmt / 2;
+        } else {
+          igstAmt += itemTaxAmt;
+        }
+      });
+    } else {
+      totalTaxable = row.subtotal || row.total_amount || 0;
+      const taxAmt = row.tax_amount || 0;
+      if (isIntrastate) {
+        cgstAmt = taxAmt / 2;
+        sgstAmt = taxAmt / 2;
+      } else {
+        igstAmt = taxAmt;
+      }
+    }
+
+    const cgstPct = isIntrastate && totalTaxable > 0 ? (cgstAmt / totalTaxable) * 100 : 0;
+    const sgstPct = isIntrastate && totalTaxable > 0 ? (sgstAmt / totalTaxable) * 100 : 0;
+    const igstPct = !isIntrastate && totalTaxable > 0 ? (igstAmt / totalTaxable) * 100 : 0;
+
+    return { 
+      cgstPct: Math.round(cgstPct * 100) / 100, 
+      cgstAmt, 
+      sgstPct: Math.round(sgstPct * 100) / 100, 
+      sgstAmt, 
+      igstPct: Math.round(igstPct * 100) / 100, 
+      igstAmt 
+    };
   };
 
   const handleExportCSV = () => {
