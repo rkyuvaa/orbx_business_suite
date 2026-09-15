@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Alert, Typography, Grid, TextField, Paper, TableRow, TableCell } from '@mui/material';
-import { FileDownload as ExportIcon } from '@mui/icons-material';
+import {
+  Box, Button, Alert, Typography, Grid, TextField, Paper,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer
+} from '@mui/material';
+import { FileDownload as ExportIcon, ShoppingCart as ReportIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import CommonTable from '../../components/CommonTable';
 
+const formatCurrency = (val) => {
+  return `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 const PurchaseReport = () => {
   const [pos, setPos] = useState([]);
+  const [bills, setBills] = useState([]);
+  const [debitNotes, setDebitNotes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -28,17 +37,22 @@ const PurchaseReport = () => {
 
   const loadReport = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [res, sRes, cRes] = await Promise.all([
+      const [poRes, billRes, dnRes, sRes, cRes] = await Promise.all([
         apiClient.get('/purchase/po'),
+        apiClient.get('/purchase/bills'),
+        apiClient.get('/purchase/debit-notes'),
         apiClient.get('/suppliers/'),
         apiClient.get('/admin/company')
       ]);
-      setPos(res.data);
+      setPos(poRes.data);
+      setBills(billRes.data);
+      setDebitNotes(dnRes.data);
       setSuppliers(sRes.data);
       setCompany(cRes.data);
     } catch (err) {
-      setError('Failed to fetch purchase reports.');
+      setError('Failed to fetch purchase report data.');
     } finally {
       setLoading(false);
     }
@@ -48,21 +62,48 @@ const PurchaseReport = () => {
     loadReport();
   }, []);
 
-  const getTaxDetails = (row) => {
+  // Process itemized line items across Purchase Orders, Bills, & Debit Notes
+  const getItemizedRows = () => {
     const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
-    const s = suppliers.find((sup) => sup.id === row.supplier_id);
-    const supplierGstin = s ? s.gstin : '';
-    const hasSupplierGst = supplierGstin && supplierGstin !== 'N/A' && supplierGstin.trim() !== '';
-    const supplierState = hasSupplierGst ? supplierGstin.substring(0, 2) : companyState;
-    const isIntrastate = companyState === supplierState;
+    const rows = [];
 
-    let totalTaxable = 0;
-    let cgstAmt = 0;
-    let sgstAmt = 0;
-    let igstAmt = 0;
+    const processDocument = (doc, docCategory) => {
+      const rawDate = doc.date || doc.billing_date;
+      if (!rawDate) return;
+      const docDate = new Date(rawDate);
+      const year = docDate.getFullYear();
+      const month = String(docDate.getMonth() + 1).padStart(2, '0');
+      const day = String(docDate.getDate()).padStart(2, '0');
+      const docDateStr = `${year}-${month}-${day}`;
 
-    if (row.items && row.items.length > 0) {
-      row.items.forEach((item) => {
+      const start = startDate || '1970-01-01';
+      const end = endDate || '9999-12-31';
+      if (docDateStr < start || docDateStr > end) return;
+
+      const supplierId = doc.supplier_id;
+      const sup = suppliers.find((s) => s.id === supplierId);
+      const supplierName = doc.supplier_name || (sup ? sup.name : 'Unknown Vendor');
+      const supplierGstin = doc.supplier_gstin || (sup ? sup.gstin : '');
+      const hasSupplierGst = supplierGstin && supplierGstin !== 'N/A' && supplierGstin.trim() !== '';
+      const supplierState = hasSupplierGst ? supplierGstin.substring(0, 2) : companyState;
+      const isIntrastate = companyState === supplierState;
+
+      const isDebitNote = docCategory === 'Debit Note';
+
+      const items = doc.items && doc.items.length > 0 ? doc.items : [
+        {
+          id: doc.id,
+          product_name: 'General Procurements',
+          sku: 'N/A',
+          qty: 1,
+          rate: doc.total_amount || doc.subtotal || 0,
+          discount_amount: 0,
+          tax_rate: 18,
+          tax_amount: doc.tax_amount || 0
+        }
+      ];
+
+      items.forEach((item, idx) => {
         const qty = parseFloat(item.qty) || 0;
         const rate = parseFloat(item.rate) || 0;
         const discount = parseFloat(item.discount_amount) || 0;
@@ -73,166 +114,186 @@ const PurchaseReport = () => {
           ? parseFloat(item.tax_amount)
           : (itemTaxable * (taxRate / 100));
 
-        totalTaxable += itemTaxable;
+        // Apply negative multiplier if Debit Note (return)
+        const sign = isDebitNote ? -1 : 1;
+        const finalTaxable = itemTaxable * sign;
+        const finalTaxAmt = itemTaxAmt * sign;
 
-        if (isIntrastate) {
-          cgstAmt += itemTaxAmt / 2;
-          sgstAmt += itemTaxAmt / 2;
-        } else {
-          igstAmt += itemTaxAmt;
-        }
+        const cgstPct = isIntrastate ? taxRate / 2 : 0;
+        const cgstAmt = isIntrastate ? finalTaxAmt / 2 : 0;
+        const sgstPct = isIntrastate ? taxRate / 2 : 0;
+        const sgstAmt = isIntrastate ? finalTaxAmt / 2 : 0;
+        const igstPct = !isIntrastate ? taxRate : 0;
+        const igstAmt = !isIntrastate ? finalTaxAmt : 0;
+        const lineTotal = finalTaxable + finalTaxAmt;
+
+        const docNo = doc.po_number || doc.invoice_number || doc.debit_note_number || 'N/A';
+
+        rows.push({
+          id: `${doc.id}_${item.id || idx}`,
+          doc_number: docNo,
+          doc_type: docCategory,
+          date: rawDate,
+          supplier_name: supplierName,
+          supplier_gstin: supplierGstin || 'N/A',
+          product_name: item.product_name || item.product?.name || 'Product Item',
+          sku: item.sku || item.product?.sku || item.hsn_code || '-',
+          qty: qty * sign,
+          rate: rate,
+          discount: discount * sign,
+          taxable_value: finalTaxable,
+          gst_rate: taxRate,
+          cgst_pct: cgstPct,
+          cgst_amt: cgstAmt,
+          sgst_pct: sgstPct,
+          sgst_amt: sgstAmt,
+          igst_pct: igstPct,
+          igst_amt: igstAmt,
+          total_tax: finalTaxAmt,
+          line_total: lineTotal,
+          status: doc.status
+        });
       });
-    } else {
-      totalTaxable = row.total_amount || 0;
-      const taxAmt = row.tax_amount || 0;
-      if (isIntrastate) {
-        cgstAmt = taxAmt / 2;
-        sgstAmt = taxAmt / 2;
-      } else {
-        igstAmt = taxAmt;
-      }
-    }
-
-    const cgstPct = isIntrastate && totalTaxable > 0 ? (cgstAmt / totalTaxable) * 100 : 0;
-    const sgstPct = isIntrastate && totalTaxable > 0 ? (sgstAmt / totalTaxable) * 100 : 0;
-    const igstPct = !isIntrastate && totalTaxable > 0 ? (igstAmt / totalTaxable) * 100 : 0;
-
-    return { 
-      cgstPct: Math.round(cgstPct * 100) / 100, 
-      cgstAmt, 
-      sgstPct: Math.round(sgstPct * 100) / 100, 
-      sgstAmt, 
-      igstPct: Math.round(igstPct * 100) / 100, 
-      igstAmt, 
-      supplierName: s ? s.name : 'Unknown', 
-      supplierGstin: supplierGstin || 'N/A' 
     };
+
+    pos.forEach((po) => processDocument(po, 'Purchase Order'));
+    bills.forEach((bill) => processDocument(bill, 'Purchase Bill'));
+    debitNotes.forEach((dn) => processDocument(dn, 'Debit Note'));
+
+    return rows;
   };
 
-  const handleExportCSV = () => {
-    if (pos.length === 0) return;
-    const headers = [
-      'Order Number', 'Order Date', 'Vendor Name', 'GSTIN', 'Taxable Value',
-      'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt',
-      'Total Tax', 'Total Purchase', 'Status'
-    ];
-    const rows = pos.map((po) => {
-      const { cgstPct, cgstAmt, sgstPct, sgstAmt, igstPct, igstAmt, supplierName, supplierGstin } = getTaxDetails(po);
-      return [
-        po.po_number || 'N/A',
-        new Date(po.date).toLocaleDateString(),
-        supplierName,
-        supplierGstin,
-        po.total_amount,
-        `${cgstPct}%`,
-        cgstAmt.toFixed(2),
-        `${sgstPct}%`,
-        sgstAmt.toFixed(2),
-        `${igstPct}%`,
-        igstAmt.toFixed(2),
-        po.tax_amount,
-        po.grand_total,
-        po.status,
-      ];
+  const itemizedRows = getItemizedRows();
+
+  // Compute Tax Rate Slab Summary
+  const getTaxSlabSummary = () => {
+    const summaryMap = {};
+
+    itemizedRows.forEach((row) => {
+      const rateKey = `${row.gst_rate.toFixed(1)}%`;
+      if (!summaryMap[rateKey]) {
+        summaryMap[rateKey] = {
+          gstRate: row.gst_rate,
+          taxableValue: 0,
+          cgstAmt: 0,
+          sgstAmt: 0,
+          igstAmt: 0,
+          totalTax: 0,
+          totalValue: 0,
+          count: 0
+        };
+      }
+      summaryMap[rateKey].taxableValue += row.taxable_value;
+      summaryMap[rateKey].cgstAmt += row.cgst_amt;
+      summaryMap[rateKey].sgstAmt += row.sgst_amt;
+      summaryMap[rateKey].igstAmt += row.igst_amt;
+      summaryMap[rateKey].totalTax += row.total_tax;
+      summaryMap[rateKey].totalValue += row.line_total;
+      summaryMap[rateKey].count += 1;
     });
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    return Object.values(summaryMap).sort((a, b) => a.gstRate - b.gstRate);
+  };
+
+  const taxSlabs = getTaxSlabSummary();
+
+  const handleExportCSV = () => {
+    if (itemizedRows.length === 0) return;
+
+    let csv = '';
+
+    // 1. Tax Rate Summary
+    csv += 'TAX RATE SLAB SUMMARY\n';
+    csv += 'GST Rate,Taxable Value (INR),CGST Amount (INR),SGST Amount (INR),IGST Amount (INR),Total Tax (INR),Total Value (INR)\n';
+    taxSlabs.forEach((slab) => {
+      csv += `${slab.gstRate}%,${slab.taxableValue.toFixed(2)},${slab.cgstAmt.toFixed(2)},${slab.sgstAmt.toFixed(2)},${slab.igstAmt.toFixed(2)},${slab.totalTax.toFixed(2)},${slab.totalValue.toFixed(2)}\n`;
+    });
+
+    csv += '\nITEM-WISE DETAILED PURCHASE TRANSACTIONS\n';
+    const headers = [
+      'Document No', 'Doc Type', 'Date', 'Vendor Name', 'GSTIN',
+      'Product Name', 'SKU / Code', 'Qty', 'Unit Rate', 'Discount', 'Taxable Value',
+      'CGST %', 'CGST Amt', 'SGST %', 'SGST Amt', 'IGST %', 'IGST Amt',
+      'Total Tax', 'Line Total', 'Status'
+    ];
+    csv += headers.join(',') + '\n';
+
+    itemizedRows.forEach((r) => {
+      const line = [
+        r.doc_number,
+        r.doc_type,
+        new Date(r.date).toLocaleDateString(),
+        `"${r.supplier_name.replace(/"/g, '""')}"`,
+        r.supplier_gstin,
+        `"${r.product_name.replace(/"/g, '""')}"`,
+        r.sku,
+        r.qty,
+        r.rate,
+        r.discount.toFixed(2),
+        r.taxable_value.toFixed(2),
+        `${r.cgst_pct}%`,
+        r.cgst_amt.toFixed(2),
+        `${r.sgst_pct}%`,
+        r.sgst_amt.toFixed(2),
+        `${r.igst_pct}%`,
+        r.igst_amt.toFixed(2),
+        r.total_tax.toFixed(2),
+        r.line_total.toFixed(2),
+        r.status
+      ];
+      csv += line.join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PurchaseReport_${startDate}_to_${endDate}.csv`);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Purchase_Itemized_Report_${startDate}_to_${endDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const columns = [
-    { id: 'po_number', label: 'Order No.', render: (row) => row.po_number || 'N/A' },
-    { id: 'date', label: 'Order Date', render: (row) => new Date(row.date).toLocaleDateString() },
-    { id: 'supplier_name', label: 'Vendor Name', render: (row) => getTaxDetails(row).supplierName },
-    { id: 'supplier_gstin', label: 'GSTIN', render: (row) => getTaxDetails(row).supplierGstin },
-    { id: 'total_amount', label: 'Taxable Value (₹)', render: (row) => `₹${row.total_amount.toFixed(2)}` },
-    { id: 'cgst_pct', label: 'CGST %', render: (row) => `${getTaxDetails(row).cgstPct}%` },
-    { id: 'cgst_amt', label: 'CGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).cgstAmt.toFixed(2)}` },
-    { id: 'sgst_pct', label: 'SGST %', render: (row) => `${getTaxDetails(row).sgstPct}%` },
-    { id: 'sgst_amt', label: 'SGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).sgstAmt.toFixed(2)}` },
-    { id: 'igst_pct', label: 'IGST %', render: (row) => `${getTaxDetails(row).igstPct}%` },
-    { id: 'igst_amt', label: 'IGST Amt (₹)', render: (row) => `₹${getTaxDetails(row).igstAmt.toFixed(2)}` },
-    { id: 'tax_amount', label: 'Total Tax (₹)', render: (row) => `₹${row.tax_amount.toFixed(2)}` },
-    { id: 'grand_total', label: 'Total Purchase (₹)', render: (row) => `₹${row.grand_total.toFixed(2)}` },
-    {
-      id: 'status',
-      label: 'Status',
-      render: (row) => (
-        <Typography
-          variant="caption"
-          sx={{
-            px: 1,
-            py: 0.5,
-            borderRadius: '4px',
-            fontWeight: 600,
-            backgroundColor:
-              row.status === 'Received' ? 'rgba(45, 106, 79, 0.1)' :
-              row.status === 'Draft' ? 'rgba(100, 116, 139, 0.1)' : 'rgba(255, 143, 0, 0.1)',
-            color:
-              row.status === 'Received' ? '#2d6a4f' :
-              row.status === 'Draft' ? '#64748b' : '#ff8f00',
-          }}
-        >
-          {row.status}
-        </Typography>
-      ),
-    },
+    { id: 'doc_number', label: 'Order / Doc No.', render: (row) => row.doc_number || 'N/A' },
+    { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
+    { id: 'supplier_name', label: 'Vendor Name', render: (row) => row.supplier_name },
+    { id: 'supplier_gstin', label: 'GSTIN', render: (row) => row.supplier_gstin },
+    { id: 'product_name', label: 'Product Name', render: (row) => row.product_name },
+    { id: 'sku', label: 'SKU / HSN', render: (row) => row.sku },
+    { id: 'qty', label: 'Qty', align: 'right', render: (row) => row.qty },
+    { id: 'rate', label: 'Rate (₹)', align: 'right', render: (row) => formatCurrency(row.rate) },
+    { id: 'taxable_value', label: 'Taxable Value (₹)', align: 'right', render: (row) => formatCurrency(row.taxable_value) },
+    { id: 'cgst_pct', label: 'CGST %', align: 'right', render: (row) => `${row.cgst_pct}%` },
+    { id: 'cgst_amt', label: 'CGST (₹)', align: 'right', render: (row) => formatCurrency(row.cgst_amt) },
+    { id: 'sgst_pct', label: 'SGST %', align: 'right', render: (row) => `${row.sgst_pct}%` },
+    { id: 'sgst_amt', label: 'SGST (₹)', align: 'right', render: (row) => formatCurrency(row.sgst_amt) },
+    { id: 'igst_pct', label: 'IGST %', align: 'right', render: (row) => `${row.igst_pct}%` },
+    { id: 'igst_amt', label: 'IGST (₹)', align: 'right', render: (row) => formatCurrency(row.igst_amt) },
+    { id: 'total_tax', label: 'Total Tax (₹)', align: 'right', render: (row) => formatCurrency(row.total_tax) },
+    { id: 'line_total', label: 'Line Total (₹)', align: 'right', render: (row) => formatCurrency(row.line_total) },
   ];
 
-  const filteredPos = pos.filter((po) => {
-    if (!po.date) return false;
-    const poDate = new Date(po.date);
-    const year = poDate.getFullYear();
-    const month = String(poDate.getMonth() + 1).padStart(2, '0');
-    const day = String(poDate.getDate()).padStart(2, '0');
-    const poDateStr = `${year}-${month}-${day}`;
-    
-    const start = startDate || '1970-01-01';
-    const end = endDate || '9999-12-31';
-    
-    return poDateStr >= start && poDateStr <= end;
-  });
-
   const renderSummary = (filteredRows) => {
-    const totalSubtotal = filteredRows.reduce((sum, row) => sum + (row.total_amount || 0), 0);
-    const totalTax = filteredRows.reduce((sum, row) => sum + (row.tax_amount || 0), 0);
-    const totalGrand = filteredRows.reduce((sum, row) => sum + (row.grand_total || 0), 0);
-
-    let totalCgstAmt = 0;
-    let totalSgstAmt = 0;
-    let totalIgstAmt = 0;
-
-    filteredRows.forEach((row) => {
-      const { cgstAmt, sgstAmt, igstAmt } = getTaxDetails(row);
-      totalCgstAmt += cgstAmt;
-      totalSgstAmt += sgstAmt;
-      totalIgstAmt += igstAmt;
-    });
+    const totalTaxable = filteredRows.reduce((sum, row) => sum + (row.taxable_value || 0), 0);
+    const totalCgst = filteredRows.reduce((sum, row) => sum + (row.cgst_amt || 0), 0);
+    const totalSgst = filteredRows.reduce((sum, row) => sum + (row.sgst_amt || 0), 0);
+    const totalIgst = filteredRows.reduce((sum, row) => sum + (row.igst_amt || 0), 0);
+    const totalTax = filteredRows.reduce((sum, row) => sum + (row.total_tax || 0), 0);
+    const totalGrand = filteredRows.reduce((sum, row) => sum + (row.line_total || 0), 0);
 
     return (
       <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
-        <TableCell>Total</TableCell>
+        <TableCell colSpan={8} align="center">TOTAL SUMMARY</TableCell>
+        <TableCell align="right">{formatCurrency(totalTaxable)}</TableCell>
         <TableCell></TableCell>
+        <TableCell align="right">{formatCurrency(totalCgst)}</TableCell>
         <TableCell></TableCell>
+        <TableCell align="right">{formatCurrency(totalSgst)}</TableCell>
         <TableCell></TableCell>
-        <TableCell>₹{totalSubtotal.toFixed(2)}</TableCell>
-        <TableCell></TableCell>
-        <TableCell>₹{totalCgstAmt.toFixed(2)}</TableCell>
-        <TableCell></TableCell>
-        <TableCell>₹{totalSgstAmt.toFixed(2)}</TableCell>
-        <TableCell></TableCell>
-        <TableCell>₹{totalIgstAmt.toFixed(2)}</TableCell>
-        <TableCell>₹{totalTax.toFixed(2)}</TableCell>
-        <TableCell>₹{totalGrand.toFixed(2)}</TableCell>
-        <TableCell></TableCell>
+        <TableCell align="right">{formatCurrency(totalIgst)}</TableCell>
+        <TableCell align="right">{formatCurrency(totalTax)}</TableCell>
+        <TableCell align="right">{formatCurrency(totalGrand)}</TableCell>
       </TableRow>
     );
   };
@@ -240,14 +301,15 @@ const PurchaseReport = () => {
   return (
     <Box>
       <PageHeader
-        title="Purchase Reports"
+        title="Item-Wise Purchase Reports"
+        subtitle="Itemized breakdown of procurement line items and GST tax slab reconciliation"
         breadcrumbs={[
           { label: 'Dashboard', to: '/' },
           { label: 'Purchase Reports' },
         ]}
         actions={
           <Button variant="contained" startIcon={<ExportIcon />} onClick={handleExportCSV}>
-            Export to CSV
+            Export Itemized CSV
           </Button>
         }
       />
@@ -258,6 +320,7 @@ const PurchaseReport = () => {
         </Alert>
       )}
 
+      {/* Date Range Filters */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: '12px' }}>
         <Grid container spacing={3} alignItems="center">
           <Grid item xs={12} sm={4}>
@@ -288,7 +351,63 @@ const PurchaseReport = () => {
         </Grid>
       </Paper>
 
-      <CommonTable columns={columns} rows={filteredPos} loading={loading} searchKey="status" renderSummary={renderSummary} />
+      {/* Tax Rate Slab Summary Table */}
+      <Paper sx={{ p: 3, mb: 3, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <ReportIcon color="primary" sx={{ mr: 1 }} />
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Tax Rate Slab Summary
+          </Typography>
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#1b4332' }}>
+                <TableCell sx={{ color: '#ffffff', fontWeight: 700 }}>GST Rate</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>Items Count</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>Taxable Value (₹)</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>CGST Amount (₹)</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>SGST Amount (₹)</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>IGST Amount (₹)</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>Total Tax (₹)</TableCell>
+                <TableCell align="right" sx={{ color: '#ffffff', fontWeight: 700 }}>Total Purchase Value (₹)</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {taxSlabs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 2, color: 'text.secondary' }}>
+                    No purchase items found for selected date range.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                taxSlabs.map((slab) => (
+                  <TableRow key={slab.gstRate} hover>
+                    <TableCell sx={{ fontWeight: 700 }}>{slab.gstRate}% GST</TableCell>
+                    <TableCell align="right">{slab.count}</TableCell>
+                    <TableCell align="right">{formatCurrency(slab.taxableValue)}</TableCell>
+                    <TableCell align="right">{formatCurrency(slab.cgstAmt)}</TableCell>
+                    <TableCell align="right">{formatCurrency(slab.sgstAmt)}</TableCell>
+                    <TableCell align="right">{formatCurrency(slab.igstAmt)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(slab.totalTax)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: '#1b4332' }}>{formatCurrency(slab.totalValue)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Main Itemized Common Table */}
+      <CommonTable
+        columns={columns}
+        rows={itemizedRows}
+        loading={loading}
+        searchKey="product_name"
+        searchPlaceholder="Search product name, SKU, order no..."
+        renderSummary={renderSummary}
+      />
     </Box>
   );
 };
