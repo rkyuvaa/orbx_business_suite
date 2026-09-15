@@ -13,6 +13,7 @@ const PurchaseReport = () => {
   const [endDate, setEndDate] = useState('');
   const [company, setCompany] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const today = new Date();
@@ -26,15 +27,20 @@ const PurchaseReport = () => {
   }, []);
 
   const loadReport = async () => {
+    setLoading(true);
     try {
-      const res = await apiClient.get('/purchase/po');
-      const sRes = await apiClient.get('/suppliers/');
-      const cRes = await apiClient.get('/admin/company');
+      const [res, sRes, cRes] = await Promise.all([
+        apiClient.get('/purchase/po'),
+        apiClient.get('/suppliers/'),
+        apiClient.get('/admin/company')
+      ]);
       setPos(res.data);
       setSuppliers(sRes.data);
       setCompany(cRes.data);
     } catch (err) {
       setError('Failed to fetch purchase reports.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -251,7 +257,7 @@ const PurchaseReport = () => {
         </Grid>
       </Paper>
 
-      <CommonTable columns={columns} rows={filteredPos} searchKey="status" renderSummary={renderSummary} />
+      <CommonTable columns={columns} rows={filteredPos} loading={loading} searchKey="status" renderSummary={renderSummary} />
     </Box>
   );
 };

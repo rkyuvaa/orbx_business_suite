@@ -12,6 +12,7 @@ const SalesReport = () => {
   const [endDate, setEndDate] = useState('');
   const [company, setCompany] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const today = new Date();
@@ -25,13 +26,18 @@ const SalesReport = () => {
   }, []);
 
   const loadReport = async () => {
+    setLoading(true);
     try {
-      const res = await apiClient.get('/sales/invoices');
+      const [res, cRes] = await Promise.all([
+        apiClient.get('/sales/invoices'),
+        apiClient.get('/admin/company')
+      ]);
       setInvoices(res.data);
-      const cRes = await apiClient.get('/admin/company');
       setCompany(cRes.data);
     } catch (err) {
       setError('Failed to fetch sales reports.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -236,7 +242,7 @@ const SalesReport = () => {
         </Grid>
       </Paper>
 
-      <CommonTable columns={columns} rows={filteredInvoices} searchKey="invoice_number" renderSummary={renderSummary} />
+      <CommonTable columns={columns} rows={filteredInvoices} loading={loading} searchKey="invoice_number" renderSummary={renderSummary} />
     </Box>
   );
 };

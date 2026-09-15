@@ -11,6 +11,7 @@ import CommonModal from '../../components/CommonModal';
 const Receipts = () => {
   const [payments, setPayments] = useState([]);
   const [company, setCompany] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   const [openPrintModal, setOpenPrintModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -22,14 +23,19 @@ const Receipts = () => {
   const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const payRes = await apiClient.get('/payments/');
-      const compRes = await apiClient.get('/admin/company');
+      const [payRes, compRes] = await Promise.all([
+        apiClient.get('/payments/'),
+        apiClient.get('/admin/company')
+      ]);
       
       setPayments(payRes.data);
       setCompany(compRes.data);
     } catch (err) {
       setError('Failed to load payment receipt records.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -173,6 +179,7 @@ const Receipts = () => {
       <CommonTable
         columns={columns}
         rows={payments}
+        loading={loading}
         actions={[
           {
             icon: <PrintIcon />,

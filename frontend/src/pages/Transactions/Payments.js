@@ -10,6 +10,7 @@ const Payments = () => {
   const [outstandings, setOutstandings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   // Outstanding invoices mapping for checked selection and amounts
   const [checkedInvoices, setCheckedInvoices] = useState({}); // { [invoiceId]: { checked: bool, amount: number, maxAmount: number, invoiceNumber: string } }
@@ -25,14 +26,18 @@ const Payments = () => {
   const [error, setError] = useState(null);
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const oRes = await apiClient.get('/payments/outstanding');
+      const [oRes, custRes] = await Promise.all([
+        apiClient.get('/payments/outstanding'),
+        apiClient.get('/customers/')
+      ]);
       setOutstandings(oRes.data);
-      
-      const custRes = await apiClient.get('/customers/');
       setCustomers(custRes.data.filter(c => c.is_active !== false));
     } catch (err) {
       setError('Failed to load outstanding invoice data.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -180,6 +185,7 @@ const Payments = () => {
       <CommonTable
         columns={columns}
         rows={outstandings}
+        loading={loading}
         searchKey="invoice_number"
         tableActions={
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd}>

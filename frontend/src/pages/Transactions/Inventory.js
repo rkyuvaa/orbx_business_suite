@@ -135,6 +135,7 @@ const Inventory = () => {
   const [selectedTransfer, setSelectedTransfer] = useState(null);
 
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const printRef = useRef();
 
   const { control, handleSubmit, reset } = useForm({
@@ -142,14 +143,17 @@ const Inventory = () => {
   });
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const sRes = await apiClient.get('/inventory/stock');
-      const lRes = await apiClient.get('/inventory/ledger');
-      const tRes = await apiClient.get('/inventory/transfers');
-      const pRes = await apiClient.get('/products/');
-      const bRes = await apiClient.get('/admin/branches');
-      const cRes = await apiClient.get('/customers/');
-      const compRes = await apiClient.get('/admin/company');
+      const [sRes, lRes, tRes, pRes, bRes, cRes, compRes] = await Promise.all([
+        apiClient.get('/inventory/stock'),
+        apiClient.get('/inventory/ledger'),
+        apiClient.get('/inventory/transfers'),
+        apiClient.get('/products/'),
+        apiClient.get('/admin/branches'),
+        apiClient.get('/customers/'),
+        apiClient.get('/admin/company'),
+      ]);
 
       setStockPositions(sRes.data);
       setLedger(lRes.data);
@@ -160,6 +164,8 @@ const Inventory = () => {
       setCompany(compRes.data);
     } catch (err) {
       setError('Failed to load inventory records.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -557,6 +563,7 @@ const Inventory = () => {
         <CommonTable
           columns={stockColumns}
           rows={stockPositions}
+          loading={loading}
           searchKey="qty"
           tableActions={
             <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdjustment}>
@@ -567,13 +574,14 @@ const Inventory = () => {
       )}
 
       {tabIndex === 1 && (
-        <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
+        <CommonTable columns={ledgerColumns} rows={ledger} loading={loading} searchKey="transaction_type" />
       )}
 
       {tabIndex === 2 && (
         <CommonTable
           columns={transferColumns}
           rows={transfers}
+          loading={loading}
           searchKey="challan_number"
           tableActions={
             <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenTransferModal}>

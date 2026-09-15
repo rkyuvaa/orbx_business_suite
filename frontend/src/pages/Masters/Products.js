@@ -38,6 +38,7 @@ const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { user } = useSelector((state) => state.auth);
   const isSuperAdmin = user?.role_name === 'Super Admin';
@@ -51,13 +52,18 @@ const Products = () => {
   });
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const pRes = await apiClient.get('/products/');
-      const cRes = await apiClient.get('/products/categories');
+      const [pRes, cRes] = await Promise.all([
+        apiClient.get('/products/'),
+        apiClient.get('/products/categories')
+      ]);
       setProducts(pRes.data);
       setCategories(cRes.data);
     } catch (err) {
       setError('Failed to load product/category information.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -313,6 +319,7 @@ const Products = () => {
         <CommonTable
           columns={productColumns}
           rows={products}
+          loading={loading}
           actions={productActions}
           searchKey="name"
           tableActions={
@@ -325,6 +332,7 @@ const Products = () => {
         <CommonTable
           columns={categoryColumns}
           rows={categories}
+          loading={loading}
           actions={categoryActions}
           searchKey="name"
           tableActions={

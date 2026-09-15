@@ -40,6 +40,7 @@ const UsersAndRoles = () => {
   // Custom permissions local matrix state
   const [permMatrix, setPermMatrix] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(userSchema),
@@ -47,15 +48,20 @@ const UsersAndRoles = () => {
   });
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const uRes = await apiClient.get('/admin/users');
-      const rRes = await apiClient.get('/admin/roles');
-      const bRes = await apiClient.get('/admin/branches');
+      const [uRes, rRes, bRes] = await Promise.all([
+        apiClient.get('/admin/users'),
+        apiClient.get('/admin/roles'),
+        apiClient.get('/admin/branches')
+      ]);
       setUsers(uRes.data);
       setRoles(rRes.data);
       setBranches(bRes.data);
     } catch (err) {
       setError('Failed to load users or roles lists.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -240,6 +246,7 @@ const UsersAndRoles = () => {
         <CommonTable
           columns={userColumns}
           rows={users}
+          loading={loading}
           actions={[{ type: 'edit', label: 'Edit User Profile', onClick: handleOpenEditUser }]}
           searchKey="full_name"
           tableActions={
@@ -252,6 +259,7 @@ const UsersAndRoles = () => {
         <CommonTable
           columns={roleColumns}
           rows={roles}
+          loading={loading}
           actions={[
             {
               icon: <SecurityIcon />,

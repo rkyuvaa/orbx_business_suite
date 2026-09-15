@@ -48,17 +48,21 @@ const Branches = () => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { control, handleSubmit, reset } = useForm({
     resolver: yupResolver(schema),
   });
 
   const loadBranches = async () => {
+    setLoading(true);
     try {
       const res = await apiClient.get('/admin/branches');
       setBranches(res.data);
     } catch (err) {
-      setError('Failed to load branches.');
+      setError('Failed to load branches list.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,6 +168,7 @@ const Branches = () => {
       <CommonTable
         columns={columns}
         rows={branches}
+        loading={loading}
         actions={actions}
         searchKey="branch_name"
         tableActions={

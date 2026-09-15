@@ -33,6 +33,7 @@ const Suppliers = () => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { user } = useSelector((state) => state.auth);
   const isSuperAdmin = user?.role_name === 'Super Admin';
@@ -42,11 +43,14 @@ const Suppliers = () => {
   });
 
   const loadSuppliers = async () => {
+    setLoading(true);
     try {
       const res = await apiClient.get('/suppliers/');
       setSuppliers(res.data);
     } catch (err) {
       setError('Failed to load supplier list.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -219,6 +223,7 @@ const Suppliers = () => {
       <CommonTable
         columns={columns}
         rows={suppliers}
+        loading={loading}
         actions={actions}
         searchKey="name"
         tableActions={

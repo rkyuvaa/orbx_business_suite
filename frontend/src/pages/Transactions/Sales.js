@@ -78,18 +78,22 @@ const Sales = () => {
   const [soItems, setSoItems] = useState([{ product_id: '', qty: 1, rate: 0, discount_amount: 0, tax_rate: 18 }]);
 
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const printRef = useRef();
 
   const { user } = useSelector((state) => state.auth);
   const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const soRes = await apiClient.get('/sales/so');
-      const invRes = await apiClient.get('/sales/invoices');
-      const brRes = await apiClient.get('/admin/branches');
-      const compRes = await apiClient.get('/admin/company');
-      const cnRes = await apiClient.get('/sales/credit-notes');
+      const [soRes, invRes, brRes, compRes, cnRes] = await Promise.all([
+        apiClient.get('/sales/so'),
+        apiClient.get('/sales/invoices'),
+        apiClient.get('/admin/branches'),
+        apiClient.get('/admin/company'),
+        apiClient.get('/sales/credit-notes'),
+      ]);
 
       setSos(soRes.data);
       setInvoices(invRes.data);
@@ -98,6 +102,8 @@ const Sales = () => {
       setCreditNotes(cnRes.data);
     } catch (err) {
       setError('Failed to load transaction sales documents.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -741,6 +747,7 @@ const Sales = () => {
         <CommonTable
           columns={soColumns}
           rows={sos}
+          loading={loading}
           actions={[
             {
               icon: <PrintIcon />,
@@ -791,6 +798,7 @@ const Sales = () => {
         <CommonTable
           columns={invoiceColumns}
           rows={invoices}
+          loading={loading}
           actions={[
             {
               icon: <PrintIcon />,
@@ -841,7 +849,17 @@ const Sales = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {creditNotes.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, rIdx) => (
+                    <TableRow key={rIdx}>
+                      {Array.from({ length: 10 }).map((_, cIdx) => (
+                        <TableCell key={cIdx}>
+                          <Skeleton variant="text" animation="wave" height={24} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : creditNotes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                       No Credit Notes found. Create one to offset a Tax Invoice.

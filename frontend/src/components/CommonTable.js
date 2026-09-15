@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TableSortLabel, TablePagination, Paper, IconButton, Tooltip, Box,
-  TextField, InputAdornment
+  TextField, InputAdornment, Skeleton
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -19,7 +19,9 @@ const CommonTable = ({
   searchPlaceholder = "Search records...",
   searchKey = "name",
   tableActions = null,
-  renderSummary = null
+  renderSummary = null,
+  loading = false,
+  skeletonRows = 5
 }) => {
   const [order, setOrder] = useState('asc');
   const [orderBy, setOrderBy] = useState('');
@@ -139,7 +141,22 @@ const CommonTable = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginatedRows.length === 0 ? (
+            {loading ? (
+              Array.from({ length: skeletonRows }).map((_, rIdx) => (
+                <TableRow key={rIdx}>
+                  {columns.map((col, cIdx) => (
+                    <TableCell key={cIdx} align={col.align || 'left'}>
+                      <Skeleton variant="text" animation="wave" height={28} sx={{ borderRadius: '4px' }} />
+                    </TableCell>
+                  ))}
+                  {actions.length > 0 && (
+                    <TableCell align="right">
+                      <Skeleton variant="text" animation="wave" height={28} sx={{ borderRadius: '4px', width: '60px', ml: 'auto' }} />
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            ) : paginatedRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length + (actions.length > 0 ? 1 : 0)} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                   No matching records found.
@@ -179,7 +196,7 @@ const CommonTable = ({
                 </TableRow>
               ))
             )}
-            {filteredRows.length > 0 && renderSummary && renderSummary(filteredRows)}
+            {!loading && filteredRows.length > 0 && renderSummary && renderSummary(filteredRows)}
           </TableBody>
         </Table>
       </TableContainer>

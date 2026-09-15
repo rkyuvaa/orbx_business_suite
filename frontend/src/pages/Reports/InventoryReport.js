@@ -12,17 +12,23 @@ const InventoryReport = () => {
   const [ledger, setLedger] = useState([]);
   const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const loadReport = async () => {
+    setLoading(true);
     try {
-      const sRes = await apiClient.get('/inventory/stock');
-      const lRes = await apiClient.get('/inventory/ledger');
-      const pRes = await apiClient.get('/products/');
+      const [sRes, lRes, pRes] = await Promise.all([
+        apiClient.get('/inventory/stock'),
+        apiClient.get('/inventory/ledger'),
+        apiClient.get('/products/')
+      ]);
       setStocks(sRes.data);
       setLedger(lRes.data);
       setProducts(pRes.data);
     } catch (err) {
       setError('Failed to fetch inventory reports.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -201,9 +207,9 @@ const InventoryReport = () => {
         };
 
         return tabIndex === 0 ? (
-          <CommonTable columns={valuationColumns} rows={stocks} searchKey="qty" renderSummary={renderValuationSummary} />
+          <CommonTable columns={valuationColumns} rows={stocks} loading={loading} searchKey="qty" renderSummary={renderValuationSummary} />
         ) : (
-          <CommonTable columns={ledgerColumns} rows={ledger} searchKey="transaction_type" />
+          <CommonTable columns={ledgerColumns} rows={ledger} loading={loading} searchKey="transaction_type" />
         );
       })()}
     </Box>

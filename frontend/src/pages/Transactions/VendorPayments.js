@@ -12,6 +12,7 @@ const VendorPayments = () => {
   const [outstandings, setOutstandings] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   // Outstanding bills mapping for checked selection and amounts
   const [checkedBills, setCheckedBills] = useState({}); // { [billId]: { checked: bool, amount: number, maxAmount: number, invoiceNumber: string } }
@@ -30,17 +31,20 @@ const VendorPayments = () => {
   const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const pRes = await apiClient.get('/purchase/payments');
+      const [pRes, oRes, suppRes] = await Promise.all([
+        apiClient.get('/purchase/payments'),
+        apiClient.get('/purchase/payments/outstanding'),
+        apiClient.get('/suppliers/')
+      ]);
       setPayments(pRes.data);
-
-      const oRes = await apiClient.get('/purchase/payments/outstanding');
       setOutstandings(oRes.data);
-      
-      const suppRes = await apiClient.get('/suppliers/');
       setSuppliers(suppRes.data.filter(s => s.is_active !== false));
     } catch (err) {
       setError('Failed to load supplier payment data.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -223,6 +227,7 @@ const VendorPayments = () => {
       <CommonTable
         columns={columns}
         rows={payments}
+        loading={loading}
         searchKey="supplier_name"
         searchPlaceholder="Search supplier name..."
         tableActions={

@@ -32,6 +32,7 @@ const Customers = () => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { user } = useSelector((state) => state.auth);
   const isSuperAdmin = user?.role_name === 'Super Admin';
@@ -41,11 +42,14 @@ const Customers = () => {
   });
 
   const loadCustomers = async () => {
+    setLoading(true);
     try {
       const res = await apiClient.get('/customers/');
       setCustomers(res.data);
     } catch (err) {
       setError('Failed to load customer list.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -195,6 +199,7 @@ const Customers = () => {
       <CommonTable
         columns={columns}
         rows={customers}
+        loading={loading}
         actions={actions}
         searchKey="name"
         tableActions={

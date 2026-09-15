@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Chip, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer, Divider, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Button, Box, Alert, Typography, Tabs, Tab, Paper, Grid, MenuItem, TextField, Chip, Table, TableHead, TableRow, TableCell, TableBody, IconButton, TableContainer, Divider, Dialog, DialogTitle, DialogContent, DialogActions, Skeleton } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, AssignmentTurnedIn as ReceiveIcon, Receipt as BillIcon, Edit as EditIcon, Block as CancelIcon, Print as PrintIcon, NoteAdd as DebitNoteIcon } from '@mui/icons-material';
 import { useReactToPrint } from 'react-to-print';
 import { useSearchParams } from 'react-router-dom';
@@ -67,18 +67,22 @@ const Purchase = () => {
   const [billDueDate, setBillDueDate] = useState('');
 
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const { user } = useSelector((state) => state.auth);
   const isSuperAdmin = user?.role_name === 'Super Admin';
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      const poRes = await apiClient.get('/purchase/po');
-      const grnRes = await apiClient.get('/purchase/grn');
-      const billRes = await apiClient.get('/purchase/bills');
-      const brRes = await apiClient.get('/admin/branches');
-      const compRes = await apiClient.get('/admin/company');
-      const dnRes = await apiClient.get('/purchase/debit-notes');
+      const [poRes, grnRes, billRes, brRes, compRes, dnRes] = await Promise.all([
+        apiClient.get('/purchase/po'),
+        apiClient.get('/purchase/grn'),
+        apiClient.get('/purchase/bills'),
+        apiClient.get('/admin/branches'),
+        apiClient.get('/admin/company'),
+        apiClient.get('/purchase/debit-notes'),
+      ]);
 
       setPos(poRes.data);
       setGrns(grnRes.data);
@@ -88,6 +92,8 @@ const Purchase = () => {
       setDebitNotes(dnRes.data);
     } catch (err) {
       setError('Failed to load transaction data records.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -660,6 +666,7 @@ const Purchase = () => {
         <CommonTable
           columns={poColumns}
           rows={pos}
+          loading={loading}
           actions={[
             {
               icon: <EditIcon />,
@@ -707,6 +714,7 @@ const Purchase = () => {
         <CommonTable
           columns={grnColumns}
           rows={grns}
+          loading={loading}
           actions={[
             {
               icon: <BillIcon />,
@@ -737,6 +745,7 @@ const Purchase = () => {
         <CommonTable
           columns={billColumns}
           rows={bills}
+          loading={loading}
           actions={[
             {
               icon: <CancelIcon />,
@@ -781,7 +790,17 @@ const Purchase = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {debitNotes.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, rIdx) => (
+                    <TableRow key={rIdx}>
+                      {Array.from({ length: 10 }).map((_, cIdx) => (
+                        <TableCell key={cIdx}>
+                          <Skeleton variant="text" animation="wave" height={24} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : debitNotes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                       No Debit Notes found. Create one when returning goods to a supplier.
