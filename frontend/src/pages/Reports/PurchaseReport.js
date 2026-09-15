@@ -128,6 +128,7 @@ const PurchaseReport = () => {
         const lineTotal = finalTaxable + finalTaxAmt;
 
         const docNo = doc.po_number || doc.invoice_number || doc.debit_note_number || 'N/A';
+        const supplierInvoiceNo = doc.supplier_invoice_number || doc.supplier_invoice_no || doc.vendor_invoice_number || doc.vendor_invoice_no || (docCategory === 'Purchase Bill' ? doc.invoice_number : (doc.purchase_entry_number || '-'));
 
         rows.push({
           id: `${doc.id}_${item.id || idx}`,
@@ -136,6 +137,7 @@ const PurchaseReport = () => {
           date: rawDate,
           supplier_name: supplierName,
           supplier_gstin: supplierGstin || 'N/A',
+          supplier_invoice_no: supplierInvoiceNo || '-',
           product_name: item.product_name || item.product?.name || 'Product Item',
           sku: item.sku || item.product?.sku || item.hsn_code || '-',
           qty: qty * sign,
@@ -181,6 +183,7 @@ const PurchaseReport = () => {
           date: row.date,
           supplier_name: row.supplier_name,
           supplier_gstin: row.supplier_gstin,
+          supplier_invoice_no: row.supplier_invoice_no,
           gst_rate: row.gst_rate,
           tax_type: taxType,
           items_count: 0,
@@ -257,9 +260,9 @@ const PurchaseReport = () => {
 
     // Section 2: Purchase Tax Consolidation
     csv += '\nPURCHASE TAX CONSOLIDATION (Grouped by Document No + Tax Rate)\n';
-    csv += 'Document No,Doc Type,Date,Vendor Name,GSTIN,GST Rate,Items Count,Consolidated Taxable Value (INR),CGST Amt (INR),SGST Amt (INR),IGST Amt (INR),Total Tax (INR),Total Purchase Value (INR)\n';
+    csv += 'Document No,Doc Type,Date,Vendor Name,GSTIN,Supplier Invoice No,GST Rate,Items Count,Consolidated Taxable Value (INR),CGST Amt (INR),SGST Amt (INR),IGST Amt (INR),Total Tax (INR),Total Purchase Value (INR)\n';
     consolidatedTaxRows.forEach((r) => {
-      csv += `${r.doc_number},${r.doc_type},${new Date(r.date).toLocaleDateString()},"${r.supplier_name.replace(/"/g, '""')}",${r.supplier_gstin},${r.gst_rate}%,${r.items_count},${r.taxable_value.toFixed(2)},${r.cgst_amt.toFixed(2)},${r.sgst_amt.toFixed(2)},${r.igst_amt.toFixed(2)},${r.total_tax.toFixed(2)},${r.line_total.toFixed(2)}\n`;
+      csv += `${r.doc_number},${r.doc_type},${new Date(r.date).toLocaleDateString()},"${r.supplier_name.replace(/"/g, '""')}",${r.supplier_gstin},"${r.supplier_invoice_no.replace(/"/g, '""')}",${r.gst_rate}%,${r.items_count},${r.taxable_value.toFixed(2)},${r.cgst_amt.toFixed(2)},${r.sgst_amt.toFixed(2)},${r.igst_amt.toFixed(2)},${r.total_tax.toFixed(2)},${r.line_total.toFixed(2)}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -278,6 +281,7 @@ const PurchaseReport = () => {
     { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
     { id: 'supplier_name', label: 'Vendor Name', render: (row) => row.supplier_name },
     { id: 'supplier_gstin', label: 'GSTIN', render: (row) => row.supplier_gstin },
+    { id: 'supplier_invoice_no', label: 'Supplier Invoice No', render: (row) => row.supplier_invoice_no || '-' },
     { id: 'gst_rate', label: 'GST Rate', align: 'center', render: (row) => <strong>{row.gst_rate}%</strong> },
     { id: 'items_count', label: 'Items', align: 'center', render: (row) => `${row.items_count} item(s)` },
     { id: 'taxable_value', label: 'Consolidated Taxable Value (₹)', align: 'right', render: (row) => formatCurrency(row.taxable_value) },
@@ -298,7 +302,7 @@ const PurchaseReport = () => {
 
     return (
       <TableRow sx={{ backgroundColor: '#f8fafc', '& td': { fontWeight: 'bold', borderTop: '2px solid #cbd5e1' } }}>
-        <TableCell colSpan={6} align="center">TOTAL CONSOLIDATED TAX SUMMARY</TableCell>
+        <TableCell colSpan={7} align="center">TOTAL CONSOLIDATED TAX SUMMARY</TableCell>
         <TableCell align="right">{formatCurrency(totalTaxable)}</TableCell>
         <TableCell align="right">{formatCurrency(totalCgst)}</TableCell>
         <TableCell align="right">{formatCurrency(totalSgst)}</TableCell>
