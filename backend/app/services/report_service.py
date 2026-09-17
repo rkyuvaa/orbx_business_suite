@@ -10,7 +10,7 @@ from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product, ProductCategory
 from app.models.purchase import PurchaseOrder, PurchaseEntry
 from app.models.inventory import CurrentStock, StockTransaction
-from app.models.sales import SalesOrder, Invoice, InvoiceItem
+from app.models.sales import SalesOrder, Invoice, InvoiceItem, CreditNote, CreditNoteItem
 from app.models.finance import Payment, VendorPayment
 from app.schemas.transaction import (
     DashboardResponse, KPICardsOut, SalesByCategoryOut,
@@ -618,7 +618,116 @@ class ReportService:
                     "outstanding_amount": round(outstanding_amount, 2),
                     "remarks": inv.status
                 })
-                
+
+        # Include Credit Notes (Sales Returns)
+        stmt_cn = (
+            select(CreditNote)
+            .options(
+                selectinload(CreditNote.items).selectinload(CreditNoteItem.product),
+                selectinload(CreditNote.invoice).selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+            )
+            .filter(CreditNote.status != "Cancelled")
+        )
+        if branch_id:
+            stmt_cn = stmt_cn.filter(CreditNote.branch_id == branch_id)
+        if start_date:
+            try:
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                stmt_cn = stmt_cn.filter(CreditNote.date >= start_dt)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+                stmt_cn = stmt_cn.filter(CreditNote.date <= end_dt)
+            except ValueError:
+                pass
+
+        query_cn = await db.execute(stmt_cn.order_by(CreditNote.credit_note_number.asc()))
+        credit_notes = list(query_cn.scalars().all())
+
+        for cn in credit_notes:
+            q_br = await db.execute(select(Branch).filter(Branch.id == cn.branch_id))
+            branch = q_br.scalar_one_or_none()
+            company_state = "22"
+            if branch:
+                q_comp = await db.execute(select(Company).filter(Company.id == branch.company_id))
+                company = q_comp.scalar_one_or_none()
+                if company:
+                    company_state = company.gstin[:2] if company.gstin else (company.state_code if company.state_code else "22")
+
+            cust_name = "Walk-in Customer"
+            cust_gstin = ""
+            cust_address = ""
+            if cn.invoice and cn.invoice.sales_order and cn.invoice.sales_order.customer:
+                customer = cn.invoice.sales_order.customer
+                cust_name = customer.name
+                cust_gstin = customer.gstin or ""
+                cust_address = customer.billing_address or ""
+
+            place_of_supply = "Other"
+            cust_state_code = cust_gstin[:2] if cust_gstin else ""
+            if cust_state_code in STATE_CODES:
+                place_of_supply = f"{STATE_CODES[cust_state_code]} ({cust_state_code})"
+            elif cust_address:
+                place_of_supply = cust_address.split(",")[-1].strip()
+
+            is_interstate = False
+            if cust_state_code and company_state:
+                is_interstate = (cust_state_code != company_state)
+
+            cn_items = cn.items if cn.items else []
+            for item in cn_items:
+                product_name = item.product.name if item.product else "Unknown Product"
+                hsn_code = item.product.hsn_code if item.product else ""
+
+                taxable_value = -abs(item.amount)
+                cgst_pct = 0.0
+                cgst_amt = 0.0
+                sgst_pct = 0.0
+                sgst_amt = 0.0
+                igst_pct = 0.0
+                igst_amt = 0.0
+
+                item_tax = -abs(item.tax_amount)
+
+                if is_interstate:
+                    igst_pct = item.tax_rate
+                    igst_amt = item_tax
+                else:
+                    cgst_pct = item.tax_rate / 2.0
+                    cgst_amt = item_tax / 2.0
+                    sgst_pct = item.tax_rate / 2.0
+                    sgst_amt = item_tax / 2.0
+
+                rows.append({
+                    "id": str(item.id),
+                    "invoice_id": str(cn.id),
+                    "invoice_number": cn.credit_note_number,
+                    "invoice_date": cn.date.strftime("%Y-%m-%d"),
+                    "payment_date": "",
+                    "payment_mode": "CREDIT NOTE",
+                    "customer_name": cust_name,
+                    "customer_gstin": cust_gstin,
+                    "place_of_supply": place_of_supply,
+                    "hsn_code": hsn_code,
+                    "product_description": f"{product_name} (Return)",
+                    "taxable_value": round(taxable_value, 2),
+                    "discount": 0.0,
+                    "cgst_pct": round(cgst_pct, 2),
+                    "cgst_amount": round(cgst_amt, 2),
+                    "sgst_pct": round(sgst_pct, 2),
+                    "sgst_amount": round(sgst_amt, 2),
+                    "igst_pct": round(igst_pct, 2),
+                    "igst_amount": round(igst_amt, 2),
+                    "total_tax": round(item_tax, 2),
+                    "total_invoice_value": round(-abs(cn.total_amount), 2),
+                    "tds_pct": 0.0,
+                    "tds_amount": 0.0,
+                    "outstanding_amount": 0.0,
+                    "remarks": f"Credit Note ({cn.status})"
+                })
+
         return rows
 
     @staticmethod

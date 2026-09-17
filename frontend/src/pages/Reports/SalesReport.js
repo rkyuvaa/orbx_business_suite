@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Button, Alert, Typography, Grid, TextField, Paper,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Chip
 } from '@mui/material';
 import { FileDownload as ExportIcon, Receipt as ReportIcon } from '@mui/icons-material';
 
@@ -62,6 +62,7 @@ const SalesReport = () => {
     const rows = [];
 
     const processDocument = (doc, isCreditNote = false) => {
+      if (doc.status === 'Cancelled') return;
       if (!doc.date) return;
       const docDate = new Date(doc.date);
       const year = docDate.getFullYear();
@@ -81,7 +82,7 @@ const SalesReport = () => {
       const items = doc.items && doc.items.length > 0 ? doc.items : [
         {
           id: doc.id,
-          product_name: 'General Items',
+          product_name: isCreditNote ? 'Sales Return' : 'General Items',
           sku: 'N/A',
           qty: 1,
           rate: doc.subtotal || doc.total_amount || 0,
@@ -90,6 +91,10 @@ const SalesReport = () => {
           tax_amount: doc.tax_amount || 0
         }
       ];
+
+      const docNo = isCreditNote
+        ? (doc.credit_note_number || `CN-${doc.id.substring(0, 6).toUpperCase()}`)
+        : (doc.invoice_number || `INV-${doc.id.substring(0, 6).toUpperCase()}`);
 
       items.forEach((item, idx) => {
         const qty = parseFloat(item.qty) || 0;
@@ -117,12 +122,12 @@ const SalesReport = () => {
 
         rows.push({
           id: `${doc.id}_${item.id || idx}`,
-          doc_number: isCreditNote ? doc.credit_note_number : doc.invoice_number,
+          doc_number: docNo,
           doc_type: isCreditNote ? 'Credit Note' : 'Tax Invoice',
           date: doc.date,
           customer_name: doc.customer_name || 'Walk-in Customer',
           customer_gstin: customerGstin || 'N/A',
-          product_name: item.product_name || item.product?.name || 'Product Item',
+          product_name: item.product_name || item.product?.name || (isCreditNote ? 'Return Item' : 'Product Item'),
           sku: item.sku || item.product?.sku || item.hsn_code || '-',
           qty: qty * sign,
           rate: rate,
@@ -260,7 +265,22 @@ const SalesReport = () => {
 
   // Columns for Consolidated Tax View
   const consolidatedColumns = [
-    { id: 'doc_number', label: 'Invoice No.', render: (row) => <strong>{row.doc_number}</strong> },
+    {
+      id: 'doc_number',
+      label: 'Invoice / Doc No.',
+      render: (row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <strong>{row.doc_number}</strong>
+          <Chip
+            size="small"
+            label={row.doc_type}
+            color={row.doc_type === 'Credit Note' ? 'error' : 'primary'}
+            variant="outlined"
+            sx={{ fontSize: '0.7rem', height: 20, fontWeight: 500 }}
+          />
+        </Box>
+      )
+    },
     { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
     { id: 'customer_name', label: 'Customer Name', render: (row) => row.customer_name },
     { id: 'customer_gstin', label: 'GSTIN', render: (row) => row.customer_gstin },
@@ -271,7 +291,7 @@ const SalesReport = () => {
     { id: 'sgst_amt', label: 'SGST (₹)', align: 'right', render: (row) => formatCurrency(row.sgst_amt) },
     { id: 'igst_amt', label: 'IGST (₹)', align: 'right', render: (row) => formatCurrency(row.igst_amt) },
     { id: 'total_tax', label: 'Total Tax (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.total_tax)}</strong> },
-    { id: 'line_total', label: 'Total Invoice Value (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.line_total)}</strong> },
+    { id: 'line_total', label: 'Total Net Value (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.line_total)}</strong> },
   ];
 
   const renderConsolidatedSummary = (filteredRows) => {
@@ -299,7 +319,7 @@ const SalesReport = () => {
     <Box>
       <PageHeader
         title="Sales Tax Consolidation Reports"
-        subtitle="Consolidated tax reporting grouped by Invoice Number, Tax Type, and GST Rate slab"
+        subtitle="Consolidated tax reporting across Invoices and Credit Notes, grouped by Document Number, Tax Type, and GST Rate slab"
         breadcrumbs={[
           { label: 'Dashboard', to: '/' },
           { label: 'Sales Reports' },
@@ -402,7 +422,7 @@ const SalesReport = () => {
         rows={consolidatedTaxRows}
         loading={loading}
         searchKey="doc_number"
-        searchPlaceholder="Search invoice number, customer name..."
+        searchPlaceholder="Search invoice / credit note number, customer name..."
         renderSummary={renderConsolidatedSummary}
       />
     </Box>

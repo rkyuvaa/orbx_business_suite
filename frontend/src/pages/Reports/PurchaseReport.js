@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Button, Alert, Typography, Grid, TextField, Paper,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Chip
 } from '@mui/material';
 import { FileDownload as ExportIcon, ShoppingCart as ReportIcon } from '@mui/icons-material';
 
@@ -15,7 +15,6 @@ const formatCurrency = (val) => {
 
 const PurchaseReport = () => {
   const [pos, setPos] = useState([]);
-  const [bills, setBills] = useState([]);
   const [debitNotes, setDebitNotes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [startDate, setStartDate] = useState('');
@@ -39,15 +38,13 @@ const PurchaseReport = () => {
     setLoading(true);
     setError(null);
     try {
-      const [poRes, billRes, dnRes, sRes, cRes] = await Promise.all([
+      const [poRes, dnRes, sRes, cRes] = await Promise.all([
         apiClient.get('/purchase/po'),
-        apiClient.get('/purchase/bills'),
         apiClient.get('/purchase/debit-notes'),
         apiClient.get('/suppliers/'),
         apiClient.get('/admin/company')
       ]);
       setPos(poRes.data);
-      setBills(billRes.data);
       setDebitNotes(dnRes.data);
       setSuppliers(sRes.data);
       setCompany(cRes.data);
@@ -62,12 +59,13 @@ const PurchaseReport = () => {
     loadReport();
   }, []);
 
-  // 1. Process itemized line items across Purchase Orders, Bills, & Debit Notes
+  // 1. Process itemized line items across Purchase Orders & Debit Notes
   const getItemizedRows = () => {
     const companyState = company?.state_code || (company?.gstin ? company.gstin.substring(0, 2) : '33');
     const rows = [];
 
     const processDocument = (doc, docCategory) => {
+      if (doc.status === 'Cancelled') return;
       const rawDate = doc.date || doc.billing_date;
       if (!rawDate) return;
       const docDate = new Date(rawDate);
@@ -127,8 +125,8 @@ const PurchaseReport = () => {
         const igstAmt = !isIntrastate ? finalTaxAmt : 0;
         const lineTotal = finalTaxable + finalTaxAmt;
 
-        const docNo = doc.po_number || doc.invoice_number || doc.debit_note_number || 'N/A';
-        const supplierInvoiceNo = doc.supplier_invoice_number || doc.supplier_invoice_no || doc.vendor_invoice_number || doc.vendor_invoice_no || (docCategory === 'Purchase Bill' ? doc.invoice_number : (doc.purchase_entry_number || '-'));
+        const docNo = doc.po_number || (docCategory === 'Purchase Order' ? `PO-${doc.id.substring(0, 6).toUpperCase()}` : (doc.debit_note_number || 'N/A'));
+        const supplierInvoiceNo = doc.supplier_invoice_number || doc.supplier_invoice_no || doc.vendor_invoice_number || doc.vendor_invoice_no || doc.purchase_entry_number || '-';
 
         rows.push({
           id: `${doc.id}_${item.id || idx}`,
@@ -159,7 +157,6 @@ const PurchaseReport = () => {
     };
 
     pos.forEach((po) => processDocument(po, 'Purchase Order'));
-    bills.forEach((bill) => processDocument(bill, 'Purchase Bill'));
     debitNotes.forEach((dn) => processDocument(dn, 'Debit Note'));
 
     return rows;
@@ -277,7 +274,22 @@ const PurchaseReport = () => {
 
   // Columns for Consolidated Tax View
   const consolidatedColumns = [
-    { id: 'doc_number', label: 'Order / Doc No.', render: (row) => <strong>{row.doc_number}</strong> },
+    {
+      id: 'doc_number',
+      label: 'Order / Doc No.',
+      render: (row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <strong>{row.doc_number}</strong>
+          <Chip
+            size="small"
+            label={row.doc_type}
+            color={row.doc_type === 'Debit Note' ? 'error' : 'primary'}
+            variant="outlined"
+            sx={{ fontSize: '0.7rem', height: 20, fontWeight: 500 }}
+          />
+        </Box>
+      )
+    },
     { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
     { id: 'supplier_name', label: 'Vendor Name', render: (row) => row.supplier_name },
     { id: 'supplier_gstin', label: 'GSTIN', render: (row) => row.supplier_gstin },
@@ -420,7 +432,7 @@ const PurchaseReport = () => {
         rows={consolidatedTaxRows}
         loading={loading}
         searchKey="doc_number"
-        searchPlaceholder="Search order/bill number, vendor..."
+        searchPlaceholder="Search order / debit note number, vendor..."
         renderSummary={renderConsolidatedSummary}
       />
     </Box>
