@@ -2040,6 +2040,7 @@ class TxServices:
         """List all Credit Notes with invoice and item details."""
         q = select(CreditNote).options(
             selectinload(CreditNote.invoice).selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+            selectinload(CreditNote.invoice).selectinload(Invoice.delivery_challan).selectinload(StockTransfer.customer),
             selectinload(CreditNote.items).selectinload(CreditNoteItem.product)
         )
         if branch_id:
@@ -2048,14 +2049,25 @@ class TxServices:
         result = await db.execute(q)
         cns = result.scalars().all()
         for cn in cns:
+            cn.invoice_number = None
+            cn.customer_name = "Walk-in Customer"
+            cn.customer_id = None
+            cn.customer_gstin = None
+            cn.customer_billing_address = None
+            cn.customer_shipping_address = None
             if cn.invoice:
                 cn.invoice_number = cn.invoice.invoice_number
+                cust = None
                 if cn.invoice.sales_order and cn.invoice.sales_order.customer:
-                    cn.customer_name = cn.invoice.sales_order.customer.name
-                    cn.customer_id = cn.invoice.sales_order.customer.id
-                    cn.customer_gstin = cn.invoice.sales_order.customer.gstin
-                    cn.customer_billing_address = cn.invoice.sales_order.customer.billing_address
-                    cn.customer_shipping_address = cn.invoice.sales_order.customer.shipping_address
+                    cust = cn.invoice.sales_order.customer
+                elif cn.invoice.delivery_challan and cn.invoice.delivery_challan.customer:
+                    cust = cn.invoice.delivery_challan.customer
+                if cust:
+                    cn.customer_name = cust.name
+                    cn.customer_id = cust.id
+                    cn.customer_gstin = cust.gstin
+                    cn.customer_billing_address = cust.billing_address
+                    cn.customer_shipping_address = cust.shipping_address
             for it in cn.items:
                 it.product_name = it.product.name if it.product else "Unknown"
                 it.sku = it.product.sku if it.product else ""

@@ -243,7 +243,7 @@ const SalesRegister = () => {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 100 }}>Invoice Date</TableCell>
-                <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 120 }}>Invoice No.</TableCell>
+                <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 140 }}>Invoice / Doc No.</TableCell>
                 <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 160 }}>Customer Name</TableCell>
                 <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 130 }}>Customer GSTIN</TableCell>
                 <TableCell sx={{ backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 600, minWidth: 140 }}>Place of Supply</TableCell>
@@ -277,27 +277,38 @@ const SalesRegister = () => {
                 data.rows.map((row, idx) => (
                   <TableRow hover key={row.invoice_id || idx} sx={{ backgroundColor: idx % 2 === 1 ? '#f8fafc' : '#ffffff' }}>
                     <TableCell>{row.invoice_date}</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>{row.invoice_number}</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span>{row.invoice_number}</span>
+                        {(row.invoice_number.startsWith('CN-') || row.status === 'Credit Note') && (
+                          <Chip size="small" label="Credit Note" color="error" variant="outlined" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }} />
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{row.customer_name}</TableCell>
                     <TableCell>{row.customer_gstin || '-'}</TableCell>
                     <TableCell>{row.place_of_supply}</TableCell>
-                    <TableCell align="right">{formatCurrency(row.taxable_value)}</TableCell>
+                    <TableCell align="right" sx={{ color: (row.invoice_number.startsWith('CN-') || row.status === 'Credit Note') ? 'error.main' : 'inherit' }}>
+                      {formatCurrency(row.taxable_value)}
+                    </TableCell>
                     <TableCell align="right" sx={{ color: row.cgst_amount > 0 ? 'text.primary' : 'text.secondary' }}>
-                      {row.cgst_amount > 0 ? formatCurrency(row.cgst_amount) : '-'}
+                      {row.cgst_amount !== 0 ? formatCurrency(row.cgst_amount) : '-'}
                     </TableCell>
                     <TableCell align="right" sx={{ color: row.sgst_amount > 0 ? 'text.primary' : 'text.secondary' }}>
-                      {row.sgst_amount > 0 ? formatCurrency(row.sgst_amount) : '-'}
+                      {row.sgst_amount !== 0 ? formatCurrency(row.sgst_amount) : '-'}
                     </TableCell>
                     <TableCell align="right" sx={{ color: row.igst_amount > 0 ? 'text.primary' : 'text.secondary' }}>
-                      {row.igst_amount > 0 ? formatCurrency(row.igst_amount) : '-'}
+                      {row.igst_amount !== 0 ? formatCurrency(row.igst_amount) : '-'}
                     </TableCell>
                     <TableCell align="right">{formatCurrency(row.total_tax)}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(row.total_amount)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, color: (row.invoice_number.startsWith('CN-') || row.status === 'Credit Note') ? 'error.main' : 'inherit' }}>
+                      {formatCurrency(row.total_amount)}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
                         label={row.status}
-                        color={row.status === 'Paid' ? 'success' : row.status === 'Unpaid' ? 'error' : 'warning'}
+                        color={row.status === 'Paid' ? 'success' : row.status === 'Unpaid' ? 'error' : row.status === 'Credit Note' ? 'error' : 'warning'}
                         sx={{ fontWeight: 700, fontSize: '0.7rem' }}
                       />
                     </TableCell>

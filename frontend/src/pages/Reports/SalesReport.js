@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Button, Alert, Typography, Grid, TextField, Paper,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Chip
+  Box, Button, Alert, Typography, Grid, TextField, Paper, MenuItem,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Chip, Stack
 } from '@mui/material';
-import { FileDownload as ExportIcon, Receipt as ReportIcon } from '@mui/icons-material';
+import {
+  FileDownload as ExportIcon,
+  Receipt as ReportIcon,
+  FilterList as FilterIcon,
+  RestartAlt as ResetIcon
+} from '@mui/icons-material';
 
 import apiClient from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -18,11 +23,13 @@ const SalesReport = () => {
   const [creditNotes, setCreditNotes] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [docTypeFilter, setDocTypeFilter] = useState('ALL'); // 'ALL' | 'INVOICE' | 'CREDIT_NOTE'
   const [company, setCompany] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Default to current month
+  const setCurrentMonthDates = () => {
     const today = new Date();
     const y = today.getFullYear();
     const m = today.getMonth();
@@ -31,20 +38,46 @@ const SalesReport = () => {
     const endStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
     setStartDate(startStr);
     setEndDate(endStr);
+  };
+
+  const setAllTimeDates = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
+  useEffect(() => {
+    setCurrentMonthDates();
   }, []);
 
   const loadReport = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [invRes, cnRes, cRes] = await Promise.all([
+      const [invRes, cnRes, cRes] = await Promise.allSettled([
         apiClient.get('/sales/invoices'),
         apiClient.get('/sales/credit-notes'),
         apiClient.get('/admin/company')
       ]);
-      setInvoices(invRes.data);
-      setCreditNotes(cnRes.data);
-      setCompany(cRes.data);
+
+      if (invRes.status === 'fulfilled') {
+        setInvoices(invRes.value.data || []);
+      } else {
+        console.error('Failed to load invoices:', invRes.reason);
+      }
+
+      if (cnRes.status === 'fulfilled') {
+        setCreditNotes(cnRes.value.data || []);
+      } else {
+        console.error('Failed to load credit notes:', cnRes.reason);
+      }
+
+      if (cRes.status === 'fulfilled') {
+        setCompany(cRes.value.data || null);
+      }
+
+      if (invRes.status === 'rejected' && cnRes.status === 'rejected') {
+        setError('Failed to fetch sales report data.');
+      }
     } catch (err) {
       setError('Failed to fetch sales report data.');
     } finally {
@@ -63,23 +96,41 @@ const SalesReport = () => {
 
     const processDocument = (doc, isCreditNote = false) => {
       if (doc.status === 'Cancelled') return;
-      if (!doc.date) return;
-      const docDate = new Date(doc.date);
-      const year = docDate.getFullYear();
-      const month = String(docDate.getMonth() + 1).padStart(2, '0');
-      const day = String(docDate.getDate()).padStart(2, '0');
-      const docDateStr = `${year}-${month}-${day}`;
 
-      const start = startDate || '1970-01-01';
-      const end = endDate || '9999-12-31';
-      if (docDateStr < start || docDateStr > end) return;
+      // Filter by Doc Type
+      if (docTypeFilter === 'INVOICE' && isCreditNote) return;
+      if (docTypeFilter === 'CREDIT_NOTE' && !isCreditNote) return;
+
+      // Safe date parsing without timezone day shifts
+      const rawDate = doc.date || doc.created_at || '';
+      let docDateStr = '';
+      if (rawDate) {
+        if (typeof rawDate === 'string' && rawDate.includes('T')) {
+          docDateStr = rawDate.split('T')[0];
+        } else if (typeof rawDate === 'string' && rawDate.length >= 10 && rawDate.match(/^\d{4}-\d{2}-\d{2}/)) {
+          docDateStr = rawDate.substring(0, 10);
+        } else {
+          const d = new Date(rawDate);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            docDateStr = `${y}-${m}-${day}`;
+          }
+        }
+      }
+
+      if (docDateStr) {
+        if (startDate && docDateStr < startDate) return;
+        if (endDate && docDateStr > endDate) return;
+      }
 
       const customerGstin = doc.customer_gstin || '';
       const hasCustomerGst = customerGstin && customerGstin !== 'N/A' && customerGstin.trim() !== '';
       const customerState = hasCustomerGst ? customerGstin.substring(0, 2) : companyState;
       const isIntrastate = companyState === customerState;
 
-      const items = doc.items && doc.items.length > 0 ? doc.items : [
+      const items = (doc.items && doc.items.length > 0) ? doc.items : [
         {
           id: doc.id,
           product_name: isCreditNote ? 'Sales Return' : 'General Items',
@@ -93,21 +144,27 @@ const SalesReport = () => {
       ];
 
       const docNo = isCreditNote
-        ? (doc.credit_note_number || `CN-${doc.id.substring(0, 6).toUpperCase()}`)
-        : (doc.invoice_number || `INV-${doc.id.substring(0, 6).toUpperCase()}`);
+        ? (doc.credit_note_number || `CN-${String(doc.id || '').substring(0, 6).toUpperCase()}`)
+        : (doc.invoice_number || `INV-${String(doc.id || '').substring(0, 6).toUpperCase()}`);
+
+      const custName = doc.customer_name || doc.customer?.name || (isCreditNote ? 'Walk-in Customer' : 'Walk-in Customer');
 
       items.forEach((item, idx) => {
-        const qty = parseFloat(item.qty) || 0;
+        const qty = parseFloat(item.qty) || 1;
         const rate = parseFloat(item.rate) || 0;
         const discount = parseFloat(item.discount_amount) || 0;
-        const itemTaxable = (qty * rate) - discount;
-        const taxRate = parseFloat(item.tax_rate) || 18;
+        const itemTaxable = (item.amount !== undefined && item.amount !== null && parseFloat(item.amount) > 0)
+          ? parseFloat(item.amount)
+          : ((qty * rate) - discount);
+        const taxRate = (item.tax_rate !== undefined && item.tax_rate !== null)
+          ? parseFloat(item.tax_rate)
+          : 18;
 
         const itemTaxAmt = (item.tax_amount !== undefined && item.tax_amount !== null && item.tax_amount > 0)
           ? parseFloat(item.tax_amount)
           : (itemTaxable * (taxRate / 100));
 
-        // Apply negative multiplier if Credit Note (return)
+        // Apply negative multiplier if Credit Note (sales return)
         const sign = isCreditNote ? -1 : 1;
         const finalTaxable = itemTaxable * sign;
         const finalTaxAmt = itemTaxAmt * sign;
@@ -124,8 +181,8 @@ const SalesReport = () => {
           id: `${doc.id}_${item.id || idx}`,
           doc_number: docNo,
           doc_type: isCreditNote ? 'Credit Note' : 'Tax Invoice',
-          date: doc.date,
-          customer_name: doc.customer_name || 'Walk-in Customer',
+          date: doc.date || doc.created_at,
+          customer_name: custName,
           customer_gstin: customerGstin || 'N/A',
           product_name: item.product_name || item.product?.name || (isCreditNote ? 'Return Item' : 'Product Item'),
           sku: item.sku || item.product?.sku || item.hsn_code || '-',
@@ -142,7 +199,7 @@ const SalesReport = () => {
           igst_amt: igstAmt,
           total_tax: finalTaxAmt,
           line_total: lineTotal,
-          status: doc.status
+          status: doc.status || 'Issued'
         });
       });
     };
@@ -155,7 +212,7 @@ const SalesReport = () => {
 
   const itemizedRows = getItemizedRows();
 
-  // 2. Consolidate Tax Rows: GROUP BY (Invoice Number, Tax Type, GST Rate)
+  // 2. Consolidate Tax Rows: GROUP BY (Doc Number, Tax Type, GST Rate)
   const getConsolidatedTaxRows = () => {
     const groupMap = {};
 
@@ -183,7 +240,8 @@ const SalesReport = () => {
           igst_amt: 0,
           total_tax: 0,
           line_total: 0,
-          status: row.status
+          status: row.status,
+          search_text: `${row.doc_number} ${row.customer_name} ${row.doc_type} ${row.customer_gstin}`.toLowerCase()
         };
       }
 
@@ -196,7 +254,12 @@ const SalesReport = () => {
       groupMap[key].line_total += row.line_total;
     });
 
-    return Object.values(groupMap);
+    // Sort by date descending so latest documents / credit notes appear on the first page!
+    return Object.values(groupMap).sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateB - dateA;
+    });
   };
 
   const consolidatedTaxRows = getConsolidatedTaxRows();
@@ -233,6 +296,11 @@ const SalesReport = () => {
 
   const taxSlabs = getTaxSlabSummary();
 
+  // Quick stats
+  const totalInvoicesCount = consolidatedTaxRows.filter(r => r.doc_type === 'Tax Invoice').length;
+  const totalCreditNotesCount = consolidatedTaxRows.filter(r => r.doc_type === 'Credit Note').length;
+  const netSalesValue = consolidatedTaxRows.reduce((sum, r) => sum + (r.line_total || 0), 0);
+
   // CSV Export
   const handleExportCSV = () => {
     if (consolidatedTaxRows.length === 0) return;
@@ -250,14 +318,14 @@ const SalesReport = () => {
     csv += '\nINVOICE TAX CONSOLIDATION (Grouped by Invoice No + Tax Rate)\n';
     csv += 'Document No,Doc Type,Date,Customer Name,GSTIN,GST Rate,Items Count,Consolidated Taxable Value (INR),CGST Amt (INR),SGST Amt (INR),IGST Amt (INR),Total Tax (INR),Total Invoice Value (INR)\n';
     consolidatedTaxRows.forEach((r) => {
-      csv += `${r.doc_number},${r.doc_type},${new Date(r.date).toLocaleDateString()},"${r.customer_name.replace(/"/g, '""')}",${r.customer_gstin},${r.gst_rate}%,${r.items_count},${r.taxable_value.toFixed(2)},${r.cgst_amt.toFixed(2)},${r.sgst_amt.toFixed(2)},${r.igst_amt.toFixed(2)},${r.total_tax.toFixed(2)},${r.line_total.toFixed(2)}\n`;
+      csv += `${r.doc_number},${r.doc_type},${r.date ? new Date(r.date).toLocaleDateString() : '-'},"${(r.customer_name || '').replace(/"/g, '""')}",${r.customer_gstin},${r.gst_rate}%,${r.items_count},${r.taxable_value.toFixed(2)},${r.cgst_amt.toFixed(2)},${r.sgst_amt.toFixed(2)},${r.igst_amt.toFixed(2)},${r.total_tax.toFixed(2)},${r.line_total.toFixed(2)}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Sales_Tax_Consolidation_Report_${startDate}_to_${endDate}.csv`);
+    link.setAttribute('download', `Sales_Tax_Consolidation_Report_${startDate || 'all'}_to_${endDate || 'all'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -275,23 +343,41 @@ const SalesReport = () => {
             size="small"
             label={row.doc_type}
             color={row.doc_type === 'Credit Note' ? 'error' : 'primary'}
-            variant="outlined"
-            sx={{ fontSize: '0.7rem', height: 20, fontWeight: 500 }}
+            variant={row.doc_type === 'Credit Note' ? 'filled' : 'outlined'}
+            sx={{ fontSize: '0.7rem', height: 22, fontWeight: 600 }}
           />
         </Box>
       )
     },
-    { id: 'date', label: 'Date', render: (row) => new Date(row.date).toLocaleDateString() },
+    { id: 'date', label: 'Date', render: (row) => row.date ? new Date(row.date).toLocaleDateString() : '-' },
     { id: 'customer_name', label: 'Customer Name', render: (row) => row.customer_name },
     { id: 'customer_gstin', label: 'GSTIN', render: (row) => row.customer_gstin },
     { id: 'gst_rate', label: 'GST Rate', align: 'center', render: (row) => <strong>{row.gst_rate}%</strong> },
     { id: 'items_count', label: 'Items', align: 'center', render: (row) => `${row.items_count} item(s)` },
-    { id: 'taxable_value', label: 'Consolidated Taxable Value (₹)', align: 'right', render: (row) => formatCurrency(row.taxable_value) },
+    {
+      id: 'taxable_value',
+      label: 'Consolidated Taxable Value (₹)',
+      align: 'right',
+      render: (row) => (
+        <span style={{ color: row.doc_type === 'Credit Note' ? '#d32f2f' : 'inherit', fontWeight: row.doc_type === 'Credit Note' ? 600 : 400 }}>
+          {formatCurrency(row.taxable_value)}
+        </span>
+      )
+    },
     { id: 'cgst_amt', label: 'CGST (₹)', align: 'right', render: (row) => formatCurrency(row.cgst_amt) },
     { id: 'sgst_amt', label: 'SGST (₹)', align: 'right', render: (row) => formatCurrency(row.sgst_amt) },
     { id: 'igst_amt', label: 'IGST (₹)', align: 'right', render: (row) => formatCurrency(row.igst_amt) },
     { id: 'total_tax', label: 'Total Tax (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.total_tax)}</strong> },
-    { id: 'line_total', label: 'Total Net Value (₹)', align: 'right', render: (row) => <strong>{formatCurrency(row.line_total)}</strong> },
+    {
+      id: 'line_total',
+      label: 'Total Net Value (₹)',
+      align: 'right',
+      render: (row) => (
+        <strong style={{ color: row.doc_type === 'Credit Note' ? '#d32f2f' : '#1b4332' }}>
+          {formatCurrency(row.line_total)}
+        </strong>
+      )
+    },
   ];
 
   const renderConsolidatedSummary = (filteredRows) => {
@@ -310,7 +396,7 @@ const SalesReport = () => {
         <TableCell align="right">{formatCurrency(totalSgst)}</TableCell>
         <TableCell align="right">{formatCurrency(totalIgst)}</TableCell>
         <TableCell align="right">{formatCurrency(totalTax)}</TableCell>
-        <TableCell align="right">{formatCurrency(totalGrand)}</TableCell>
+        <TableCell align="right" sx={{ color: '#1b4332', fontSize: '0.95rem' }}>{formatCurrency(totalGrand)}</TableCell>
       </TableRow>
     );
   };
@@ -337,23 +423,70 @@ const SalesReport = () => {
         </Alert>
       )}
 
-      {/* Date Range Filters */}
+      {/* Summary KPI Badges */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, borderRadius: '10px', borderLeft: '4px solid #1b4332', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">Tax Invoices</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>{totalInvoicesCount}</Typography>
+            </Box>
+            <Chip label="Tax Invoices" color="primary" size="small" variant="outlined" />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, borderRadius: '10px', borderLeft: '4px solid #d32f2f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">Credit Notes (Returns)</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#d32f2f' }}>{totalCreditNotesCount}</Typography>
+            </Box>
+            <Chip label="Credit Notes" color="error" size="small" />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, borderRadius: '10px', borderLeft: '4px solid #0288d1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">Net Consolidated Sales</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#0288d1' }}>{formatCurrency(netSalesValue)}</Typography>
+            </Box>
+            <Chip label="Net Total" size="small" variant="outlined" />
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Date Range & Document Type Filters */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: '12px' }}>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} sm={4}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={3}>
+            <TextField
+              select
+              label="Document Type"
+              fullWidth
+              size="small"
+              value={docTypeFilter}
+              onChange={(e) => setDocTypeFilter(e.target.value)}
+            >
+              <MenuItem value="ALL">All Documents ({invoices.length + creditNotes.length})</MenuItem>
+              <MenuItem value="INVOICE">Tax Invoices Only ({invoices.length})</MenuItem>
+              <MenuItem value="CREDIT_NOTE">Credit Notes Only ({creditNotes.length})</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={2.5}>
             <TextField
               label="Start Date"
               type="date"
+              size="small"
               fullWidth
               InputLabelProps={{ shrink: true }}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={2.5}>
             <TextField
               label="End Date"
               type="date"
+              size="small"
               fullWidth
               InputLabelProps={{ shrink: true }}
               value={endDate}
@@ -361,9 +494,33 @@ const SalesReport = () => {
             />
           </Grid>
           <Grid item xs={12} sm={4}>
-            <Button variant="outlined" fullWidth onClick={loadReport} sx={{ py: 1.5 }}>
-              Apply Date Filters
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={setCurrentMonthDates}
+                sx={{ textTransform: 'none', flex: 1 }}
+              >
+                This Month
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={setAllTimeDates}
+                sx={{ textTransform: 'none', flex: 1 }}
+              >
+                All Dates
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={loadReport}
+                startIcon={<ResetIcon />}
+                sx={{ textTransform: 'none', flex: 1 }}
+              >
+                Refresh
+              </Button>
+            </Stack>
           </Grid>
         </Grid>
       </Paper>
@@ -394,7 +551,7 @@ const SalesReport = () => {
               {taxSlabs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 2, color: 'text.secondary' }}>
-                    No sales items found for selected date range.
+                    No sales items found for selected filter.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -421,8 +578,8 @@ const SalesReport = () => {
         columns={consolidatedColumns}
         rows={consolidatedTaxRows}
         loading={loading}
-        searchKey="doc_number"
-        searchPlaceholder="Search invoice / credit note number, customer name..."
+        searchKey="search_text"
+        searchPlaceholder="Search invoice / credit note number, customer name, GSTIN..."
         renderSummary={renderConsolidatedSummary}
       />
     </Box>

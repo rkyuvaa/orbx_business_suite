@@ -625,6 +625,7 @@ class ReportService:
             .options(
                 selectinload(CreditNote.items).selectinload(CreditNoteItem.product),
                 selectinload(CreditNote.invoice).selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+                selectinload(CreditNote.invoice).selectinload(Invoice.delivery_challan).selectinload(StockTransfer.customer),
             )
             .filter(CreditNote.status != "Cancelled")
         )
@@ -659,8 +660,13 @@ class ReportService:
             cust_name = "Walk-in Customer"
             cust_gstin = ""
             cust_address = ""
+            customer = None
             if cn.invoice and cn.invoice.sales_order and cn.invoice.sales_order.customer:
                 customer = cn.invoice.sales_order.customer
+            elif cn.invoice and cn.invoice.delivery_challan and cn.invoice.delivery_challan.customer:
+                customer = cn.invoice.delivery_challan.customer
+
+            if customer:
                 cust_name = customer.name
                 cust_gstin = customer.gstin or ""
                 cust_address = customer.billing_address or ""
@@ -1498,29 +1504,59 @@ class ReportService:
             end_date = end_date or def_end
 
         sql_rows = text("""
-            SELECT 
-                inv.id,
-                inv.date as invoice_date,
-                inv.invoice_number,
-                cust.name as customer_name,
-                cust.gstin as customer_gstin,
-                cust.billing_address as customer_address,
-                comp.state_code as branch_state_code,
-                comp.gstin as branch_gstin,
-                inv.subtotal,
-                inv.tax_amount,
-                inv.total_amount,
-                inv.status,
-                inv.gst_breakup
-            FROM invoices inv
-            JOIN sales_orders so ON so.id = inv.sales_order_id
-            JOIN customers cust ON cust.id = so.customer_id
-            JOIN branches b ON b.id = inv.branch_id
-            JOIN companies comp ON comp.id = b.company_id
-            WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
-              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
-            ORDER BY inv.date ASC, inv.invoice_number ASC, inv.id ASC
+            SELECT * FROM (
+                SELECT 
+                    inv.id,
+                    inv.date as invoice_date,
+                    inv.invoice_number,
+                    COALESCE(cust.name, 'Walk-in Customer') as customer_name,
+                    COALESCE(cust.gstin, '') as customer_gstin,
+                    COALESCE(cust.billing_address, '') as customer_address,
+                    comp.state_code as branch_state_code,
+                    comp.gstin as branch_gstin,
+                    inv.subtotal,
+                    inv.tax_amount,
+                    inv.total_amount,
+                    inv.status,
+                    inv.gst_breakup
+                FROM invoices inv
+                LEFT JOIN sales_orders so ON so.id = inv.sales_order_id
+                LEFT JOIN stock_transfers dc ON dc.id = inv.delivery_challan_id
+                LEFT JOIN customers cust ON cust.id = COALESCE(so.customer_id, dc.customer_id)
+                JOIN branches b ON b.id = inv.branch_id
+                JOIN companies comp ON comp.id = b.company_id
+                WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
+                  AND (CAST(:customer_id AS UUID) IS NULL OR cust.id = :customer_id)
+                  AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
+
+                UNION ALL
+
+                SELECT 
+                    cn.id,
+                    cn.date as invoice_date,
+                    cn.credit_note_number as invoice_number,
+                    COALESCE(cust.name, 'Walk-in Customer') as customer_name,
+                    COALESCE(cust.gstin, '') as customer_gstin,
+                    COALESCE(cust.billing_address, '') as customer_address,
+                    comp.state_code as branch_state_code,
+                    comp.gstin as branch_gstin,
+                    -cn.subtotal as subtotal,
+                    -cn.tax_amount as tax_amount,
+                    -cn.total_amount as total_amount,
+                    'Credit Note' as status,
+                    '{}'::json as gst_breakup
+                FROM credit_notes cn
+                LEFT JOIN invoices inv ON inv.id = cn.invoice_id
+                LEFT JOIN sales_orders so ON so.id = inv.sales_order_id
+                LEFT JOIN stock_transfers dc ON dc.id = inv.delivery_challan_id
+                LEFT JOIN customers cust ON cust.id = COALESCE(so.customer_id, dc.customer_id)
+                JOIN branches b ON b.id = cn.branch_id
+                JOIN companies comp ON comp.id = b.company_id
+                WHERE cn.status != 'Cancelled' AND cn.date BETWEEN :start_date AND :end_date
+                  AND (CAST(:customer_id AS UUID) IS NULL OR cust.id = :customer_id)
+                  AND (CAST(:branch_id AS UUID) IS NULL OR cn.branch_id = :branch_id)
+            ) sub
+            ORDER BY sub.invoice_date DESC, sub.invoice_number ASC, sub.id ASC
             OFFSET :skip LIMIT :limit
         """)
 
@@ -1592,14 +1628,29 @@ class ReportService:
 
         sql_totals = text("""
             SELECT 
-                SUM(inv.subtotal) as sub_total,
-                SUM(inv.tax_amount) as tax_total,
-                SUM(inv.total_amount) as grand_total
-            FROM invoices inv
-            JOIN sales_orders so ON so.id = inv.sales_order_id
-            WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
-              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
+                COALESCE(SUM(sub.subtotal), 0) as sub_total,
+                COALESCE(SUM(sub.tax_amount), 0) as tax_total,
+                COALESCE(SUM(sub.total_amount), 0) as grand_total
+            FROM (
+                SELECT inv.subtotal, inv.tax_amount, inv.total_amount
+                FROM invoices inv
+                LEFT JOIN sales_orders so ON so.id = inv.sales_order_id
+                LEFT JOIN stock_transfers dc ON dc.id = inv.delivery_challan_id
+                LEFT JOIN customers cust ON cust.id = COALESCE(so.customer_id, dc.customer_id)
+                WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
+                  AND (CAST(:customer_id AS UUID) IS NULL OR cust.id = :customer_id)
+                  AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
+                UNION ALL
+                SELECT -cn.subtotal, -cn.tax_amount, -cn.total_amount
+                FROM credit_notes cn
+                LEFT JOIN invoices inv ON inv.id = cn.invoice_id
+                LEFT JOIN sales_orders so ON so.id = inv.sales_order_id
+                LEFT JOIN stock_transfers dc ON dc.id = inv.delivery_challan_id
+                LEFT JOIN customers cust ON cust.id = COALESCE(so.customer_id, dc.customer_id)
+                WHERE cn.status != 'Cancelled' AND cn.date BETWEEN :start_date AND :end_date
+                  AND (CAST(:customer_id AS UUID) IS NULL OR cust.id = :customer_id)
+                  AND (CAST(:branch_id AS UUID) IS NULL OR cn.branch_id = :branch_id)
+            ) sub
         """)
         res_totals = await db.execute(
             sql_totals,
@@ -1614,14 +1665,22 @@ class ReportService:
 
         sql_tax_totals = text("""
             SELECT 
-                SUM(COALESCE(CAST(inv.gst_breakup->>'cgst' AS NUMERIC), 0)) as cgst_total,
-                SUM(COALESCE(CAST(inv.gst_breakup->>'sgst' AS NUMERIC), 0)) as sgst_total,
-                SUM(COALESCE(CAST(inv.gst_breakup->>'igst' AS NUMERIC), 0)) as igst_total
-            FROM invoices inv
-            JOIN sales_orders so ON so.id = inv.sales_order_id
-            WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
-              AND (CAST(:customer_id AS UUID) IS NULL OR so.customer_id = :customer_id)
-              AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
+                COALESCE(SUM(sub.cgst), 0) as cgst_total,
+                COALESCE(SUM(sub.sgst), 0) as sgst_total,
+                COALESCE(SUM(sub.igst), 0) as igst_total
+            FROM (
+                SELECT 
+                    COALESCE(CAST(inv.gst_breakup->>'cgst' AS NUMERIC), 0) as cgst,
+                    COALESCE(CAST(inv.gst_breakup->>'sgst' AS NUMERIC), 0) as sgst,
+                    COALESCE(CAST(inv.gst_breakup->>'igst' AS NUMERIC), 0) as igst
+                FROM invoices inv
+                LEFT JOIN sales_orders so ON so.id = inv.sales_order_id
+                LEFT JOIN stock_transfers dc ON dc.id = inv.delivery_challan_id
+                LEFT JOIN customers cust ON cust.id = COALESCE(so.customer_id, dc.customer_id)
+                WHERE inv.status != 'Cancelled' AND inv.date BETWEEN :start_date AND :end_date
+                  AND (CAST(:customer_id AS UUID) IS NULL OR cust.id = :customer_id)
+                  AND (CAST(:branch_id AS UUID) IS NULL OR inv.branch_id = :branch_id)
+            ) sub
         """)
         res_tax = await db.execute(
             sql_tax_totals,
