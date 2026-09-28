@@ -1518,7 +1518,7 @@ const Sales = () => {
               <TableContainer sx={{ borderRadius: 0 }}>
                 <Table size="small" sx={{
                   border: '1px solid #cbd5e1',
-                  '& .MuiTableCell-root': { py: 0.5, px: 1, fontSize: '0.8rem', borderBottom: '1px solid #cbd5e1' }
+                  '& .MuiTableCell-root': { py: 0.15, px: 1, fontSize: '0.8rem', borderBottom: '1px solid #cbd5e1' }
                 }}>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#f8fafc', borderBottom: '1.5px solid #cbd5e1' }}>
