@@ -311,6 +311,7 @@ const CustomerLedger = () => {
         <Box
           ref={printRef}
           sx={{
+            position: 'relative',
             width: '100%',
             maxWidth: '180mm',
             minHeight: '265mm',
@@ -466,6 +467,21 @@ const CustomerLedger = () => {
             <Typography variant="caption" color="textSecondary">
               This is a computer-generated statement of accounts. No signature required.
             </Typography>
+          </Box>
+          <Box sx={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '15px',
+            fontSize: '10px',
+            color: '#94a3b8',
+            pointerEvents: 'none',
+            '@media print': {
+              position: 'fixed',
+              bottom: '5mm',
+              left: '5mm',
+            }
+          }}>
+            Powered by OrbX | orbx.in
           </Box>
         </Box>
       </div>

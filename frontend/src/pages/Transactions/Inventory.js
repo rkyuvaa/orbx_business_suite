@@ -864,6 +864,7 @@ const Inventory = () => {
           <Box
             ref={printRef}
             sx={{
+              position: 'relative',
               backgroundColor: '#ffffff',
               color: '#000000',
               fontFamily: 'sans-serif',
@@ -1055,7 +1056,7 @@ const Inventory = () => {
             </Box>
 
             {/* Signature Area */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 8, pt: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 8, pt: 4, mb: 2 }}>
               <Box sx={{ textAlign: 'center', width: '200px' }}>
                 <Divider />
                 <Typography sx={{ fontSize: '0.8rem', mt: 1, color: 'text.secondary' }}>Receiver's Signature</Typography>
@@ -1065,6 +1066,22 @@ const Inventory = () => {
                 <Typography sx={{ fontSize: '0.8rem', mt: 1, fontWeight: 600 }}>For {company?.name ? company.name.trim() : 'ORBX CORPORATION'}</Typography>
                 <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Authorized Signatory</Typography>
               </Box>
+            </Box>
+
+            <Box sx={{
+              position: 'absolute',
+              bottom: '10px',
+              left: '15px',
+              fontSize: '10px',
+              color: '#94a3b8',
+              pointerEvents: 'none',
+              '@media print': {
+                position: 'fixed',
+                bottom: '5mm',
+                left: '5mm',
+              }
+            }}>
+              Powered by OrbX | orbx.in
             </Box>
           </Box>
         </Box>

@@ -218,6 +218,7 @@ const Receipts = () => {
         <Box
           ref={printRef}
           sx={{
+            position: 'relative',
             width: '100%',
             maxWidth: '180mm',
             minHeight: '265mm',
@@ -352,6 +353,21 @@ const Receipts = () => {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>Cashier Signature</Typography>
             </Grid>
           </Grid>
+          <Box sx={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '15px',
+            fontSize: '10px',
+            color: '#94a3b8',
+            pointerEvents: 'none',
+            '@media print': {
+              position: 'fixed',
+              bottom: '5mm',
+              left: '5mm',
+            }
+          }}>
+            Powered by OrbX | orbx.in
+          </Box>
         </Box>
       </CommonModal>
     </Box>
