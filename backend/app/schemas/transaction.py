@@ -61,6 +61,7 @@ class PurchaseOrderOut(BaseModel):
     tax_amount: float
     grand_total: float
     items: List[PurchaseOrderItemOut] = []
+    supplier_invoice_no: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -165,7 +165,8 @@ class TxServices:
             select(PurchaseOrder)
             .options(
                 selectinload(PurchaseOrder.supplier),
-                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product)
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product),
+                selectinload(PurchaseOrder.grns).selectinload(GRN.purchase_entries)
             )
             .order_by(PurchaseOrder.created_at.desc())
         )
@@ -175,6 +176,14 @@ class TxServices:
         orders = list(query.scalars().all())
         for o in orders:
             o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+            
+            inv_nos = []
+            for grn in o.grns:
+                for pe in grn.purchase_entries:
+                    if pe.invoice_number:
+                        inv_nos.append(pe.invoice_number)
+            o.supplier_invoice_no = ", ".join(inv_nos) if inv_nos else None
+
             for item in o.items:
                 item.product_name = item.product.name if item.product else "Unknown"
                 item.sku = item.product.sku if item.product else ""
