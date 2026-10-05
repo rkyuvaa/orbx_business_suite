@@ -9,7 +9,7 @@ from sqlalchemy import func, and_
 from app.models.business import Customer, Supplier, Branch, Company
 from app.models.product import Product, ProductCategory
 from app.models.purchase import PurchaseOrder, PurchaseEntry
-from app.models.inventory import CurrentStock, StockTransaction
+from app.models.inventory import CurrentStock, StockTransaction, StockTransfer
 from app.models.sales import SalesOrder, Invoice, InvoiceItem, CreditNote, CreditNoteItem
 from app.models.finance import Payment, VendorPayment
 from app.schemas.transaction import (
@@ -480,7 +480,7 @@ class ReportService:
                 selectinload(Invoice.items).selectinload(InvoiceItem.product),
                 selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
                 selectinload(Invoice.payments),
-                selectinload(Invoice.delivery_challan)
+                selectinload(Invoice.delivery_challan).selectinload(StockTransfer.customer)
             )
             .filter(Invoice.status != "Cancelled")
         )
