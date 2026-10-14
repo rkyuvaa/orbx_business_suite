@@ -55,9 +55,18 @@ class AdminService:
     # ==========================================
     @staticmethod
     async def list_branches(db: AsyncSession) -> List[Branch]:
-        """Fetch all branches."""
+        """Fetch all branches with auto-synchronized sequence numbers."""
+        from app.services.tx_services import TxServices
         query = await db.execute(select(Branch).order_by(Branch.created_at.desc()))
-        return list(query.scalars().all())
+        branches = list(query.scalars().all())
+        updated = False
+        for branch in branches:
+            changed = await TxServices.sync_all_sequences_for_branch(db, branch)
+            if changed:
+                updated = True
+        if updated:
+            await db.commit()
+        return branches
 
     @staticmethod
     async def create_branch(db: AsyncSession, branch_data: BranchCreate) -> Branch:

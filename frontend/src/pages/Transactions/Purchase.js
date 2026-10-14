@@ -340,6 +340,30 @@ const Purchase = () => {
     }
   };
 
+  const getNextPoNumber = (branchId, branchList = branches) => {
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
+    if (!br) return '';
+    const nextNum = String(br.po_next_number || 1).padStart(5, '0');
+    return `${br.po_prefix || ''}${nextNum}${br.po_suffix || ''}`;
+  };
+
+  const getNextGrnNumber = (branchId, branchList = branches) => {
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
+    if (!br) return '';
+    const nextNum = String(br.grn_next_number || 1).padStart(5, '0');
+    return `${br.grn_prefix || ''}${nextNum}${br.grn_suffix || ''}`;
+  };
+
+  const getNextDnNumber = (branchId, branchList = branches) => {
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
+    if (!br) return '';
+    const nextNum = String(br.dn_next_number || 1).padStart(5, '0');
+    return `${br.dn_prefix || ''}${nextNum}${br.dn_suffix || ''}`;
+  };
+
   const handleOpenAddPO = () => {
     setSelectedPO(null);
     setPoSupplierId('');
@@ -769,7 +793,7 @@ const Purchase = () => {
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>Debit Notes (Purchase Returns)</Typography>
-            <Button variant="contained" color="error" startIcon={<AddIcon />} onClick={() => { setDnError(null); setDnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setDnBillId(''); setDnSupplierId(''); setDnBranchId(''); setDnReason(''); setDnDate(''); setOpenDNModal(true); }}>
+            <Button variant="contained" color="error" startIcon={<AddIcon />} onClick={() => { setDnError(null); setDnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setDnBillId(''); setDnSupplierId(''); setDnBranchId(branches.length > 0 ? branches[0].id : ''); setDnReason(''); setDnDate(''); setOpenDNModal(true); }}>
               New Debit Note
             </Button>
           </Box>
@@ -839,7 +863,20 @@ const Purchase = () => {
       <CommonModal
         open={openDNModal}
         onClose={() => setOpenDNModal(false)}
-        title="New Debit Note"
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>New Debit Note</span>
+            {getNextDnNumber(dnBranchId) && (
+              <Chip
+                label={getNextDnNumber(dnBranchId)}
+                size="small"
+                color="error"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
         actions={
           <>
@@ -957,7 +994,20 @@ const Purchase = () => {
       <CommonModal
         open={openPOModal}
         onClose={() => setOpenPOModal(false)}
-        title={selectedPO ? "Edit Purchase Order" : "Create Purchase Order"}
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>{selectedPO ? "Edit Purchase Order" : "Create Purchase Order"}</span>
+            {(selectedPO?.po_number || getNextPoNumber(poBranchId)) && (
+              <Chip
+                label={selectedPO?.po_number || getNextPoNumber(poBranchId)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
       >
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap', mb: 3 }}>
@@ -1107,7 +1157,20 @@ const Purchase = () => {
       <CommonModal
         open={openGRNModal}
         onClose={() => setOpenGRNModal(false)}
-        title="Record Goods Receipt Note"
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>Record Goods Receipt Note</span>
+            {getNextGrnNumber(selectedPO?.branch_id) && (
+              <Chip
+                label={getNextGrnNumber(selectedPO?.branch_id)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
       >
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>

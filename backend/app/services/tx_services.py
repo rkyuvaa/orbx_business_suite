@@ -1,7 +1,9 @@
+import re
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 from fastapi import HTTPException, status
+from sqlalchemy import or_, and_, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -22,6 +24,169 @@ from app.schemas.transaction import (
 
 
 class TxServices:
+    # ==========================================
+    # AUTOMATED DOCUMENT SEQUENCE SERVICES
+    # ==========================================
+    @staticmethod
+    async def get_next_sequence_number(
+        db: AsyncSession,
+        branch: Branch,
+        doc_type: str
+    ) -> int:
+        """
+        Calculates the next available sequence number for a document type in a branch.
+        Scans existing document numbers for that branch matching prefix & suffix,
+        identifies gaps created by deleted documents, and automatically returns the next
+        available sequence number without altering previous entries.
+        """
+        prefix = getattr(branch, f"{doc_type}_prefix", "") or ""
+        suffix = getattr(branch, f"{doc_type}_suffix", "") or ""
+        configured_next = getattr(branch, f"{doc_type}_next_number", 1) or 1
+
+        doc_numbers: List[str] = []
+
+        if doc_type == "so":
+            stmt = select(SalesOrder.so_number).filter(
+                SalesOrder.branch_id == branch.id,
+                SalesOrder.so_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "invoice":
+            stmt = select(Invoice.invoice_number).filter(
+                Invoice.branch_id == branch.id,
+                Invoice.invoice_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "po":
+            stmt = select(PurchaseOrder.po_number).filter(
+                PurchaseOrder.branch_id == branch.id,
+                PurchaseOrder.po_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "grn":
+            stmt = select(GRN.grn_number).filter(
+                GRN.branch_id == branch.id,
+                GRN.grn_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "challan":
+            stmt = select(StockTransfer.challan_number).filter(
+                StockTransfer.source_branch_id == branch.id,
+                StockTransfer.challan_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "cn":
+            stmt = select(CreditNote.credit_note_number).filter(
+                CreditNote.branch_id == branch.id,
+                CreditNote.credit_note_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "dn":
+            stmt = select(DebitNote.debit_note_number).filter(
+                DebitNote.branch_id == branch.id,
+                DebitNote.debit_note_number.isnot(None)
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        elif doc_type == "receipt":
+            stmt = (
+                select(PaymentReceipt.receipt_number)
+                .join(Payment, PaymentReceipt.payment_id == Payment.id)
+                .outerjoin(Invoice, Payment.invoice_id == Invoice.id)
+                .outerjoin(Customer, Payment.customer_id == Customer.id)
+                .filter(
+                    or_(
+                        Invoice.branch_id == branch.id,
+                        and_(Payment.invoice_id.is_(None), Customer.branch_id == branch.id),
+                        PaymentReceipt.receipt_number.like(f"{prefix}%") if prefix else False
+                    ),
+                    PaymentReceipt.receipt_number.isnot(None)
+                )
+            )
+            res = await db.execute(stmt)
+            doc_numbers = [r for r in res.scalars().all() if r]
+
+        pattern = rf"^{re.escape(prefix)}(\d+){re.escape(suffix)}$"
+        used_numbers: set[int] = set()
+        for num_str in doc_numbers:
+            match = re.match(pattern, num_str.strip())
+            if match:
+                try:
+                    used_numbers.add(int(match.group(1)))
+                except ValueError:
+                    pass
+
+        if not used_numbers:
+            return max(configured_next, 1)
+
+        min_used = min(used_numbers)
+        if min_used < 50:
+            base = 1
+        else:
+            base = min(min_used, configured_next) if configured_next > 0 else min_used
+
+        cand = base
+        while cand in used_numbers:
+            cand += 1
+        return cand
+
+    @staticmethod
+    async def sync_branch_sequence(
+        db: AsyncSession,
+        branch_id: UUID,
+        doc_type: str
+    ) -> int:
+        """
+        Synchronizes the branch's next_number field for a specific doc_type
+        to match the next available sequence number.
+        """
+        q_br = await db.execute(select(Branch).filter(Branch.id == branch_id))
+        branch = q_br.scalar_one_or_none()
+        if not branch:
+            return 1
+        
+        next_seq = await TxServices.get_next_sequence_number(db, branch, doc_type)
+        field_name = f"{doc_type}_next_number"
+        if getattr(branch, field_name) != next_seq:
+            setattr(branch, field_name, next_seq)
+            db.add(branch)
+            await db.flush()
+        return next_seq
+
+    @staticmethod
+    async def sync_all_sequences_for_branch(
+        db: AsyncSession,
+        branch: Branch
+    ) -> bool:
+        """
+        Synchronizes all 8 document sequences for a branch.
+        Returns True if any sequence number was updated.
+        """
+        doc_types = ["so", "invoice", "challan", "po", "grn", "receipt", "cn", "dn"]
+        changed = False
+        for doc_type in doc_types:
+            next_seq = await TxServices.get_next_sequence_number(db, branch, doc_type)
+            field_name = f"{doc_type}_next_number"
+            if getattr(branch, field_name) != next_seq:
+                setattr(branch, field_name, next_seq)
+                changed = True
+        if changed:
+            db.add(branch)
+        return changed
+
     # ==========================================
     # CORE STOCK HELPER METHODS
     # ==========================================
@@ -87,10 +252,7 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
             
-        po_seq = branch.po_next_number
-        branch.po_next_number += 1
-        db.add(branch)
-        
+        po_seq = await TxServices.get_next_sequence_number(db, branch, "po")
         po_no = f"{branch.po_prefix}{po_seq:05d}{branch.po_suffix}"
 
         po = PurchaseOrder(
@@ -140,6 +302,7 @@ class TxServices:
         po.grand_total = total_amount + tax_amount
         
         db.add(po)
+        await TxServices.sync_branch_sequence(db, branch.id, "po")
         await db.commit()
 
         # Re-fetch
@@ -270,10 +433,7 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
             
-        grn_seq = branch.grn_next_number
-        branch.grn_next_number += 1
-        db.add(branch)
-        
+        grn_seq = await TxServices.get_next_sequence_number(db, branch, "grn")
         grn_no = f"{branch.grn_prefix}{grn_seq:05d}{branch.grn_suffix}"
 
         grn = GRN(
@@ -314,7 +474,7 @@ class TxServices:
         # Update PO Status to Confirmed/Received
         po.status = "Received"
         db.add(po)
-
+        await TxServices.sync_branch_sequence(db, branch.id, "grn")
         await db.commit()
         
         q_final = await db.execute(
@@ -603,11 +763,10 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
             
-        expected_so_no = f"{branch.so_prefix}{branch.so_next_number:05d}{branch.so_suffix}"
-        if not so_data.so_number or so_data.so_number == expected_so_no:
-            so_seq = branch.so_next_number
-            branch.so_next_number += 1
-            db.add(branch)
+        so_seq = await TxServices.get_next_sequence_number(db, branch, "so")
+        expected_so_no = f"{branch.so_prefix}{so_seq:05d}{branch.so_suffix}"
+        legacy_expected = f"{branch.so_prefix}{branch.so_next_number:05d}{branch.so_suffix}"
+        if not so_data.so_number or so_data.so_number in (expected_so_no, legacy_expected):
             so_no = expected_so_no
         else:
             so_no = so_data.so_number
@@ -662,6 +821,7 @@ class TxServices:
         so.grand_total = total_amount - discount_amount + tax_amount
 
         db.add(so)
+        await TxServices.sync_branch_sequence(db, branch.id, "so")
         await db.commit()
 
         # Re-fetch
@@ -820,11 +980,10 @@ class TxServices:
         q_comp = await db.execute(select(Company).filter(Company.id == branch.company_id))
         company = q_comp.scalar_one_or_none()
 
-        expected_invoice_no = f"{branch.invoice_prefix}{branch.invoice_next_number:05d}{branch.invoice_suffix}"
-        if not inv_data.invoice_number or inv_data.invoice_number == expected_invoice_no:
-            invoice_seq = branch.invoice_next_number
-            branch.invoice_next_number += 1
-            db.add(branch)
+        invoice_seq = await TxServices.get_next_sequence_number(db, branch, "invoice")
+        expected_invoice_no = f"{branch.invoice_prefix}{invoice_seq:05d}{branch.invoice_suffix}"
+        legacy_expected = f"{branch.invoice_prefix}{branch.invoice_next_number:05d}{branch.invoice_suffix}"
+        if not inv_data.invoice_number or inv_data.invoice_number in (expected_invoice_no, legacy_expected):
             invoice_no = expected_invoice_no
         else:
             invoice_no = inv_data.invoice_number
@@ -902,7 +1061,7 @@ class TxServices:
                 amount=item.amount
             )
             db.add(inv_item)
-
+        await TxServices.sync_branch_sequence(db, branch.id, "invoice")
         await db.commit()
 
         # Re-fetch
@@ -1068,14 +1227,8 @@ class TxServices:
             branch = q_br.scalar_one_or_none()
 
         if branch:
-            while True:
-                receipt_seq = branch.receipt_next_number
-                branch.receipt_next_number += 1
-                db.add(branch)
-                rcpt_no = f"{branch.receipt_prefix}{receipt_seq:05d}{branch.receipt_suffix}"
-                q_exist = await db.execute(select(PaymentReceipt).filter(PaymentReceipt.receipt_number == rcpt_no))
-                if not q_exist.scalars().first():
-                    break
+            receipt_seq = await TxServices.get_next_sequence_number(db, branch, "receipt")
+            rcpt_no = f"{branch.receipt_prefix}{receipt_seq:05d}{branch.receipt_suffix}"
         else:
             receipt_seq = 1
             while True:
@@ -1092,6 +1245,9 @@ class TxServices:
             printed_at=datetime.utcnow()
         )
         db.add(receipt)
+
+        if branch:
+            await TxServices.sync_branch_sequence(db, branch.id, "receipt")
 
         await db.commit()
         await db.refresh(payment)
@@ -1329,8 +1485,25 @@ class TxServices:
             raise HTTPException(status_code=404, detail="Payment collection record not found.")
             
         invoice = payment.invoice
+        branch_id = None
+        if invoice and invoice.branch_id:
+            branch_id = invoice.branch_id
+        elif payment.customer_id:
+            q_c = await db.execute(select(Customer).filter(Customer.id == payment.customer_id))
+            customer = q_c.scalar_one_or_none()
+            if customer:
+                branch_id = customer.branch_id
+        if not branch_id:
+            q_br = await db.execute(select(Branch))
+            first_br = q_br.scalars().first()
+            if first_br:
+                branch_id = first_br.id
+
         await db.delete(payment)
         await db.flush()
+
+        if branch_id:
+            await TxServices.sync_branch_sequence(db, branch_id, "receipt")
         
         if invoice:
             # Recalculate remaining payments
@@ -1483,10 +1656,7 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Source branch not found.")
             
-        challan_seq = branch.challan_next_number
-        branch.challan_next_number += 1
-        db.add(branch)
-        
+        challan_seq = await TxServices.get_next_sequence_number(db, branch, "challan")
         challan_no = f"{branch.challan_prefix}{challan_seq:05d}{branch.challan_suffix}"
         
         transfer = StockTransfer(
@@ -1580,6 +1750,7 @@ class TxServices:
         transfer.gst_breakup = {"cgst": cgst, "sgst": sgst, "igst": igst}
         
         db.add(transfer)
+        await TxServices.sync_branch_sequence(db, branch.id, "challan")
         await db.commit()
         return await TxServices.get_stock_transfer(db, transfer.id)
 
@@ -1723,21 +1894,78 @@ class TxServices:
                         reason=f"Stock transfer reversal/cancellation (Challan: {t.challan_number})"
                     )
                 
+        source_branch_id = t.source_branch_id
+        await db.flush()
+        if source_branch_id:
+            await TxServices.sync_branch_sequence(db, source_branch_id, "challan")
         await db.commit()
         return await TxServices.get_stock_transfer(db, t.id)
 
     @staticmethod
+    async def delete_stock_transfer(db: AsyncSession, transfer_id: UUID) -> None:
+        """Delete a Stock Transfer / Delivery Challan, reverse stock, and auto-sync sequence."""
+        t = await TxServices.get_stock_transfer(db, transfer_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="Stock transfer not found.")
+            
+        q_inv = await db.execute(select(Invoice).filter(Invoice.delivery_challan_id == transfer_id, Invoice.status != "Cancelled"))
+        active_invoices = q_inv.scalars().all()
+        if active_invoices:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete Delivery Challan because it is linked to active invoice(s): {', '.join([i.invoice_number for i in active_invoices])}"
+            )
+            
+        source_branch_id = t.source_branch_id
+        
+        # If it was transferred, reverse stock
+        if t.status == "Transferred":
+            for item in t.items:
+                await TxServices.update_stock(
+                    db=db,
+                    product_id=item.product_id,
+                    branch_id=t.source_branch_id,
+                    qty_change=item.qty,
+                    tx_type="In",
+                    ref_type="StockTransferDelete",
+                    ref_id=t.id,
+                    reason=f"Stock transfer deleted (Challan: {t.challan_number})"
+                )
+                if t.destination_branch_id:
+                    await TxServices.update_stock(
+                        db=db,
+                        product_id=item.product_id,
+                        branch_id=t.destination_branch_id,
+                        qty_change=-item.qty,
+                        tx_type="Out",
+                        ref_type="StockTransferDelete",
+                        ref_id=t.id,
+                        reason=f"Stock transfer deleted (Challan: {t.challan_number})"
+                    )
+
+        await db.execute(sql_delete(StockTransferItem).filter(StockTransferItem.transfer_id == transfer_id))
+        await db.delete(t)
+        await db.flush()
+        if source_branch_id:
+            await TxServices.sync_branch_sequence(db, source_branch_id, "challan")
+        await db.commit()
+
+    @staticmethod
     async def delete_purchase_order(db: AsyncSession, po_id: UUID) -> None:
-        """Delete purchase order and items."""
+        """Delete purchase order and items, and auto-sync sequence."""
         from app.models.purchase import PurchaseOrderItem
         from sqlalchemy import delete
         q_po = await db.execute(select(PurchaseOrder).filter(PurchaseOrder.id == po_id))
         po = q_po.scalar_one_or_none()
         if not po:
             raise HTTPException(status_code=404, detail="Purchase Order not found.")
+        branch_id = po.branch_id
         try:
             await db.execute(delete(PurchaseOrderItem).filter(PurchaseOrderItem.purchase_order_id == po_id))
             await db.delete(po)
+            await db.flush()
+            if branch_id:
+                await TxServices.sync_branch_sequence(db, branch_id, "po")
             await db.commit()
         except Exception:
             await db.rollback()
@@ -1748,7 +1976,7 @@ class TxServices:
 
     @staticmethod
     async def delete_grn(db: AsyncSession, grn_id: UUID) -> None:
-        """Delete GRN, reverse stock transactions, and reset PO status."""
+        """Delete GRN, reverse stock transactions, reset PO status, and auto-sync sequence."""
         from app.models.purchase import GRNItem
         from sqlalchemy import delete
         q_grn = await db.execute(
@@ -1764,6 +1992,8 @@ class TxServices:
         if active_entries:
             raise HTTPException(status_code=400, detail="Cannot delete GRN with linked active purchase bills. Delete the bills first.")
             
+        branch_id = grn.branch_id
+
         # Reset linked PO status back to Draft
         if grn.purchase_order:
             grn.purchase_order.status = "Draft"
@@ -1794,6 +2024,9 @@ class TxServices:
         try:
             await db.execute(delete(GRNItem).filter(GRNItem.grn_id == grn_id))
             await db.delete(grn)
+            await db.flush()
+            if branch_id:
+                await TxServices.sync_branch_sequence(db, branch_id, "grn")
             await db.commit()
         except Exception:
             await db.rollback()
@@ -1834,7 +2067,7 @@ class TxServices:
 
     @staticmethod
     async def delete_sales_order(db: AsyncSession, so_id: UUID) -> None:
-        """Delete sales order and its items."""
+        """Delete sales order and its items, and auto-sync sequence."""
         from app.models.sales import SalesOrderItem
         from sqlalchemy import delete
         q_so = await db.execute(
@@ -1850,9 +2083,13 @@ class TxServices:
         if active_invoices:
             raise HTTPException(status_code=400, detail="Cannot delete Sales Order with linked active invoices. Delete the invoices first.")
             
+        branch_id = so.branch_id
         try:
             await db.execute(delete(SalesOrderItem).filter(SalesOrderItem.sales_order_id == so_id))
             await db.delete(so)
+            await db.flush()
+            if branch_id:
+                await TxServices.sync_branch_sequence(db, branch_id, "so")
             await db.commit()
         except Exception:
             await db.rollback()
@@ -1860,7 +2097,7 @@ class TxServices:
 
     @staticmethod
     async def delete_invoice(db: AsyncSession, invoice_id: UUID) -> None:
-        """Delete invoice, reverse stock, and reset sales order status."""
+        """Delete invoice, reverse stock, reset sales order status, and auto-sync sequence."""
         from app.models.sales import InvoiceItem
         from sqlalchemy import delete
         q_inv = await db.execute(
@@ -1875,6 +2112,8 @@ class TxServices:
         if inv.payments:
             raise HTTPException(status_code=400, detail="Cannot delete Invoice with recorded payments. Delete the payments first.")
             
+        branch_id = inv.branch_id
+
         # Reset linked sales order status to Draft so it can be re-invoiced
         if inv.sales_order_id:
             q_so = await db.execute(select(SalesOrder).filter(SalesOrder.id == inv.sales_order_id))
@@ -1907,6 +2146,9 @@ class TxServices:
         try:
             await db.execute(delete(InvoiceItem).filter(InvoiceItem.invoice_id == invoice_id))
             await db.delete(inv)
+            await db.flush()
+            if branch_id:
+                await TxServices.sync_branch_sequence(db, branch_id, "invoice")
             await db.commit()
         except Exception:
             await db.rollback()
@@ -1924,10 +2166,7 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
 
-        cn_seq = branch.cn_next_number
-        branch.cn_next_number += 1
-        db.add(branch)
-
+        cn_seq = await TxServices.get_next_sequence_number(db, branch, "cn")
         cn_no = f"{branch.cn_prefix}{cn_seq:05d}{branch.cn_suffix}"
 
         # 2. Optionally fetch linked invoice
@@ -2018,6 +2257,7 @@ class TxServices:
                 invoice.status = "Unpaid"
             db.add(invoice)
 
+        await TxServices.sync_branch_sequence(db, branch.id, "cn")
         await db.commit()
 
         # 6. Re-fetch with full relationships
@@ -2114,8 +2354,12 @@ class TxServices:
             cn.invoice.status = "Unpaid"
             db.add(cn.invoice)
 
+        branch_id = cn.branch_id
         await db.execute(sql_delete(CreditNoteItem).filter(CreditNoteItem.credit_note_id == cn_id))
         await db.delete(cn)
+        await db.flush()
+        if branch_id:
+            await TxServices.sync_branch_sequence(db, branch_id, "cn")
         await db.commit()
 
     # ==========================================
@@ -2130,10 +2374,7 @@ class TxServices:
         if not branch:
             raise HTTPException(status_code=400, detail="Branch not found.")
 
-        dn_seq = branch.dn_next_number
-        branch.dn_next_number += 1
-        db.add(branch)
-
+        dn_seq = await TxServices.get_next_sequence_number(db, branch, "dn")
         dn_no = f"{branch.dn_prefix}{dn_seq:05d}{branch.dn_suffix}"
 
         # 2. Optionally fetch linked purchase entry
@@ -2223,6 +2464,7 @@ class TxServices:
                 purchase_entry.status = "Unpaid"
             db.add(purchase_entry)
 
+        await TxServices.sync_branch_sequence(db, branch.id, "dn")
         await db.commit()
 
         # 6. Re-fetch with full relationships
@@ -2306,6 +2548,10 @@ class TxServices:
             dn.purchase_entry.status = "Unpaid"
             db.add(dn.purchase_entry)
 
+        branch_id = dn.branch_id
         await db.execute(sql_delete(DebitNoteItem).filter(DebitNoteItem.debit_note_id == dn_id))
         await db.delete(dn)
+        await db.flush()
+        if branch_id:
+            await TxServices.sync_branch_sequence(db, branch_id, "dn")
         await db.commit()

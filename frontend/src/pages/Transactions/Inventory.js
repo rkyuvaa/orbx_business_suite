@@ -206,6 +206,14 @@ const Inventory = () => {
   // ==========================================
   // STOCK TRANSFER / DELIVERY CHALLAN FLOWS
   // ==========================================
+  const getNextChallanNumber = (branchId, branchList = branches) => {
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
+    if (!br) return '';
+    const nextNum = String(br.challan_next_number || 1).padStart(5, '0');
+    return `${br.challan_prefix || ''}${nextNum}${br.challan_suffix || ''}`;
+  };
+
   const handleOpenTransferModal = () => {
     setTransferSourceBranch(branches.length > 0 ? branches[0].id : '');
     setTransferType('branch');
@@ -284,6 +292,17 @@ const Inventory = () => {
       loadData();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to cancel Stock Transfer.');
+    }
+  };
+
+  const handleDeleteTransfer = async (transfer) => {
+    if (window.confirm(`WARNING: Are you sure you want to PERMANENTLY delete Delivery Challan ${transfer.challan_number}? This action cannot be undone.`)) {
+      try {
+        await apiClient.delete(`/inventory/transfers/${transfer.id}`);
+        loadData();
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Failed to delete Delivery Challan.');
+      }
     }
   };
 
@@ -510,6 +529,11 @@ const Inventory = () => {
               <CancelIcon />
             </IconButton>
           )}
+          {(row.status === 'Draft' || row.status === 'Cancelled') && (
+            <IconButton size="small" color="error" title="Delete Challan" onClick={() => handleDeleteTransfer(row)}>
+              <DeleteIcon />
+            </IconButton>
+          )}
           <IconButton size="small" color="primary" title="Print Challan" onClick={() => handleOpenPrint(row)}>
             <PrintIcon />
           </IconButton>
@@ -649,7 +673,20 @@ const Inventory = () => {
       <CommonModal
         open={openTransferModal}
         onClose={() => setOpenTransferModal(false)}
-        title="Issue Stock Transfer / Delivery Challan"
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>Issue Stock Transfer / Delivery Challan</span>
+            {getNextChallanNumber(transferSourceBranch) && (
+              <Chip
+                label={getNextChallanNumber(transferSourceBranch)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>

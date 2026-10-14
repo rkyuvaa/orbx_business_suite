@@ -163,17 +163,27 @@ const Sales = () => {
   };
 
   const getNextSoNumber = (branchId, branchList = branches) => {
-    const br = branchList.find((b) => b.id === branchId);
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
     if (!br) return '';
-    const nextNum = String(br.so_next_number).padStart(5, '0');
+    const nextNum = String(br.so_next_number || 1).padStart(5, '0');
     return `${br.so_prefix || ''}${nextNum}${br.so_suffix || ''}`;
   };
 
   const getNextInvoiceNumber = (branchId, branchList = branches) => {
-    const br = branchList.find((b) => b.id === branchId);
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
     if (!br) return '';
-    const nextNum = String(br.invoice_next_number).padStart(5, '0');
+    const nextNum = String(br.invoice_next_number || 1).padStart(5, '0');
     return `${br.invoice_prefix || ''}${nextNum}${br.invoice_suffix || ''}`;
+  };
+
+  const getNextCnNumber = (branchId, branchList = branches) => {
+    const targetId = branchId || (branchList.length > 0 ? branchList[0].id : null);
+    const br = branchList.find((b) => b.id === targetId);
+    if (!br) return '';
+    const nextNum = String(br.cn_next_number || 1).padStart(5, '0');
+    return `${br.cn_prefix || ''}${nextNum}${br.cn_suffix || ''}`;
   };
 
   const handleOpenAddSO = () => {
@@ -828,7 +838,7 @@ const Sales = () => {
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>Credit Notes (Sales Returns)</Typography>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCnError(null); setCnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setCnInvoiceId(''); setCnBranchId(''); setCnReason(''); setCnDate(''); setOpenCNModal(true); }} color="primary">
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCnError(null); setCnItems([{ product_id: '', qty: 1, rate: 0, tax_rate: 18 }]); setCnInvoiceId(''); setCnBranchId(branches.length > 0 ? branches[0].id : ''); setCnReason(''); setCnDate(''); setOpenCNModal(true); }} color="primary">
               New Credit Note
             </Button>
           </Box>
@@ -898,7 +908,20 @@ const Sales = () => {
       <CommonModal
         open={openCNModal}
         onClose={() => setOpenCNModal(false)}
-        title="New Credit Note"
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>New Credit Note</span>
+            {getNextCnNumber(cnBranchId) && (
+              <Chip
+                label={getNextCnNumber(cnBranchId)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
         actions={
           <>
@@ -1002,7 +1025,20 @@ const Sales = () => {
       <CommonModal
         open={openSOModal}
         onClose={() => setOpenSOModal(false)}
-        title={selectedSO ? "Edit Sales Order" : "Create Sales Order"}
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>{selectedSO ? "Edit Sales Order" : "Create Sales Order"}</span>
+            {(selectedSO?.so_number || manualSoNumber || getNextSoNumber(soBranchId)) && (
+              <Chip
+                label={selectedSO?.so_number || manualSoNumber || getNextSoNumber(soBranchId)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
         maxWidth="md"
       >
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap', mb: 3 }}>
@@ -1188,7 +1224,20 @@ const Sales = () => {
       <CommonModal
         open={openInvoiceModal}
         onClose={() => setOpenInvoiceModal(false)}
-        title="Create Tax Invoice"
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>Create Tax Invoice</span>
+            {(manualInvoiceNumber || getNextInvoiceNumber(selectedSO?.branch_id)) && (
+              <Chip
+                label={manualInvoiceNumber || getNextInvoiceNumber(selectedSO?.branch_id)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
       >
         <Typography variant="body1" sx={{ mb: 2 }}>
           Generating sequential tax invoice for order: <strong>{selectedSO?.so_number || `SO-${selectedSO?.id.substring(0, 6).toUpperCase()}`}</strong>

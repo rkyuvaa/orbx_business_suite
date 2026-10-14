@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Box, Alert, MenuItem, TextField, Typography, Autocomplete } from '@mui/material';
+import { Button, Box, Alert, MenuItem, TextField, Typography, Autocomplete, Chip } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 
 import apiClient from '../../api/client';
@@ -9,6 +9,7 @@ import CommonModal from '../../components/CommonModal';
 const Payments = () => {
   const [outstandings, setOutstandings] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -28,12 +29,14 @@ const Payments = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [oRes, custRes] = await Promise.all([
+      const [oRes, custRes, brRes] = await Promise.all([
         apiClient.get('/payments/outstanding'),
-        apiClient.get('/customers/')
+        apiClient.get('/customers/'),
+        apiClient.get('/admin/branches')
       ]);
       setOutstandings(oRes.data);
       setCustomers(custRes.data.filter(c => c.is_active !== false));
+      setBranches(brRes.data);
     } catch (err) {
       setError('Failed to load outstanding invoice data.');
     } finally {
@@ -174,6 +177,26 @@ const Payments = () => {
     { value: 'bank', label: 'Bank IMPS/NEFT Transfer' },
   ];
 
+  const getNextReceiptNumber = (targetBranchId, branchList = branches) => {
+    let br = branchList.find((b) => b.id === targetBranchId);
+    if (!br && branchList.length > 0) {
+      br = branchList[0];
+    }
+    if (!br) return '';
+    const nextNum = String(br.receipt_next_number || 1).padStart(5, '0');
+    return `${br.receipt_prefix || ''}${nextNum}${br.receipt_suffix || ''}`;
+  };
+
+  const activeReceiptBranchId = (() => {
+    const checkedKeys = Object.keys(checkedInvoices).filter((id) => checkedInvoices[id].checked);
+    if (checkedKeys.length > 0) {
+      const inv = outstandings.find((o) => o.id === checkedKeys[0]);
+      if (inv?.branch_id) return inv.branch_id;
+    }
+    if (selectedCustomer?.branch_id) return selectedCustomer.branch_id;
+    return branches.length > 0 ? branches[0].id : '';
+  })();
+
   return (
     <Box>
       {error && (
@@ -194,7 +217,25 @@ const Payments = () => {
         }
       />
 
-      <CommonModal open={openModal} onClose={() => setOpenModal(false)} title="Collect Customer Payment" maxWidth="sm">
+      <CommonModal
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        title={
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <span>Collect Customer Payment</span>
+            {getNextReceiptNumber(activeReceiptBranchId) && (
+              <Chip
+                label={getNextReceiptNumber(activeReceiptBranchId)}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 700, borderRadius: '6px' }}
+              />
+            )}
+          </Box>
+        }
+        maxWidth="sm"
+      >
         <form onSubmit={handleSubmitPayments}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             

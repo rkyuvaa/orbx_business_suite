@@ -92,3 +92,14 @@ async def cancel_transfer(
 ):
     """Cancel the stock transfer / delivery challan (reverses stock adjustments if already transferred)."""
     return await TxServices.cancel_stock_transfer(db, transfer_id)
+
+
+@router.delete("/transfers/{transfer_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transfer(
+    transfer_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user = Depends(deps.PermissionChecker("inventory", "delete"))
+):
+    """Delete a stock transfer / delivery challan and auto-sync sequence."""
+    await TxServices.delete_stock_transfer(db, transfer_id)
+    return None

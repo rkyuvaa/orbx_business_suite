@@ -198,7 +198,7 @@ const Branches = () => {
                 Document Sequence Configuration
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Configure unique prefix, suffix, and next sequence numbers for all generated transactions.
+                Configure unique prefix, suffix, and starting sequence numbers. Next numbers are automated and automatically adapt when transactions are created or deleted, preserving all previous entries.
               </Typography>
               <Divider sx={{ mt: 1, mb: 2 }} />
             </Box>
