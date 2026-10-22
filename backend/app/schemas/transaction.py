@@ -104,6 +104,9 @@ class GRNOut(BaseModel):
     received_by_id: Optional[UUID] = None
     status: str
     items: List[GRNItemOut] = []
+    supplier_id: Optional[UUID] = None
+    supplier_name: Optional[str] = None
+    po_number: Optional[str] = None
 
     class Config:
         from_attributes = True

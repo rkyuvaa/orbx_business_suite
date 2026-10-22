@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 from uuid import UUID, uuid4
 from fastapi import HTTPException, status
@@ -480,18 +480,35 @@ class TxServices:
         q_final = await db.execute(
             select(GRN)
             .filter(GRN.id == grn.id)
-            .options(selectinload(GRN.items), selectinload(GRN.purchase_order))
+            .options(
+                selectinload(GRN.items),
+                selectinload(GRN.purchase_order).selectinload(PurchaseOrder.supplier)
+            )
         )
-        return q_final.scalar_one()
+        res_grn = q_final.scalar_one()
+        if res_grn.purchase_order:
+            res_grn.supplier_id = res_grn.purchase_order.supplier_id
+            res_grn.supplier_name = res_grn.purchase_order.supplier.name if res_grn.purchase_order.supplier else "Unknown"
+            res_grn.po_number = res_grn.purchase_order.po_number
+        return res_grn
 
     @staticmethod
     async def list_grns(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[GRN]:
         """List GRNs."""
-        stmt = select(GRN).options(selectinload(GRN.items), selectinload(GRN.purchase_order)).order_by(GRN.created_at.desc())
+        stmt = select(GRN).options(
+            selectinload(GRN.items),
+            selectinload(GRN.purchase_order).selectinload(PurchaseOrder.supplier)
+        ).order_by(GRN.created_at.desc())
         if branch_id:
             stmt = stmt.filter(GRN.branch_id == branch_id)
         query = await db.execute(stmt)
-        return list(query.scalars().all())
+        grns = list(query.scalars().all())
+        for g in grns:
+            if g.purchase_order:
+                g.supplier_id = g.purchase_order.supplier_id
+                g.supplier_name = g.purchase_order.supplier.name if g.purchase_order.supplier else "Unknown"
+                g.po_number = g.purchase_order.po_number
+        return grns
 
     @staticmethod
     async def create_purchase_entry(db: AsyncSession, entry_data: PurchaseEntryCreate, user_id: UUID) -> PurchaseEntry:
@@ -590,64 +607,81 @@ class TxServices:
             db.add(entry)
             await db.flush()  # Obtain entry.id and fill billing_date default if not supplied
 
-            # Prepare journal entry lines
+            # Prepare balanced journal entry lines
+            subtotal_dec = Decimal(str(round(entry.subtotal, 2))) if entry.subtotal > 0 else Decimal("0.00")
+            tax_dec = Decimal(str(round(entry.tax_amount, 2))) if entry.tax_amount > 0 else Decimal("0.00")
+            total_dec = Decimal(str(round(entry.total_amount, 2))) if entry.total_amount > 0 else Decimal("0.00")
+
+            dr_sum = subtotal_dec + tax_dec
+            if dr_sum > 0 and (total_dec == Decimal("0.00") or abs(total_dec - dr_sum) <= Decimal("1.00")):
+                total_dec = dr_sum
+
             journal_lines = []
             
             # Purchase Expense Debit
-            if entry.subtotal > 0:
+            if subtotal_dec > 0:
                 journal_lines.append(
                     JournalEntryLine(
                         ledger_id=purchase_account_id,
                         dr_cr="Dr",
-                        amount=Decimal(str(entry.subtotal)),
+                        amount=subtotal_dec,
                         narration=f"Purchase expense for bill {entry.invoice_number}"
                     )
                 )
 
             # GST Input Tax Debit
-            if entry.tax_amount > 0:
+            if tax_dec > 0:
                 journal_lines.append(
                     JournalEntryLine(
                         ledger_id=tax_ledger_id,
                         dr_cr="Dr",
-                        amount=Decimal(str(entry.tax_amount)),
+                        amount=tax_dec,
                         narration=f"GST input tax on purchase {entry.invoice_number}"
                     )
                 )
 
             # Supplier Payable Credit
-            if entry.total_amount > 0:
+            if total_dec > 0:
                 journal_lines.append(
                     JournalEntryLine(
                         ledger_id=payable_ledger_id,
                         dr_cr="Cr",
-                        amount=Decimal(str(entry.total_amount)),
+                        amount=total_dec,
                         narration=f"Accounts payable to supplier for bill {entry.invoice_number}"
                     )
                 )
 
             # Post the journal entry
             billing_date = entry.billing_date.date() if isinstance(entry.billing_date, datetime) else entry.billing_date
+            if not billing_date:
+                billing_date = date.today()
             
-            journal = await AccountServices.post_journal_entry(
-                db=db,
-                voucher_type_name="Purchase",
-                reference_id=entry.id,
-                reference_type="PurchaseEntry",
-                entry_date=billing_date,
-                lines=journal_lines,
-                user_id=user_id,
-                narration=f"Journal entry for purchase invoice {entry.invoice_number}"
-            )
-            
-            # Link journal entry to PurchaseEntry
-            entry.journal_entry_id = journal.id
+            if journal_lines:
+                journal = await AccountServices.post_journal_entry(
+                    db=db,
+                    voucher_type_name="Purchase",
+                    reference_id=entry.id,
+                    reference_type="PurchaseEntry",
+                    entry_date=billing_date,
+                    lines=journal_lines,
+                    user_id=user_id,
+                    narration=f"Journal entry for purchase invoice {entry.invoice_number}"
+                )
+                entry.journal_entry_id = journal.id
 
             await db.commit()
 
+        except HTTPException:
+            await db.rollback()
+            raise
+        except ValueError as e:
+            await db.rollback()
+            logger.warning("Validation error creating purchase entry: %s", e)
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             await db.rollback()
-            raise e
+            logger.exception("Error creating purchase entry: %s", e)
+            raise HTTPException(status_code=500, detail=f"Failed to create purchase entry: {str(e)}")
 
         # Re-fetch with relationship
         q = await db.execute(

@@ -28,6 +28,15 @@ const formatIndianCurrency = (val) => {
   });
 };
 
+const extractErrorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(d => `${d.loc?.slice(-1)[0] || 'field'}: ${d.msg}`).join(', ');
+  }
+  return err?.message || fallback;
+};
+
 const Sales = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = parseInt(searchParams.get('tab')) || 0;
@@ -246,17 +255,31 @@ const Sales = () => {
 
   const submitSO = async () => {
     try {
+      if (!soCustomerId) {
+        setError('Please select a Customer before submitting the Sales Order.');
+        return;
+      }
+      if (!soBranchId) {
+        setError('Please select an Ordering Branch.');
+        return;
+      }
+      const validItems = soItems.filter(item => item.product_id);
+      if (validItems.length === 0) {
+        setError('Please add at least one line item with a selected Product.');
+        return;
+      }
+
       const payload = {
         customer_id: soCustomerId,
         branch_id: soBranchId,
         so_number: manualSoNumber || null,
-        date: soDate ? new Date(soDate).toISOString() : null,
-        items: soItems.map(item => ({
+        date: soDate ? new Date(soDate).toISOString() : new Date().toISOString(),
+        items: validItems.map(item => ({
           product_id: item.product_id,
-          qty: item.qty,
-          rate: item.rate,
-          discount_amount: item.discount_amount,
-          tax_rate: item.tax_rate
+          qty: parseFloat(item.qty) || 1,
+          rate: parseFloat(item.rate) || 0,
+          discount_amount: parseFloat(item.discount_amount) || 0,
+          tax_rate: parseFloat(item.tax_rate) || 0
         }))
       };
       if (selectedSO) {
@@ -267,7 +290,8 @@ const Sales = () => {
       setOpenSOModal(false);
       loadData();
     } catch (err) {
-      setError('Failed to submit Sales Order.');
+      console.error('Failed to submit Sales Order:', err);
+      setError(extractErrorMessage(err, 'Failed to submit Sales Order.'));
     }
   };
 
@@ -298,11 +322,15 @@ const Sales = () => {
 
   const submitInvoice = async () => {
     try {
+      if (!selectedSO) {
+        setError('No Sales Order selected for invoice generation.');
+        return;
+      }
       const payload = {
         sales_order_id: selectedSO.id,
         delivery_challan_id: selectedDCId || null,
         invoice_number: manualInvoiceNumber || null,
-        date: invoiceDate ? new Date(invoiceDate).toISOString() : null,
+        date: invoiceDate ? new Date(invoiceDate).toISOString() : new Date().toISOString(),
         due_date: new Date(Date.now() + 15 * 86400000).toISOString(),
         reference_note: referenceNote || null,
         reference_date: referenceDate ? new Date(referenceDate).toISOString() : null
@@ -311,7 +339,8 @@ const Sales = () => {
       setOpenInvoiceModal(false);
       loadData();
     } catch (err) {
-      setError('Failed to generate Tax Invoice.');
+      console.error('Failed to generate Tax Invoice:', err);
+      setError(extractErrorMessage(err, 'Failed to generate Tax Invoice.'));
     }
   };
 

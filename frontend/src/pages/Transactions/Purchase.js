@@ -19,6 +19,15 @@ const formatIndianCurrency = (val) => {
   });
 };
 
+const extractErrorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(d => `${d.loc?.slice(-1)[0] || 'field'}: ${d.msg}`).join(', ');
+  }
+  return err?.message || fallback;
+};
+
 const Purchase = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = parseInt(searchParams.get('tab')) || 0;
@@ -417,15 +426,29 @@ const Purchase = () => {
 
   const submitPO = async () => {
     try {
+      if (!poSupplierId) {
+        setError('Please select a Supplier before submitting the Purchase Order.');
+        return;
+      }
+      if (!poBranchId) {
+        setError('Please select a Branch Office.');
+        return;
+      }
+      const validItems = poItems.filter(item => item.product_id);
+      if (validItems.length === 0) {
+        setError('Please add at least one line item with a selected Product.');
+        return;
+      }
+
       const payload = {
         supplier_id: poSupplierId,
         branch_id: poBranchId,
-        date: poDate ? new Date(poDate).toISOString() : null,
-        items: poItems.map(item => ({
+        date: poDate ? new Date(poDate).toISOString() : new Date().toISOString(),
+        items: validItems.map(item => ({
           product_id: item.product_id,
-          qty: item.qty,
-          rate: item.rate,
-          tax_rate: item.tax_rate
+          qty: parseFloat(item.qty) || 1,
+          rate: parseFloat(item.rate) || 0,
+          tax_rate: parseFloat(item.tax_rate) || 0
         }))
       };
       if (selectedPO) {
@@ -436,7 +459,8 @@ const Purchase = () => {
       setOpenPOModal(false);
       loadData();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to submit Purchase Order.');
+      console.error('Failed to submit Purchase Order:', err);
+      setError(extractErrorMessage(err, 'Failed to submit Purchase Order.'));
     }
   };
 
@@ -468,53 +492,90 @@ const Purchase = () => {
 
   const submitGRN = async () => {
     try {
+      if (!selectedPO) {
+        setError('No Purchase Order selected for GRN.');
+        return;
+      }
       const payload = {
         purchase_order_id: selectedPO.id,
         branch_id: selectedPO.branch_id,
-        date: grnDate ? new Date(grnDate).toISOString() : null,
+        date: grnDate ? new Date(grnDate).toISOString() : new Date().toISOString(),
         items: grnItems
       };
       await apiClient.post('/purchase/grn', payload);
       setOpenGRNModal(false);
       loadData();
     } catch (err) {
-      setError('Failed to log Goods Receipt Note.');
+      console.error('Failed to log Goods Receipt Note:', err);
+      setError(extractErrorMessage(err, 'Failed to log Goods Receipt Note.'));
     }
   };
 
   // ==========================================
   // VENDOR BILL FLOWS
   // ==========================================
-  const handleOpenBill = (grn) => {
+  const handleOpenBill = async (grn) => {
     setSelectedGRN(grn);
     setBillInvoiceNo(`INV-${grn.grn_number || grn.id.substring(0, 6).toUpperCase()}`);
     setBillDate(new Date().toISOString().split('T')[0]);
     setBillDueDate(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
     setOpenBillModal(true);
+
+    // If PO is not in pos array, fetch proactively
+    let po = pos.find((p) => p.id === grn.purchase_order_id);
+    if (!po && grn.purchase_order_id) {
+      try {
+        const res = await apiClient.get('/purchase/po');
+        if (res.data) setPos(res.data);
+      } catch (err) {
+        console.warn('Could not refresh PO list', err);
+      }
+    }
   };
 
   const submitBill = async () => {
+    if (!selectedGRN) return;
     try {
-      // Find corresponding PO total amount
-      const po = pos.find((p) => p.id === selectedGRN.purchase_order_id);
+      let po = pos.find((p) => p.id === selectedGRN.purchase_order_id);
+      if (!po && selectedGRN.purchase_order_id) {
+        try {
+          const res = await apiClient.get('/purchase/po');
+          po = (res.data || []).find((p) => p.id === selectedGRN.purchase_order_id);
+          if (res.data) setPos(res.data);
+        } catch (err) {
+          console.warn('Could not fetch PO', err);
+        }
+      }
+
+      const supplierId = po?.supplier_id || selectedGRN.supplier_id;
+      if (!supplierId) {
+        setError('Cannot post bill: Associated supplier could not be determined. Please ensure the linked Purchase Order exists.');
+        return;
+      }
+
+      const subtotal = po ? (parseFloat(po.total_amount) || 0) : 0;
+      const taxAmount = po ? (parseFloat(po.tax_amount) || 0) : 0;
+      const grandTotal = po ? (parseFloat(po.grand_total) || (subtotal + taxAmount)) : 0;
+
       const payload = {
         grn_id: selectedGRN.id,
-        supplier_id: selectedGRN.purchase_order_id ? po.supplier_id : '',
+        supplier_id: supplierId,
         branch_id: selectedGRN.branch_id,
-        invoice_number: billInvoiceNo,
-        billing_date: billDate ? new Date(billDate).toISOString() : null,
-        due_date: new Date(billDueDate).toISOString(),
+        invoice_number: billInvoiceNo || `INV-${selectedGRN.grn_number || selectedGRN.id.substring(0, 6).toUpperCase()}`,
+        billing_date: billDate ? new Date(billDate).toISOString() : new Date().toISOString(),
+        due_date: billDueDate ? new Date(billDueDate).toISOString() : new Date(Date.now() + 15 * 86400000).toISOString(),
         payment_terms: "15 Days Net",
-        subtotal: po ? po.total_amount : 0,
-        tax_amount: po ? po.tax_amount : 0,
-        total_amount: po ? po.grand_total : 0
+        subtotal: subtotal,
+        tax_amount: taxAmount,
+        total_amount: grandTotal
       };
 
       await apiClient.post('/purchase/bills', payload);
       setOpenBillModal(false);
       loadData();
     } catch (err) {
-      setError('Failed to log Supplier Invoice Bill.');
+      console.error('Failed to log Supplier Invoice Bill:', err);
+      setError(extractErrorMessage(err, 'Failed to log Supplier Invoice Bill.'));
     }
   };
 
