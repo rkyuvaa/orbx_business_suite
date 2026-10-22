@@ -485,12 +485,7 @@ class TxServices:
                 selectinload(GRN.purchase_order).selectinload(PurchaseOrder.supplier)
             )
         )
-        res_grn = q_final.scalar_one()
-        if res_grn.purchase_order:
-            res_grn.supplier_id = res_grn.purchase_order.supplier_id
-            res_grn.supplier_name = res_grn.purchase_order.supplier.name if res_grn.purchase_order.supplier else "Unknown"
-            res_grn.po_number = res_grn.purchase_order.po_number
-        return res_grn
+        return q_final.scalar_one()
 
     @staticmethod
     async def list_grns(db: AsyncSession, branch_id: Optional[UUID] = None) -> List[GRN]:
@@ -502,13 +497,7 @@ class TxServices:
         if branch_id:
             stmt = stmt.filter(GRN.branch_id == branch_id)
         query = await db.execute(stmt)
-        grns = list(query.scalars().all())
-        for g in grns:
-            if g.purchase_order:
-                g.supplier_id = g.purchase_order.supplier_id
-                g.supplier_name = g.purchase_order.supplier.name if g.purchase_order.supplier else "Unknown"
-                g.po_number = g.purchase_order.po_number
-        return grns
+        return list(query.scalars().all())
 
     @staticmethod
     async def create_purchase_entry(db: AsyncSession, entry_data: PurchaseEntryCreate, user_id: UUID) -> PurchaseEntry:

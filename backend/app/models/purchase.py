@@ -66,6 +66,16 @@ class GRN(Base):
     def po_number(self) -> Optional[str]:
         return self.purchase_order.po_number if self.purchase_order else None
 
+    @property
+    def supplier_id(self) -> Optional[UUID]:
+        return self.purchase_order.supplier_id if self.purchase_order else None
+
+    @property
+    def supplier_name(self) -> Optional[str]:
+        if self.purchase_order and self.purchase_order.supplier:
+            return self.purchase_order.supplier.name
+        return None
+
 
 class GRNItem(Base):
     __tablename__ = "grn_items"
