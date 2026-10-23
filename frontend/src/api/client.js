@@ -21,41 +21,66 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Enforce Automated Refresh Token Rotation
+// Response Interceptor: Enforce Automated Refresh with Daily 4:00 AM Cutoff Handling
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
     
-    // Check if error is 401 Unauthorized and request has not been retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      if (refreshToken) {
-        try {
-          // Attempt token refresh rotation
-          // Pass refresh token as query param according to backend spec
-          const res = await axios.post(`/api/v1/auth/refresh?refresh_token_str=${refreshToken}`);
-          
-          if (res.status === 200) {
-            const { access_token, refresh_token } = res.data;
-            
-            // Save fresh tokens
-            localStorage.setItem('access_token', access_token);
-            localStorage.setItem('refresh_token', refresh_token);
-            
-            // Retry the original failed request
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
-            return apiClient(originalRequest);
-          }
-        } catch (refreshError) {
-          // Refresh token expired or invalid -> logout session
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
+    // Check if error is 401 Unauthorized
+    if (error.response?.status === 401) {
+      const detail = error.response?.data?.detail || '';
+      const isDailyReset = typeof detail === 'string' && (detail.includes('4:00 AM') || detail.includes('reset'));
+
+      // If backend explicitly rejected due to daily 4:00 AM cutoff, abort immediately without refresh
+      if (isDailyReset) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login?reason=daily_reset';
         }
+        return Promise.reject(error);
+      }
+
+      // If request has not been retried yet, attempt refresh
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        if (refreshToken) {
+          try {
+            const res = await axios.post(`/api/v1/auth/refresh?refresh_token_str=${refreshToken}`);
+            
+            if (res.status === 200) {
+              const { access_token, refresh_token } = res.data;
+              
+              localStorage.setItem('access_token', access_token);
+              localStorage.setItem('refresh_token', refresh_token);
+              
+              originalRequest.headers.Authorization = `Bearer ${access_token}`;
+              return apiClient(originalRequest);
+            }
+          } catch (refreshError) {
+            const refreshDetail = refreshError.response?.data?.detail || '';
+            const reason = typeof refreshDetail === 'string' && refreshDetail.includes('4:00 AM')
+              ? 'daily_reset'
+              : 'session_expired';
+
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            if (!window.location.pathname.startsWith('/login')) {
+              window.location.href = `/login?reason=${reason}`;
+            }
+            return Promise.reject(refreshError);
+          }
+        }
+      }
+
+      // If no refresh token or already retried
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?reason=session_expired';
       }
     }
     

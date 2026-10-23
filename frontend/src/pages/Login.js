@@ -26,6 +26,9 @@ const Login = () => {
 
   const from = location.state?.from?.pathname || '/';
 
+  const searchParams = new URLSearchParams(location.search);
+  const reason = searchParams.get('reason');
+
   const onSubmit = async (data) => {
     dispatch(clearAuthError());
     const result = await dispatch(loginUser(data));
@@ -39,6 +42,18 @@ const Login = () => {
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, color: '#1e293b' }}>
         Welcome Back
       </Typography>
+
+      {reason === 'daily_reset' && (
+        <Alert severity="info" sx={{ mb: 3, borderRadius: '8px', textAlign: 'left' }}>
+          <strong>Daily Session Reset:</strong> All sessions are reset daily at 4:00 AM for security and system maintenance. Please sign in to begin today's session.
+        </Alert>
+      )}
+
+      {reason === 'session_expired' && (
+        <Alert severity="warning" sx={{ mb: 3, borderRadius: '8px', textAlign: 'left' }}>
+          <strong>Session Expired:</strong> Your session has expired. Please sign in again to continue.
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', textAlign: 'left' }}>

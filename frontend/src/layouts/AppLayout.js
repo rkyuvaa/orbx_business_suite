@@ -55,6 +55,73 @@ const AppLayout = () => {
     dispatch(fetchBranches());
   }, [dispatch]);
 
+  // Proactive Daily 4:00 AM Session Reset Watcher
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkTokenStale = () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) return false;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = new Date();
+        const recent4AM = new Date(now);
+        if (now.getHours() < 4) {
+          recent4AM.setDate(recent4AM.getDate() - 1);
+        }
+        recent4AM.setHours(4, 0, 0, 0);
+        const cutoffSec = Math.floor(recent4AM.getTime() / 1000);
+
+        if (payload.iat && payload.iat < cutoffSec) {
+          return true;
+        }
+        if (payload.exp && payload.exp < Math.floor(now.getTime() / 1000)) {
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    if (checkTokenStale()) {
+      dispatch(logoutUser());
+      navigate('/login?reason=daily_reset');
+      return;
+    }
+
+    const now = new Date();
+    const next4AM = new Date(now);
+    if (now.getHours() >= 4) {
+      next4AM.setDate(next4AM.getDate() + 1);
+    }
+    next4AM.setHours(4, 0, 0, 0);
+    const msTo4AM = Math.max(0, next4AM.getTime() - now.getTime());
+
+    const timerId = setTimeout(() => {
+      dispatch(logoutUser());
+      navigate('/login?reason=daily_reset');
+    }, msTo4AM);
+
+    const handleWakeOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        if (checkTokenStale()) {
+          dispatch(logoutUser());
+          navigate('/login?reason=daily_reset');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleWakeOrFocus);
+    window.addEventListener('focus', handleWakeOrFocus);
+
+    return () => {
+      clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', handleWakeOrFocus);
+      window.removeEventListener('focus', handleWakeOrFocus);
+    };
+  }, [dispatch, isAuthenticated, navigate]);
+
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
   };

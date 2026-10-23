@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.config import settings
-from app.core.security import ALGORITHM
+from app.core.security import ALGORITHM, is_token_stale_by_daily_cutoff
 from app.db.session import SessionLocal
 
 # Reusable OAuth2 password bearer
@@ -51,6 +51,15 @@ async def get_current_user(
         token_type: str = payload.get("type")
         if user_id is None or token_type != "access":
             raise credentials_exception
+            
+        # Enforce daily 4:00 AM session reset
+        iat = payload.get("iat")
+        if is_token_stale_by_daily_cutoff(iat):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired. All sessions are reset daily at 4:00 AM. Please sign in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     except JWTError:
         raise credentials_exception
 

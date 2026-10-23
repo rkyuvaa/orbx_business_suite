@@ -11,8 +11,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "ORBX ERP"
     SECRET_KEY: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours (capped at daily 4:00 AM cutoff)
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    BUSINESS_TIMEZONE: str = "Asia/Kolkata"
+    DAILY_RESET_HOUR: int = 4  # 4:00 AM daily reset cutoff
 
     # DB Config
     DATABASE_URL: str
