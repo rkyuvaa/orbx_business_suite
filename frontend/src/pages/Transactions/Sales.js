@@ -133,7 +133,7 @@ const Sales = () => {
         await apiClient.post(`/sales/so/${so.id}/cancel`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to cancel Sales Order.');
+        setError(extractErrorMessage(err, 'Failed to cancel Sales Order.'));
       }
     }
   };
@@ -144,7 +144,7 @@ const Sales = () => {
         await apiClient.delete(`/sales/so/${so.id}`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete Sales Order.');
+        setError(extractErrorMessage(err, 'Failed to delete Sales Order.'));
       }
     }
   };
@@ -155,7 +155,7 @@ const Sales = () => {
         await apiClient.post(`/sales/invoices/${inv.id}/cancel`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to cancel Tax Invoice.');
+        setError(extractErrorMessage(err, 'Failed to cancel Tax Invoice.'));
       }
     }
   };
@@ -166,7 +166,7 @@ const Sales = () => {
         await apiClient.delete(`/sales/invoices/${inv.id}`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete Tax Invoice.');
+        setError(extractErrorMessage(err, 'Failed to delete Tax Invoice.'));
       }
     }
   };

@@ -289,7 +289,7 @@ const Purchase = () => {
         await apiClient.post(`/purchase/po/${po.id}/cancel`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to cancel Purchase Order.');
+        setError(extractErrorMessage(err, 'Failed to cancel Purchase Order.'));
       }
     }
   };
@@ -300,7 +300,7 @@ const Purchase = () => {
         await apiClient.delete(`/purchase/po/${po.id}`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete Purchase Order.');
+        setError(extractErrorMessage(err, 'Failed to delete Purchase Order.'));
       }
     }
   };
@@ -311,7 +311,7 @@ const Purchase = () => {
         await apiClient.post(`/purchase/grn/${grn.id}/cancel`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to cancel Goods Receipt Note.');
+        setError(extractErrorMessage(err, 'Failed to cancel Goods Receipt Note.'));
       }
     }
   };
@@ -322,7 +322,7 @@ const Purchase = () => {
         await apiClient.delete(`/purchase/grn/${grn.id}`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete GRN.');
+        setError(extractErrorMessage(err, 'Failed to delete GRN.'));
       }
     }
   };
@@ -333,7 +333,7 @@ const Purchase = () => {
         await apiClient.post(`/purchase/bills/${bill.id}/cancel`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to cancel Purchase Entry Bill.');
+        setError(extractErrorMessage(err, 'Failed to cancel Purchase Entry Bill.'));
       }
     }
   };
@@ -344,7 +344,7 @@ const Purchase = () => {
         await apiClient.delete(`/purchase/bills/${bill.id}`);
         loadData();
       } catch (err) {
-        setError(err.response?.data?.detail || 'Failed to delete Purchase Bill.');
+        setError(extractErrorMessage(err, 'Failed to delete Purchase Bill.'));
       }
     }
   };

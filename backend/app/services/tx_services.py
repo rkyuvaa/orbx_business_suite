@@ -1316,6 +1316,142 @@ class TxServices:
         return payments
 
     @staticmethod
+    async def get_sales_order(db: AsyncSession, so_id: UUID) -> SalesOrder:
+        """Fetch a single Sales Order with all relationships and dynamic properties populated."""
+        stmt = (
+            select(SalesOrder)
+            .filter(SalesOrder.id == so_id)
+            .options(
+                selectinload(SalesOrder.customer),
+                selectinload(SalesOrder.items).selectinload(SalesOrderItem.product)
+            )
+        )
+        q = await db.execute(stmt)
+        so = q.scalar_one_or_none()
+        if not so:
+            raise HTTPException(status_code=404, detail="Sales Order not found.")
+        so.customer_name = so.customer.name if so.customer else "Unknown"
+        so.customer_gstin = so.customer.gstin if so.customer else None
+        so.customer_billing_address = so.customer.billing_address if so.customer else None
+        so.customer_shipping_address = so.customer.shipping_address if so.customer else None
+        for item in so.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
+        return so
+
+    @staticmethod
+    async def get_invoice(db: AsyncSession, invoice_id: UUID) -> Invoice:
+        """Fetch a single Invoice with all relationships and dynamic properties populated."""
+        stmt = (
+            select(Invoice)
+            .filter(Invoice.id == invoice_id)
+            .options(
+                selectinload(Invoice.items).selectinload(InvoiceItem.product),
+                selectinload(Invoice.sales_order).selectinload(SalesOrder.customer),
+                selectinload(Invoice.payments),
+                selectinload(Invoice.delivery_challan)
+            )
+        )
+        q = await db.execute(stmt)
+        inv = q.scalar_one_or_none()
+        if not inv:
+            raise HTTPException(status_code=404, detail="Invoice not found.")
+        total_paid = sum([p.amount_paid for p in inv.payments]) if inv.payments else 0.0
+        inv.outstanding_amount = max(0.0, inv.total_amount - total_paid)
+        inv.delivery_challan_number = inv.delivery_challan.challan_number if inv.delivery_challan else None
+        inv.sales_order_number = inv.sales_order.so_number if inv.sales_order else None
+        if inv.sales_order and inv.sales_order.customer:
+            inv.customer_name = inv.sales_order.customer.name
+            inv.customer_id = inv.sales_order.customer.id
+            inv.customer_gstin = inv.sales_order.customer.gstin
+            inv.customer_email = inv.sales_order.customer.email
+            inv.customer_billing_address = inv.sales_order.customer.billing_address
+            inv.customer_shipping_address = inv.sales_order.customer.shipping_address
+        else:
+            inv.customer_name = "Unknown"
+            inv.customer_id = None
+            inv.customer_gstin = None
+            inv.customer_email = None
+            inv.customer_billing_address = None
+            inv.customer_shipping_address = None
+        for item in inv.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
+        return inv
+
+    @staticmethod
+    async def get_purchase_order(db: AsyncSession, po_id: UUID) -> PurchaseOrder:
+        """Fetch a single Purchase Order with all relationships and dynamic properties populated."""
+        stmt = (
+            select(PurchaseOrder)
+            .filter(PurchaseOrder.id == po_id)
+            .options(
+                selectinload(PurchaseOrder.supplier),
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.product),
+                selectinload(PurchaseOrder.grns).selectinload(GRN.purchase_entries)
+            )
+        )
+        q = await db.execute(stmt)
+        o = q.scalar_one_or_none()
+        if not o:
+            raise HTTPException(status_code=404, detail="Purchase Order not found.")
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        inv_nos = []
+        for grn in o.grns:
+            for pe in grn.purchase_entries:
+                if pe.invoice_number:
+                    inv_nos.append(pe.invoice_number)
+        o.supplier_invoice_no = ", ".join(inv_nos) if inv_nos else None
+        for item in o.items:
+            item.product_name = item.product.name if item.product else "Unknown"
+            item.sku = item.product.sku if item.product else ""
+            item.hsn_code = item.product.hsn_code if item.product else ""
+        return o
+
+    @staticmethod
+    async def get_grn(db: AsyncSession, grn_id: UUID) -> GRN:
+        """Fetch a single GRN with items and purchase order supplier populated."""
+        stmt = (
+            select(GRN)
+            .filter(GRN.id == grn_id)
+            .options(
+                selectinload(GRN.items),
+                selectinload(GRN.purchase_order).selectinload(PurchaseOrder.supplier)
+            )
+        )
+        q = await db.execute(stmt)
+        grn = q.scalar_one_or_none()
+        if not grn:
+            raise HTTPException(status_code=404, detail="GRN not found.")
+        return grn
+
+    @staticmethod
+    async def get_purchase_entry(db: AsyncSession, bill_id: UUID) -> PurchaseEntry:
+        """Fetch a single Purchase Entry Bill with all relationships populated."""
+        stmt = (
+            select(PurchaseEntry)
+            .filter(PurchaseEntry.id == bill_id)
+            .options(
+                selectinload(PurchaseEntry.supplier),
+                selectinload(PurchaseEntry.payments),
+                selectinload(PurchaseEntry.payable_ledger),
+                selectinload(PurchaseEntry.purchase_account),
+                selectinload(PurchaseEntry.tax_ledger),
+                selectinload(PurchaseEntry.journal_entry)
+            )
+        )
+        q = await db.execute(stmt)
+        o = q.scalar_one_or_none()
+        if not o:
+            raise HTTPException(status_code=404, detail="Purchase Entry bill not found.")
+        total_paid = sum([p.amount_paid for p in o.payments]) if o.payments else 0.0
+        o.outstanding_amount = max(0.0, o.total_amount - total_paid)
+        o.supplier_name = o.supplier.name if o.supplier else "Unknown"
+        return o
+
+    @staticmethod
     async def cancel_sales_order(db: AsyncSession, so_id: UUID) -> SalesOrder:
         """Cancel a Sales Order if it has no active Tax Invoices."""
         q_so = await db.execute(
@@ -1335,8 +1471,7 @@ class TxServices:
         so.status = "Cancelled"
         db.add(so)
         await db.commit()
-        await db.refresh(so)
-        return so
+        return await TxServices.get_sales_order(db, so.id)
 
     @staticmethod
     async def cancel_invoice(db: AsyncSession, invoice_id: UUID) -> Invoice:
@@ -1373,30 +1508,19 @@ class TxServices:
         )
         stock_txs = q_stock.scalars().all()
         for st in stock_txs:
-            rev_tx = StockTransaction(
-                product_id=st.product_id,
-                branch_id=st.branch_id,
-                qty=-st.qty,
-                transaction_type="Adjustment",
-                reference_type="InvoiceCancel",
-                reference_id=invoice_id,
-                reason=f"Stock reversal for Cancelled Invoice {inv.invoice_number}"
-            )
-            db.add(rev_tx)
             await TxServices.update_stock(
                 db=db,
                 product_id=st.product_id,
                 branch_id=st.branch_id,
                 qty_change=-st.qty,
-                tx_type="Adjustment",
+                tx_type="In",
                 ref_type="InvoiceCancel",
                 ref_id=invoice_id,
                 reason=f"Stock reversal for Cancelled Invoice {inv.invoice_number}"
             )
             
         await db.commit()
-        await db.refresh(inv)
-        return inv
+        return await TxServices.get_invoice(db, inv.id)
 
     @staticmethod
     async def cancel_purchase_order(db: AsyncSession, po_id: UUID) -> PurchaseOrder:
@@ -1417,8 +1541,7 @@ class TxServices:
         po.status = "Cancelled"
         db.add(po)
         await db.commit()
-        await db.refresh(po)
-        return po
+        return await TxServices.get_purchase_order(db, po.id)
 
     @staticmethod
     async def cancel_grn(db: AsyncSession, grn_id: UUID) -> GRN:
@@ -1456,30 +1579,19 @@ class TxServices:
         )
         stock_txs = q_stock.scalars().all()
         for st in stock_txs:
-            rev_tx = StockTransaction(
-                product_id=st.product_id,
-                branch_id=st.branch_id,
-                qty=-st.qty,
-                transaction_type="Adjustment",
-                reference_type="GRNCancel",
-                reference_id=grn_id,
-                reason=f"Stock reversal for Cancelled GRN"
-            )
-            db.add(rev_tx)
             await TxServices.update_stock(
                 db=db,
                 product_id=st.product_id,
                 branch_id=st.branch_id,
                 qty_change=-st.qty,
-                tx_type="Adjustment",
+                tx_type="Out",
                 ref_type="GRNCancel",
                 ref_id=grn_id,
                 reason=f"Stock reversal for Cancelled GRN"
             )
             
         await db.commit()
-        await db.refresh(grn)
-        return grn
+        return await TxServices.get_grn(db, grn.id)
 
     @staticmethod
     async def cancel_purchase_entry(db: AsyncSession, bill_id: UUID) -> PurchaseEntry:
@@ -1492,8 +1604,7 @@ class TxServices:
         bill.status = "Cancelled"
         db.add(bill)
         await db.commit()
-        await db.refresh(bill)
-        return bill
+        return await TxServices.get_purchase_entry(db, bill.id)
 
     @staticmethod
     async def cancel_payment(db: AsyncSession, payment_id: UUID) -> None:
