@@ -27,7 +27,7 @@ services:
     volumes:
       - ./backend:/app
     ports:
-      - "8000:8000"
+      - "8002:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@db:5432/${POSTGRES_DB:-erp_db}
       - SECRET_KEY=${SECRET_KEY:-super_secret_jwt_key_please_change_in_production}
@@ -50,7 +50,7 @@ services:
     container_name: erp_frontend
     restart: always
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       - backend
 
